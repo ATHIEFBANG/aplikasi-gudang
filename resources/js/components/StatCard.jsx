@@ -1,4 +1,4 @@
-import GlassCard from '@/Components/GlassCard';
+import GlassCard from '@/components/GlassCard';
 
 export default function StatCard({ title, value, subtext, icon: Icon, variant = 'danger' }) {
     const accentColors = {

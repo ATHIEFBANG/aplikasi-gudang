@@ -22,7 +22,7 @@ import {
     CartesianGrid, 
     Legend 
 } from 'recharts';
-import Map from '@/Components/Map';
+import Map from '@/components/Map';
 
 export default function StatistikSmartkey({ data = [] }) {
     // State untuk toggle visibilitas series BarChart via Legend
