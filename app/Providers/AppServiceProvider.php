@@ -2,24 +2,21 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\URL; // <-- 1. Tambahkan baris ini
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-        Vite::prefetch(concurrency: 3);
+        // 2. Tambahkan baris ini untuk memaksa HTTPS di Vercel/Production
+        if (config('app.env') !== 'local') {
+            URL::forceScheme('https');
+        }
     }
 }
