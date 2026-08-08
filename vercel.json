@@ -9,11 +9,11 @@
     "routes": [
         {
             "src": "/build/(.*)",
-            "dest": "/build/$1"
+            "dest": "/public/build/$1"
         },
         {
             "src": "/(favicon.ico|robots.txt|storage/.*|assets/.*)",
-            "dest": "/$1"
+            "dest": "/public/$1"
         },
         {
             "handle": "filesystem"
