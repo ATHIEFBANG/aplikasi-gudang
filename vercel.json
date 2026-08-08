@@ -12,6 +12,13 @@
             "dest": "/build/$1"
         },
         {
+            "src": "/(favicon.ico|robots.txt|storage/.*|assets/.*)",
+            "dest": "/$1"
+        },
+        {
+            "handle": "filesystem"
+        },
+        {
             "src": "/(.*)",
             "dest": "/api/index.php"
         }
