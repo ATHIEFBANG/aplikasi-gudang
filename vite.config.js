@@ -6,8 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            // Ubah bagian input ini menjadi array yang memuat CSS & JS
-            input: ['resources/css/app.css', 'resources/js/app.jsx'], 
+            input: 'resources/js/app.jsx', // Cukup app.jsx saja
             refresh: true,
             buildDirectory: 'build',
         }),
