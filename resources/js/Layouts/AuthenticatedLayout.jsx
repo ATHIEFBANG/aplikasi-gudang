@@ -8,7 +8,6 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -24,7 +23,8 @@ import {
     Menu,
     X,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Shield
 } from 'lucide-react';
 
 // Context Universal untuk Confirm Modal
@@ -35,6 +35,7 @@ const ROUTE_FALLBACKS = {
     'home': '/home',
     'maintenance.dashboard': '/maintenance/dashboard',
     'maintenance.data-management.index': '/maintenance/data-management',
+    'admin.users.index': '/admin/users', // Fallback route Admin Panel
     'profile.edit': '/profile',
     'logout': '/logout',
 };
@@ -200,7 +201,9 @@ export default function AuthenticatedLayout({ header, children }) {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-3 sm:gap-4">
+                        {/* POJOK KANAN ATAS (Theme, Admin Panel Button, & Profile) */}
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            {/* 1. TOMBOL TEMA */}
                             <button
                                 onClick={toggleTheme}
                                 className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:scale-105 transition-all shadow-sm"
@@ -209,7 +212,23 @@ export default function AuthenticatedLayout({ header, children }) {
                                 {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
                             </button>
 
-                            {/* SHADCN DROPDOWN MENU */}
+                            {/* 2. 🟢 TOMBOL ADMIN PANEL (1 TUNGGAL DI SAMPING TOMBOL TEMA) */}
+                            {user?.role === 'admin' && (
+                                <Link
+                                    href={getRoute('admin.users.index')}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-sm border ${
+                                        checkActive('admin.users.index')
+                                            ? 'bg-red-600 text-white border-red-600 shadow-red-600/30'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-red-600 dark:text-red-400 border-slate-200 dark:border-white/10 hover:bg-red-500/10'
+                                    }`}
+                                    title="Admin Panel"
+                                >
+                                    <Shield className="w-4 h-4 text-red-500 dark:text-red-400" />
+                                    <span>Admin Panel</span>
+                                </Link>
+                            )}
+
+                            {/* 3. SHADCN DROPDOWN MENU PROFIL */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button
@@ -225,18 +244,40 @@ export default function AuthenticatedLayout({ header, children }) {
                                 </DropdownMenuTrigger>
 
                                 <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-1 z-[60]">
-                                    <DropdownMenuLabel className="px-3 py-2">
+                                    {/* USER INFO HEADER */}
+                                    <div className="px-3 py-2">
                                         <p className="font-semibold text-slate-900 dark:text-white text-sm">{user?.name}</p>
+                                        
+                                        {/* 🟢 TAMPILAN ROLE DI BAWAH NAMA */}
+                                        <div className="mt-1 mb-1">
+                                            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400 border border-red-500/20">
+                                                {user?.role || 'User'}
+                                            </span>
+                                        </div>
+
                                         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
-                                    </DropdownMenuLabel>
+                                    </div>
+
                                     <DropdownMenuSeparator className="bg-slate-100 dark:bg-white/10 my-1" />
-                                    <DropdownMenuItem asChild className="cursor-pointer rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 focus:bg-slate-100 dark:focus:bg-white/10">
-                                        <Link href={getRoute('profile.edit')} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
+                                    
+                                    {/* MENU PROFILE */}
+                                    <DropdownMenuItem className="p-0 focus:bg-transparent">
+                                        <Link 
+                                            href={getRoute('profile.edit')} 
+                                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                                        >
                                             <UserIcon className="w-4 h-4 text-slate-400" /> Profile
                                         </Link>
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem asChild className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10 text-red-600 dark:text-red-400">
-                                        <Link href={getRoute('logout')} method="post" as="button" className="w-full flex items-center gap-2 px-3 py-2 text-sm">
+
+                                    {/* LOGOUT */}
+                                    <DropdownMenuItem className="p-0 focus:bg-transparent">
+                                        <Link 
+                                            href={getRoute('logout')} 
+                                            method="post" 
+                                            as="button" 
+                                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors text-left"
+                                        >
                                             <LogOut className="w-4 h-4" /> Log Out
                                         </Link>
                                     </DropdownMenuItem>
@@ -372,7 +413,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     {children}
                 </main>
 
-                {/* TOAST NOTIFIKASI UNIVERSAL (Pojok Kanan Bawah) */}
+                {/* TOAST NOTIFIKASI UNIVERSAL */}
                 <Toast
                     key={toastState.key}
                     isOpen={toastState.isOpen}
@@ -383,7 +424,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     onClose={() => setToastState(prev => ({ ...prev, isOpen: false }))}
                 />
 
-                {/* CONFIRM MODAL UNIVERSAL (Pojok Kanan Bawah) */}
+                {/* CONFIRM MODAL UNIVERSAL */}
                 <ConfirmModal
                     isOpen={confirmState.isOpen}
                     title={confirmState.title}

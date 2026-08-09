@@ -24,6 +24,7 @@ class PasswordController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        return back();
+        // 🟢 Tambahkan ->with('success', ...)
+        return back()->with('success', 'Kata sandi Anda berhasil diperbarui!');
     }
 }

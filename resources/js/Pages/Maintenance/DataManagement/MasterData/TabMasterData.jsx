@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Activity, KeyRound, ChevronLeft, ChevronRight } from 'lucide-react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react'; // 👈 Tambah usePage
 
 // Shadcn UI
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 // IMPORT TOOLBAR, TABEL, DAN HOOK CONFIRM UNIVERSAL
 import Toolbar from '@/components/Toolbar';
 import CrudTable from './CrudTable';
-import { useConfirm } from '@/Layouts/AuthenticatedLayout'; // 👈 Pakai Hook Universal
+import { useConfirm } from '@/Layouts/AuthenticatedLayout';
 
 const safeRoute = (name, params) => {
     if (typeof window !== 'undefined' && typeof window.route === 'function') {
@@ -24,7 +24,12 @@ const safeRoute = (name, params) => {
 const getItemId = (item) => item?.id || item?.rpm_id || item?.serial_number;
 
 export default function TabMasterData({ rpmMasters, smartkeyMasters, filters }) {
-    const confirm = useConfirm(); // 👈 Inisialisasi Confirm Modal Universal
+    // 🔒 DETEKSI ROLE USER DARI INERTIA AUTH
+    const { auth } = usePage().props;
+    const userRole = auth?.user?.role || 'view';
+    const isAdmin = userRole === 'admin';
+
+    const confirm = useConfirm();
     const [subTab, setSubTab] = useState(filters?.tab || 'rpm');
     
     // State Filter & Pagination
@@ -159,9 +164,9 @@ export default function TabMasterData({ rpmMasters, smartkeyMasters, filters }) 
         }
     };
 
-    // --- HANDLE HAPUS DATA TERPILIH ---
+    // --- HANDLE HAPUS DATA TERPILIH (HANYA ADMIN) ---
     const handleDeleteSelected = () => {
-        if (selectedIds.length === 0) return;
+        if (!isAdmin || selectedIds.length === 0) return;
 
         confirm({
             title: `Hapus Data Master ${subTab.toUpperCase()}`,
@@ -185,8 +190,10 @@ export default function TabMasterData({ rpmMasters, smartkeyMasters, filters }) 
         });
     };
 
-    // --- HANDLE RESET TABLE ---
+    // --- HANDLE RESET TABLE (HANYA ADMIN) ---
     const handleResetTable = () => {
+        if (!isAdmin) return;
+
         confirm({
             title: `Kosongkan Master Data ${subTab.toUpperCase()}`,
             message: `Apakah Anda yakin ingin MENGOSONGKAN SELURUH data Master ${subTab.toUpperCase()}? Tindakan ini akan menghapus semua data di tabel ini.`,
@@ -219,8 +226,9 @@ export default function TabMasterData({ rpmMasters, smartkeyMasters, filters }) 
                 sortOrder={sortOrder}
                 onToggleSort={toggleSort}
                 selectedCount={selectedIds.length}
-                onDeleteSelected={handleDeleteSelected}
-                onReset={handleResetTable}
+                /* 🔒 Hanya lewatkan fungsi aksi hapus & reset jika user adalah Admin */
+                onDeleteSelected={isAdmin ? handleDeleteSelected : undefined}
+                onReset={isAdmin ? handleResetTable : undefined}
                 onExport={handleExportData}
                 isProcessing={isProcessing}
                 leftContent={

@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus, Trash2, PlusCircle, ClipboardPaste, AlertCircle } from 'lucide-react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react'; // 👈 Tambah usePage
 
 // IMPORT PERABOTAN KITA
 import Tabel from '@/components/Tabel';
@@ -49,6 +49,11 @@ export default function CrudTable({
     onSelectRow,
     getRowNumber
 }) {
+    // 🔒 DETEKSI ROLE USER DARI INERTIA AUTH
+    const { auth } = usePage().props;
+    const userRole = auth?.user?.role || 'view';
+    const canWrite = userRole === 'admin' || userRole === 'staff'; // 👈 Admin & Staff boleh Edit/Tambah
+
     const getFieldValue = useCallback((item, colDef) => {
         if (!item || !colDef) return '';
         if (colDef.altKeys && Array.isArray(colDef.altKeys)) {
@@ -190,12 +195,12 @@ export default function CrudTable({
     }, [subTab, createEmptyRow]);
 
     const handleContainerPaste = useCallback((e) => {
-        if (isEditMode) return;
+        if (isEditMode || !canWrite) return;
         const pastedText = e.clipboardData.getData('text');
         if (parseAndApplyExcelData(pastedText)) {
             e.preventDefault();
         }
-    }, [isEditMode, parseAndApplyExcelData]);
+    }, [isEditMode, canWrite, parseAndApplyExcelData]);
 
     const handlePasteFromClipboardButton = useCallback(async () => {
         try {
@@ -209,12 +214,14 @@ export default function CrudTable({
     }, [parseAndApplyExcelData]);
 
     const handleOpenAddModal = useCallback(() => {
+        if (!canWrite) return;
         setIsEditMode(false);
         setAddItems([createEmptyRow()]);
         setIsModalOpen(true);
-    }, [createEmptyRow]);
+    }, [canWrite, createEmptyRow]);
 
     const handleOpenEditModal = useCallback((item) => {
+        if (!canWrite) return;
         setIsEditMode(true);
         const rawCols = TABLE_COLUMNS[subTab] || TABLE_COLUMNS.rpm;
         const formattedItem = { ...item };
@@ -225,7 +232,7 @@ export default function CrudTable({
         formattedItem.tahun = item.tahun || '';
         setEditData(formattedItem);
         setIsModalOpen(true);
-    }, [subTab, getFieldValue]);
+    }, [canWrite, subTab, getFieldValue]);
 
     const handleCloseModal = useCallback(() => {
         if (isProcessing) return;
@@ -264,6 +271,7 @@ export default function CrudTable({
 
     const handleSubmitForm = (e) => {
         e?.preventDefault();
+        if (!canWrite) return;
         setIsProcessing(true);
 
         const routeName = subTab === 'rpm' 
@@ -300,15 +308,18 @@ export default function CrudTable({
                     Kelola Data Master {subTab.toUpperCase()}
                 </span>
                 
-                <Button 
-                    type="button" 
-                    size="sm" 
-                    onClick={handleOpenAddModal}
-                    className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Tambah Data Baru</span>
-                </Button>
+                {/* 🔒 Sembunyikan Tombol Tambah jika role = view */}
+                {canWrite && (
+                    <Button 
+                        type="button" 
+                        size="sm" 
+                        onClick={handleOpenAddModal}
+                        className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Tambah Data Baru</span>
+                    </Button>
+                )}
             </div>
 
             {/* PERABOTAN TABEL */}
@@ -318,228 +329,231 @@ export default function CrudTable({
                 selectedIds={selectedIds}
                 onSelectAll={onSelectAll}
                 onSelectRow={onSelectRow}
-                onEditRow={handleOpenEditModal}
+                /* 🔒 Pasang null jika user = view agar tombol Edit di baris tabel disembunyikan */
+                onEditRow={canWrite ? handleOpenEditModal : undefined}
                 getItemId={getItemId}
                 getRowNumber={getRowNumber}
                 emptyMessage={`Belum ada data Master ${subTab.toUpperCase()}.`}
             />
 
             {/* PERABOTAN MODAL */}
-            <Modal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                title={`${isEditMode ? 'Edit Data' : 'Tambah Data Master'} (${subTab.toUpperCase()})`}
-                onSubmit={handleSubmitForm}
-                submitLabel={isEditMode ? 'Simpan Perubahan' : 'Simpan Semua Data'}
-                isProcessing={isProcessing}
-                onPaste={handleContainerPaste}
-                headerExtra={
-                    !isEditMode && (
-                        <div className="flex items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handlePasteFromClipboardButton}
-                                className="h-7 text-xs gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400"
-                            >
-                                <ClipboardPaste className="w-3.5 h-3.5" />
-                                <span>Paste dari Excel</span>
-                            </Button>
-                            <Badge 
-                                variant="secondary"
-                                className={addItems.length >= MAX_ROWS_LIMIT 
-                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' 
-                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                                }
-                            >
-                                {addItems.length} / {MAX_ROWS_LIMIT} Baris
-                            </Badge>
-                        </div>
-                    )
-                }
-            >
-                {/* NOTICE BANNER */}
-                {!isEditMode && (
-                    <Alert className="shrink-0 mb-3 bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 p-2.5 flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                        <AlertDescription className="text-[11px] leading-relaxed">
-                            <strong>Smart Paste (Maks {MAX_ROWS_LIMIT} Baris):</strong> Tekan <strong>Ctrl + V</strong> untuk menempelkan sel dari Excel. Pastikan urutan 9 kolom Excel RPM meliputi: <em>ID RPM, Site ID, RTP, Mitra, Bulan, Tahun, Tanggal Submit, Tanggal Approve, Status Approve</em>.
-                        </AlertDescription>
-                    </Alert>
-                )}
-
-                {/* FORM BODY */}
-                <div className="space-y-4">
-                    {isEditMode ? (
-                        /* MODE EDIT */
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
-                            {subTab === 'rpm' ? (
-                                <>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">ID RPM</Label>
-                                        <Input disabled={isProcessing} value={editData.rpm_id || ''} onChange={(e) => setEditData({ ...editData, rpm_id: e.target.value })} placeholder="ID RPM" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Site ID</Label>
-                                        <Input disabled={isProcessing} value={editData.site_id || editData.siteid || ''} onChange={(e) => setEditData({ ...editData, site_id: e.target.value, siteid: e.target.value })} placeholder="Site ID" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">RTP</Label>
-                                        <Input disabled={isProcessing} value={editData.rtp || ''} onChange={(e) => setEditData({ ...editData, rtp: e.target.value })} placeholder="RTP" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Mitra</Label>
-                                        <Input disabled={isProcessing} value={editData.mitra || ''} onChange={(e) => setEditData({ ...editData, mitra: e.target.value })} placeholder="Mitra" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Bulan</Label>
-                                        <Input disabled={isProcessing} value={editData.bulan || ''} onChange={(e) => setEditData({ ...editData, bulan: e.target.value })} placeholder="Bulan" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tahun</Label>
-                                        <Input disabled={isProcessing} value={editData.tahun || ''} onChange={(e) => setEditData({ ...editData, tahun: e.target.value })} placeholder="Tahun" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tanggal Submit</Label>
-                                        <Input type="date" disabled={isProcessing} value={editData.tanggal_submit || editData.tanggalsubn || ''} onChange={(e) => setEditData({ ...editData, tanggal_submit: e.target.value, tanggalsubn: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tanggal Approve</Label>
-                                        <Input type="date" disabled={isProcessing} value={editData.tanggal_approve || editData.tanggalappr || ''} onChange={(e) => setEditData({ ...editData, tanggal_approve: e.target.value, tanggalappr: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Approve Status</Label>
-                                        <Input disabled={isProcessing} value={editData.approve || ''} onChange={(e) => setEditData({ ...editData, approve: e.target.value })} placeholder="Status Approve" />
-                                    </div>
-                                </>
-                            ) : (
-                                (TABLE_COLUMNS[subTab] || TABLE_COLUMNS.smartkey).map((col) => (
-                                    <div key={col.key} className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{col.label}</Label>
-                                        <Input 
-                                            type={col.type || 'text'}
-                                            disabled={isProcessing}
-                                            value={editData[col.key] || ''} 
-                                            onChange={(e) => setEditData({ ...editData, [col.key]: e.target.value })} 
-                                            placeholder={`Masukkan ${col.label}`}
-                                        />
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    ) : (
-                        /* MODE TAMBAH MULTI-ROW */
-                        <div className="space-y-4">
-                            {addItems.map((item, itemIdx) => (
-                                <div 
-                                    key={`add-row-${itemIdx}`} 
-                                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 relative group space-y-3 transition-all"
+            {canWrite && (
+                <Modal
+                    isOpen={isModalOpen}
+                    onClose={handleCloseModal}
+                    title={`${isEditMode ? 'Edit Data' : 'Tambah Data Master'} (${subTab.toUpperCase()})`}
+                    onSubmit={handleSubmitForm}
+                    submitLabel={isEditMode ? 'Simpan Perubahan' : 'Simpan Semua Data'}
+                    isProcessing={isProcessing}
+                    onPaste={handleContainerPaste}
+                    headerExtra={
+                        !isEditMode && (
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handlePasteFromClipboardButton}
+                                    className="h-7 text-xs gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400"
                                 >
-                                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-                                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                                            Baris #{itemIdx + 1}
-                                        </span>
-                                        {addItems.length > 1 && (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleRemoveAddRow(itemIdx)}
-                                                className="h-7 px-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs gap-1"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" /> Hapus Baris
-                                            </Button>
+                                    <ClipboardPaste className="w-3.5 h-3.5" />
+                                    <span>Paste dari Excel</span>
+                                </Button>
+                                <Badge 
+                                    variant="secondary"
+                                    className={addItems.length >= MAX_ROWS_LIMIT 
+                                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' 
+                                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                    }
+                                >
+                                    {addItems.length} / {MAX_ROWS_LIMIT} Baris
+                                </Badge>
+                            </div>
+                        )
+                    }
+                >
+                    {/* NOTICE BANNER */}
+                    {!isEditMode && (
+                        <Alert className="shrink-0 mb-3 bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 p-2.5 flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                            <AlertDescription className="text-[11px] leading-relaxed">
+                                <strong>Smart Paste (Maks {MAX_ROWS_LIMIT} Baris):</strong> Tekan <strong>Ctrl + V</strong> untuk menempelkan sel dari Excel. Pastikan urutan 9 kolom Excel RPM meliputi: <em>ID RPM, Site ID, RTP, Mitra, Bulan, Tahun, Tanggal Submit, Tanggal Approve, Status Approve</em>.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* FORM BODY */}
+                    <div className="space-y-4">
+                        {isEditMode ? (
+                            /* MODE EDIT */
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
+                                {subTab === 'rpm' ? (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">ID RPM</Label>
+                                            <Input disabled={isProcessing} value={editData.rpm_id || ''} onChange={(e) => setEditData({ ...editData, rpm_id: e.target.value })} placeholder="ID RPM" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Site ID</Label>
+                                            <Input disabled={isProcessing} value={editData.site_id || editData.siteid || ''} onChange={(e) => setEditData({ ...editData, site_id: e.target.value, siteid: e.target.value })} placeholder="Site ID" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">RTP</Label>
+                                            <Input disabled={isProcessing} value={editData.rtp || ''} onChange={(e) => setEditData({ ...editData, rtp: e.target.value })} placeholder="RTP" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Mitra</Label>
+                                            <Input disabled={isProcessing} value={editData.mitra || ''} onChange={(e) => setEditData({ ...editData, mitra: e.target.value })} placeholder="Mitra" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Bulan</Label>
+                                            <Input disabled={isProcessing} value={editData.bulan || ''} onChange={(e) => setEditData({ ...editData, bulan: e.target.value })} placeholder="Bulan" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tahun</Label>
+                                            <Input disabled={isProcessing} value={editData.tahun || ''} onChange={(e) => setEditData({ ...editData, tahun: e.target.value })} placeholder="Tahun" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tanggal Submit</Label>
+                                            <Input type="date" disabled={isProcessing} value={editData.tanggal_submit || editData.tanggalsubn || ''} onChange={(e) => setEditData({ ...editData, tanggal_submit: e.target.value, tanggalsubn: e.target.value })} />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tanggal Approve</Label>
+                                            <Input type="date" disabled={isProcessing} value={editData.tanggal_approve || editData.tanggalappr || ''} onChange={(e) => setEditData({ ...editData, tanggal_approve: e.target.value, tanggalappr: e.target.value })} />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Approve Status</Label>
+                                            <Input disabled={isProcessing} value={editData.approve || ''} onChange={(e) => setEditData({ ...editData, approve: e.target.value })} placeholder="Status Approve" />
+                                        </div>
+                                    </>
+                                ) : (
+                                    (TABLE_COLUMNS[subTab] || TABLE_COLUMNS.smartkey).map((col) => (
+                                        <div key={col.key} className="space-y-1.5">
+                                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{col.label}</Label>
+                                            <Input 
+                                                type={col.type || 'text'}
+                                                disabled={isProcessing}
+                                                value={editData[col.key] || ''} 
+                                                onChange={(e) => setEditData({ ...editData, [col.key]: e.target.value })} 
+                                                placeholder={`Masukkan ${col.label}`}
+                                            />
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        ) : (
+                            /* MODE TAMBAH MULTI-ROW */
+                            <div className="space-y-4">
+                                {addItems.map((item, itemIdx) => (
+                                    <div 
+                                        key={`add-row-${itemIdx}`} 
+                                        className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 relative group space-y-3 transition-all"
+                                    >
+                                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+                                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                                                Baris #{itemIdx + 1}
+                                            </span>
+                                            {addItems.length > 1 && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRemoveAddRow(itemIdx)}
+                                                    className="h-7 px-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs gap-1"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" /> Hapus Baris
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {subTab === 'rpm' ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">ID RPM</Label>
+                                                    <Input disabled={isProcessing} value={item.rpm_id || ''} onChange={(e) => handleAddItemChange(itemIdx, 'rpm_id', e.target.value)} placeholder="ID RPM" className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Site ID</Label>
+                                                    <Input disabled={isProcessing} value={item.site_id || item.siteid || ''} onChange={(e) => handleAddItemChange(itemIdx, 'site_id', e.target.value)} placeholder="Site ID" className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">RTP</Label>
+                                                    <Input disabled={isProcessing} value={item.rtp || ''} onChange={(e) => handleAddItemChange(itemIdx, 'rtp', e.target.value)} placeholder="RTP" className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Mitra</Label>
+                                                    <Input disabled={isProcessing} value={item.mitra || ''} onChange={(e) => handleAddItemChange(itemIdx, 'mitra', e.target.value)} placeholder="Mitra" className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Bulan</Label>
+                                                    <Input disabled={isProcessing} value={item.bulan || ''} onChange={(e) => handleAddItemChange(itemIdx, 'bulan', e.target.value)} placeholder="Bulan" className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tahun</Label>
+                                                    <Input disabled={isProcessing} value={item.tahun || ''} onChange={(e) => handleAddItemChange(itemIdx, 'tahun', e.target.value)} placeholder="Tahun" className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Submit</Label>
+                                                    <Input type="date" disabled={isProcessing} value={item.tanggal_submit || item.tanggalsubn || ''} onChange={(e) => handleAddItemChange(itemIdx, 'tanggal_submit', e.target.value)} className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Approve</Label>
+                                                    <Input type="date" disabled={isProcessing} value={item.tanggal_approve || item.tanggalappr || ''} onChange={(e) => handleAddItemChange(itemIdx, 'tanggal_approve', e.target.value)} className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Status Approve</Label>
+                                                    <Input disabled={isProcessing} value={item.approve || ''} onChange={(e) => handleAddItemChange(itemIdx, 'approve', e.target.value)} placeholder="Status Approve" className="h-8 text-xs bg-white dark:bg-slate-900" />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                {(TABLE_COLUMNS[subTab] || TABLE_COLUMNS.smartkey).map((col) => (
+                                                    <div key={col.key} className="space-y-1">
+                                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{col.label}</Label>
+                                                        <Input 
+                                                            type={col.type || 'text'}
+                                                            disabled={isProcessing}
+                                                            value={item[col.key] || ''} 
+                                                            onChange={(e) => handleAddItemChange(itemIdx, col.key, e.target.value)} 
+                                                            placeholder={col.label}
+                                                            className="h-8 text-xs bg-white dark:bg-slate-900"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
                                     </div>
+                                ))}
 
-                                    {subTab === 'rpm' ? (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">ID RPM</Label>
-                                                <Input disabled={isProcessing} value={item.rpm_id || ''} onChange={(e) => handleAddItemChange(itemIdx, 'rpm_id', e.target.value)} placeholder="ID RPM" className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Site ID</Label>
-                                                <Input disabled={isProcessing} value={item.site_id || item.siteid || ''} onChange={(e) => handleAddItemChange(itemIdx, 'site_id', e.target.value)} placeholder="Site ID" className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">RTP</Label>
-                                                <Input disabled={isProcessing} value={item.rtp || ''} onChange={(e) => handleAddItemChange(itemIdx, 'rtp', e.target.value)} placeholder="RTP" className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Mitra</Label>
-                                                <Input disabled={isProcessing} value={item.mitra || ''} onChange={(e) => handleAddItemChange(itemIdx, 'mitra', e.target.value)} placeholder="Mitra" className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Bulan</Label>
-                                                <Input disabled={isProcessing} value={item.bulan || ''} onChange={(e) => handleAddItemChange(itemIdx, 'bulan', e.target.value)} placeholder="Bulan" className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tahun</Label>
-                                                <Input disabled={isProcessing} value={item.tahun || ''} onChange={(e) => handleAddItemChange(itemIdx, 'tahun', e.target.value)} placeholder="Tahun" className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Submit</Label>
-                                                <Input type="date" disabled={isProcessing} value={item.tanggal_submit || item.tanggalsubn || ''} onChange={(e) => handleAddItemChange(itemIdx, 'tanggal_submit', e.target.value)} className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Approve</Label>
-                                                <Input type="date" disabled={isProcessing} value={item.tanggal_approve || item.tanggalappr || ''} onChange={(e) => handleAddItemChange(itemIdx, 'tanggal_approve', e.target.value)} className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Status Approve</Label>
-                                                <Input disabled={isProcessing} value={item.approve || ''} onChange={(e) => handleAddItemChange(itemIdx, 'approve', e.target.value)} placeholder="Status Approve" className="h-8 text-xs bg-white dark:bg-slate-900" />
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {(TABLE_COLUMNS[subTab] || TABLE_COLUMNS.smartkey).map((col) => (
-                                                <div key={col.key} className="space-y-1">
-                                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{col.label}</Label>
-                                                    <Input 
-                                                        type={col.type || 'text'}
-                                                        disabled={isProcessing}
-                                                        value={item[col.key] || ''} 
-                                                        onChange={(e) => handleAddItemChange(itemIdx, col.key, e.target.value)} 
-                                                        placeholder={col.label}
-                                                        className="h-8 text-xs bg-white dark:bg-slate-900"
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                <div className="flex items-center gap-2 pt-1">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleAddMoreRows(1)}
+                                        disabled={isProcessing || addItems.length >= MAX_ROWS_LIMIT}
+                                        className="h-8 text-xs gap-1.5"
+                                    >
+                                        <PlusCircle className="w-3.5 h-3.5" />
+                                        <span>Tambah 1 Baris</span>
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleAddMoreRows(5)}
+                                        disabled={isProcessing || addItems.length >= MAX_ROWS_LIMIT}
+                                        className="h-8 text-xs gap-1.5"
+                                    >
+                                        <PlusCircle className="w-3.5 h-3.5" />
+                                        <span>Tambah 5 Baris</span>
+                                    </Button>
                                 </div>
-                            ))}
-
-                            <div className="flex items-center gap-2 pt-1">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleAddMoreRows(1)}
-                                    disabled={isProcessing || addItems.length >= MAX_ROWS_LIMIT}
-                                    className="h-8 text-xs gap-1.5"
-                                >
-                                    <PlusCircle className="w-3.5 h-3.5" />
-                                    <span>Tambah 1 Baris</span>
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleAddMoreRows(5)}
-                                    disabled={isProcessing || addItems.length >= MAX_ROWS_LIMIT}
-                                    className="h-8 text-xs gap-1.5"
-                                >
-                                    <PlusCircle className="w-3.5 h-3.5" />
-                                    <span>Tambah 5 Baris</span>
-                                </Button>
                             </div>
-                        </div>
-                    )}
-                </div>
-            </Modal>
+                        )}
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 }

@@ -31,10 +31,18 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
+            
+            // 🟢 DATA AUTHENTICATION & ROLE
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user() ? [
+                    'id'    => $request->user()->id,
+                    'name'  => $request->user()->name,
+                    'email' => $request->user()->email,
+                    'role'  => $request->user()->role, // 👈 Terkirim otomatis ke React
+                ] : null,
             ],
-            // 👇 TAMBAHKAN BAGIAN FLASH INI 👇
+
+            // 🟢 FLASH MESSAGES (Untuk Toast Notifikasi CRUD)
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),

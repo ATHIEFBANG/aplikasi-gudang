@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DataManagementController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\UserController; // 🟢 CONTROLLER ADMIN USER
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +69,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/', 'destroy')->name('destroy');
     });
 
+    // 🟢 --- ADMIN USER MANAGEMENT (EKSPLISIT / TANPA RESOURCE) ---
+    Route::prefix('admin')
+        ->name('admin.users.')
+        ->controller(UserController::class)
+        ->group(function () {
+            Route::get('/users', 'index')->name('index');
+            Route::post('/users', 'store')->name('store');
+            Route::put('/users/{user}', 'update')->name('update');
+            Route::delete('/users/{user}', 'destroy')->name('destroy');
+            Route::post('/users/bulk-delete', 'bulkDelete')->name('bulk-delete');
+        });
+
     // --- MODUL MAINTENANCE ---
     Route::prefix('maintenance')->name('maintenance.')->group(function () {
 
@@ -87,7 +100,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::delete('/rpm/{id?}', 'destroyRpm')->name('destroy-rpm');
                 Route::post('/rpm/bulk-delete', 'bulkDestroyRpm')->name('bulk-destroy-rpm');
                 Route::post('/rpm/reset', 'resetRpm')->name('reset-rpm');
-                Route::post('/rpm/bulk-paste', 'bulkPasteRpm')->name('bulk-paste-rpm'); // ✅ Updated
+                Route::post('/rpm/bulk-paste', 'bulkPasteRpm')->name('bulk-paste-rpm');
                 Route::get('/rpm/export', 'exportRpm')->name('export-rpm');
                 Route::post('/rpm/process', 'processRpm')->name('process-rpm');
 
@@ -97,7 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::delete('/smartkey/{id?}', 'destroySmartkey')->name('destroy-smartkey');
                 Route::post('/smartkey/bulk-delete', 'bulkDestroySmartkey')->name('bulk-destroy-smartkey');
                 Route::post('/smartkey/reset', 'resetSmartkey')->name('reset-smartkey');
-                Route::post('/smartkey/bulk-paste', 'bulkPasteSmartkey')->name('bulk-paste-smartkey'); // ✅ Updated
+                Route::post('/smartkey/bulk-paste', 'bulkPasteSmartkey')->name('bulk-paste-smartkey');
                 Route::get('/smartkey/export', 'exportSmartkey')->name('export-smartkey');
                 Route::post('/smartkey/process', 'processSmartkey')->name('process-smartkey');
             });

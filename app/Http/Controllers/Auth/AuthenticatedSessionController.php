@@ -33,9 +33,10 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-       return redirect()->intended(route('home', absolute: false));
+        // 🟢 Tambahkan ->with('success', ...) agar memicu Toast Notifikasi di Layout
+        return redirect()->intended(route('home', absolute: false))
+            ->with('success', 'Selamat datang kembali, ' . Auth::user()->name . '!');
     }
-
     /**
      * Destroy an authenticated session.
      */

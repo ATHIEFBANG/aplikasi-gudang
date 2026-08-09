@@ -20,15 +20,16 @@ export default function Modal({
     submitLabel = 'Simpan',
     cancelLabel = 'Batal',
     isProcessing = false,
-    maxWidth = 'sm:max-w-3xl',
+    maxWidth = 'sm:max-w-xl',
     showFooter = true,
-    headerExtra, // Untuk komponen tambahan di header (seperti Badge / Tombol Paste Excel)
+    headerExtra,
     onPaste,
 }) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && !isProcessing && onClose?.()}>
             <DialogContent 
-                className={`${maxWidth} h-[85vh] flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50`}
+                /* DIUBAH: Menggunakan max-h-[85vh] h-auto agar tidak melar kebawah */
+                className={`${maxWidth} max-h-[85vh] h-auto flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50`}
                 onPaste={onPaste}
             >
                 {/* FIXED HEADER */}

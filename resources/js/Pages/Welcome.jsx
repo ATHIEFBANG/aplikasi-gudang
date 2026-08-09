@@ -1,6 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 
-// Helper logo (components/ c kecil)
+// Helper logo
 import AppLogo from '@/components/ApplicationLogo';
 
 // UI Primitives (shadcn/ui)
@@ -36,29 +36,22 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                             <AppLogo />
                         </Link>
 
-                        {/* Nav Action (Link Membungkus Button untuk Reliabilitas Klik) */}
+                        {/* Nav Action */}
                         <nav className="flex items-center gap-3">
                             {auth.user ? (
-                                <Link href="/dashboard">
+                                <Link href={route('home')}>
                                     <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm">
                                         <LayoutDashboard className="mr-2 h-4 w-4" />
                                         Dashboard
                                     </Button>
                                 </Link>
                             ) : (
-                                <>
-                                    <Link href="/login">
-                                        <Button variant="ghost" size="sm" className="text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 font-medium">
-                                            <LogIn className="mr-2 h-4 w-4" />
-                                            Masuk
-                                        </Button>
-                                    </Link>
-                                    <Link href="/register">
-                                        <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm">
-                                            Portal Partner
-                                        </Button>
-                                    </Link>
-                                </>
+                                <Link href={route('login')}>
+                                    <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm">
+                                        <LogIn className="mr-2 h-4 w-4" />
+                                        Masuk
+                                    </Button>
+                                </Link>
                             )}
                         </nav>
                     </div>
@@ -88,26 +81,19 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
                             <div className="flex flex-wrap items-center gap-3 pt-2">
                                 {auth.user ? (
-                                    <Link href="/dashboard">
+                                    <Link href={route('home')}>
                                         <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 shadow-sm">
                                             Buka Command Center
                                             <ArrowRight className="ml-2 h-4 w-4" />
                                         </Button>
                                     </Link>
                                 ) : (
-                                    <>
-                                        <Link href="/login">
-                                            <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 shadow-sm">
-                                                Masuk ke Sistem
-                                                <ArrowRight className="ml-2 h-4 w-4" />
-                                            </Button>
-                                        </Link>
-                                        <Link href="/register">
-                                            <Button size="lg" variant="outline" className="border-slate-300 dark:border-slate-700 font-semibold px-6">
-                                                Registrasi Tenant
-                                            </Button>
-                                        </Link>
-                                    </>
+                                    <Link href={route('login')}>
+                                        <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 shadow-sm">
+                                            Masuk ke Sistem
+                                            <ArrowRight className="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </Link>
                                 )}
                             </div>
                         </div>
@@ -149,7 +135,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
                     </div>
 
-                    {/* Modul Utama / Key System Modules */}
+                    {/* Modul Utama */}
                     <div className="mt-20">
                         <div className="mb-8">
                             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Modul Layanan Utama</h2>
