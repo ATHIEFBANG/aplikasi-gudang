@@ -6,9 +6,10 @@ import { router } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-// IMPORT PERABOTAN TOOLBAR & KOMPONEN TABEL CRUD
+// IMPORT TOOLBAR, TABEL, DAN HOOK CONFIRM UNIVERSAL
 import Toolbar from '@/components/Toolbar';
 import CrudTable from './CrudTable';
+import { useConfirm } from '@/Layouts/AuthenticatedLayout'; // 👈 Pakai Hook Universal
 
 const safeRoute = (name, params) => {
     if (typeof window !== 'undefined' && typeof window.route === 'function') {
@@ -23,6 +24,7 @@ const safeRoute = (name, params) => {
 const getItemId = (item) => item?.id || item?.rpm_id || item?.serial_number;
 
 export default function TabMasterData({ rpmMasters, smartkeyMasters, filters }) {
+    const confirm = useConfirm(); // 👈 Inisialisasi Confirm Modal Universal
     const [subTab, setSubTab] = useState(filters?.tab || 'rpm');
     
     // State Filter & Pagination
@@ -157,35 +159,52 @@ export default function TabMasterData({ rpmMasters, smartkeyMasters, filters }) 
         }
     };
 
+    // --- HANDLE HAPUS DATA TERPILIH ---
     const handleDeleteSelected = () => {
         if (selectedIds.length === 0) return;
-        if (!confirm(`Apakah Anda yakin ingin MENGHAPUS ${selectedIds.length} data terpilih?`)) return;
 
-        const routeName = subTab === 'rpm' 
-            ? 'maintenance.data-management.destroy-rpm' 
-            : 'maintenance.data-management.destroy-smartkey';
+        confirm({
+            title: `Hapus Data Master ${subTab.toUpperCase()}`,
+            message: `Apakah Anda yakin ingin MENGHAPUS ${selectedIds.length} data terpilih? Data yang dihapus tidak dapat dikembalikan.`,
+            variant: 'danger',
+            confirmText: 'Ya, Hapus Data',
+            cancelText: 'Batal',
+            onConfirm: () => {
+                const routeName = subTab === 'rpm' 
+                    ? 'maintenance.data-management.destroy-rpm' 
+                    : 'maintenance.data-management.destroy-smartkey';
 
-        router.delete(safeRoute(routeName), {
-            data: { ids: selectedIds },
-            preserveScroll: true,
-            onStart: () => setIsProcessing(true),
-            onSuccess: () => setSelectedIds([]),
-            onFinish: () => setIsProcessing(false)
+                router.delete(safeRoute(routeName), {
+                    data: { ids: selectedIds },
+                    preserveScroll: true,
+                    onStart: () => setIsProcessing(true),
+                    onSuccess: () => setSelectedIds([]),
+                    onFinish: () => setIsProcessing(false)
+                });
+            }
         });
     };
 
+    // --- HANDLE RESET TABLE ---
     const handleResetTable = () => {
-        if (!confirm(`Apakah Anda yakin ingin MENGOSONGKAN SELURUH data Master ${subTab.toUpperCase()}?`)) return;
-        
-        const routeName = subTab === 'rpm' 
-            ? 'maintenance.data-management.reset-rpm' 
-            : 'maintenance.data-management.reset-smartkey';
+        confirm({
+            title: `Kosongkan Master Data ${subTab.toUpperCase()}`,
+            message: `Apakah Anda yakin ingin MENGOSONGKAN SELURUH data Master ${subTab.toUpperCase()}? Tindakan ini akan menghapus semua data di tabel ini.`,
+            variant: 'danger',
+            confirmText: 'Ya, Kosongkan',
+            cancelText: 'Batal',
+            onConfirm: () => {
+                const routeName = subTab === 'rpm' 
+                    ? 'maintenance.data-management.reset-rpm' 
+                    : 'maintenance.data-management.reset-smartkey';
 
-        router.post(safeRoute(routeName), {}, {
-            preserveScroll: true,
-            onStart: () => setIsProcessing(true),
-            onSuccess: () => setSelectedIds([]),
-            onFinish: () => setIsProcessing(false),
+                router.post(safeRoute(routeName), {}, {
+                    preserveScroll: true,
+                    onStart: () => setIsProcessing(true),
+                    onSuccess: () => setSelectedIds([]),
+                    onFinish: () => setIsProcessing(false),
+                });
+            }
         });
     };
 
