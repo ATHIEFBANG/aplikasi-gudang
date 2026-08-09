@@ -19,7 +19,7 @@ export const MAP_STYLES = {
                         'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
                     ],
                     tileSize: 256,
-                    maxzoom: 19, // Mencegah error gambar hilang saat zoom in
+                    maxzoom: 19,
                     attribution: '&copy; CARTO',
                 },
             },
@@ -36,7 +36,7 @@ export const MAP_STYLES = {
                     type: 'raster',
                     tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
                     tileSize: 256,
-                    maxzoom: 18, // FIX: Menghindari "Map data not yet available" dari Esri
+                    maxzoom: 18,
                     attribution: '&copy; Esri World Imagery',
                 },
                 'esri-labels': {
@@ -80,7 +80,7 @@ export const DEFAULT_INDONESIA_CENTER = [117.8888, -2.4833];
 export const DEFAULT_INDONESIA_ZOOM = 4.5;
 
 // ==========================================
-// 2. HELPER PARSER KOORDINAT
+// 2. HELPER PARSER KOORDINAT UNIVERSAL
 // ==========================================
 export function parseCoordinates(item) {
     if (!item || typeof item !== 'object') return null;
@@ -138,7 +138,7 @@ export function parseCoordinates(item) {
 }
 
 // ==========================================
-// 3. KOMPONEN UI OVERLAY & CONTROLS
+// 3. KOMPONEN UI OVERLAY & CONTROLS UNIVERSAL
 // ==========================================
 export default function MapControls({
     currentStyle,
@@ -150,6 +150,7 @@ export default function MapControls({
     selectedStatus,
     onSelectStatus,
     statusCounts,
+    statusConfig = {},
 }) {
     return (
         <>
@@ -218,12 +219,13 @@ export default function MapControls({
                 </div>
             )}
 
-            {/* BOTTOM BAR FILTER STATUS */}
-            <div className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl">
+            {/* BOTTOM BAR FILTER STATUS (DINAMIS DARI PROPS) */}
+            <div className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-2xl max-w-[calc(100vw-32px)] overflow-x-auto scrollbar-none">
+                {/* Tombol ALL */}
                 <button
                     type="button"
                     onClick={() => onSelectStatus('ALL')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all duration-200 flex items-center gap-1.5 ${
+                    className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
                         selectedStatus === 'ALL'
                             ? 'bg-slate-800 text-white border border-slate-700 shadow-md'
                             : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -231,57 +233,57 @@ export default function MapControls({
                 >
                     <span>ALL</span>
                     <span className="px-1.5 py-0.2 text-[10px] rounded-md bg-slate-950/60 text-slate-300">
-                        {statusCounts.ALL}
+                        {statusCounts.ALL || 0}
                     </span>
                 </button>
 
-                <button
-                    type="button"
-                    onClick={() => onSelectStatus('LOCKED')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all duration-200 flex items-center gap-1.5 ${
-                        selectedStatus === 'LOCKED'
-                            ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-[0_0_10px_rgba(14,165,233,0.3)]'
-                            : 'text-slate-400 hover:text-sky-400 hover:bg-sky-500/10'
-                    }`}
-                >
-                    <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-                    <span>LOCKED</span>
-                    <span className="px-1.5 py-0.2 text-[10px] rounded-md bg-slate-950/60 text-sky-300">
-                        {statusCounts.LOCKED}
-                    </span>
-                </button>
+                {/* Tombol Dinamis berdasarkan statusConfig */}
+                {Object.entries(statusConfig).map(([key, cfg]) => {
+                    const isSelected = selectedStatus === key;
+                    const color = cfg.color || '#38bdf8';
+                    return (
+                        <button
+                            key={key}
+                            type="button"
+                            onClick={() => onSelectStatus(key)}
+                            style={{
+                                backgroundColor: isSelected ? `${color}20` : undefined,
+                                borderColor: isSelected ? `${color}60` : undefined,
+                                color: isSelected ? color : undefined,
+                            }}
+                            className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all duration-200 flex items-center gap-1.5 border whitespace-nowrap ${
+                                isSelected
+                                    ? 'shadow-md'
+                                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                            }`}
+                        >
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }}></span>
+                            <span>{cfg.label || key}</span>
+                            <span className="px-1.5 py-0.2 text-[10px] rounded-md bg-slate-950/60" style={{ color: color }}>
+                                {statusCounts[key] || 0}
+                            </span>
+                        </button>
+                    );
+                })}
 
-                <button
-                    type="button"
-                    onClick={() => onSelectStatus('UNLOCKED')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all duration-200 flex items-center gap-1.5 ${
-                        selectedStatus === 'UNLOCKED'
-                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
-                            : 'text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'
-                    }`}
-                >
-                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                    <span>UNLOCKED</span>
-                    <span className="px-1.5 py-0.2 text-[10px] rounded-md bg-slate-950/60 text-amber-300">
-                        {statusCounts.UNLOCKED}
-                    </span>
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => onSelectStatus('NA')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all duration-200 flex items-center gap-1.5 ${
-                        selectedStatus === 'NA'
-                            ? 'bg-slate-700/60 text-slate-200 border border-slate-500/50 shadow-md'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                    }`}
-                >
-                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                    <span>#N/A</span>
-                    <span className="px-1.5 py-0.2 text-[10px] rounded-md bg-slate-950/60 text-slate-300">
-                        {statusCounts.NA}
-                    </span>
-                </button>
+                {/* Tombol NA / Lainnya */}
+                {(statusCounts.NA > 0 || selectedStatus === 'NA') && (
+                    <button
+                        type="button"
+                        onClick={() => onSelectStatus('NA')}
+                        className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
+                            selectedStatus === 'NA'
+                                ? 'bg-slate-700/60 text-slate-200 border border-slate-500/50 shadow-md'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                        }`}
+                    >
+                        <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                        <span>#N/A</span>
+                        <span className="px-1.5 py-0.2 text-[10px] rounded-md bg-slate-950/60 text-slate-300">
+                            {statusCounts.NA || 0}
+                        </span>
+                    </button>
+                )}
             </div>
         </>
     );

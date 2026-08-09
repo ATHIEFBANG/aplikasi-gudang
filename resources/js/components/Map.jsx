@@ -4,11 +4,48 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 import MapControls, { MAP_STYLES, DEFAULT_INDONESIA_CENTER, DEFAULT_INDONESIA_ZOOM, parseCoordinates } from './MapControls';
 
+// 1. Default Status Config Netral
+const DEFAULT_STATUS_CONFIG = {
+    ACTIVE: {
+        label: 'ACTIVE',
+        color: '#38bdf8',
+        bg: 'rgba(14,165,233,0.35)',
+        badgeBg: 'rgba(14,165,233,0.15)',
+        badgeBorder: 'rgba(14,165,233,0.3)',
+    },
+    INACTIVE: {
+        label: 'INACTIVE',
+        color: '#fbbf24',
+        bg: 'rgba(245,158,11,0.35)',
+        badgeBg: 'rgba(245,158,11,0.15)',
+        badgeBorder: 'rgba(245,158,11,0.3)',
+    },
+};
+
+// 2. Default Popup Renderer Netral
+const DEFAULT_POPUP_RENDERER = (item, lat, lng) => {
+    const title = item.name || item.site_name || item.title || 'Location Detail';
+    const id = item.id || item.code || item.site_id || '-';
+    const statusText = item.status || item.state || 'N/A';
+
+    return {
+        title: title,
+        details: [
+            { label: 'ID / Code', value: id },
+            { label: 'Coordinates', value: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, isMonospace: true },
+        ],
+        statusText: statusText,
+    };
+};
+
 export default function Map({ 
     data = [], 
-    center = [106.8272, -6.1754], 
-    zoom = 9,
-    height = "h-[600px]"
+    center = DEFAULT_INDONESIA_CENTER, 
+    zoom = 4.5,
+    height = "h-[600px]",
+    statusKey = 'status',
+    statusConfig = DEFAULT_STATUS_CONFIG,
+    getPopupData = DEFAULT_POPUP_RENDERER
 }) {
     const mapContainer = useRef(null);
     const map = useRef(null);
@@ -19,7 +56,7 @@ export default function Map({
     const [selectedStatus, setSelectedStatus] = useState('ALL');
     const [isClustered, setIsClustered] = useState(true);
 
-    // Style Popup Transparan
+    // Custom Transparent Popup Style
     useEffect(() => {
         const styleId = 'maplibre-custom-transparent-popup-style';
         if (!document.getElementById(styleId)) {
@@ -47,72 +84,73 @@ export default function Map({
         return [];
     }, [data]);
 
-    // Hitung Angka Status & Non-Location
+    // Extract status string from item
+    const getItemStatus = useCallback((item) => {
+        if (typeof statusKey === 'function') return statusKey(item);
+        const val = item[statusKey] || item.status || item.status_aktifitas;
+        return val ? String(val).toUpperCase().trim() : 'N/A';
+    }, [statusKey]);
+
+    // Calculate Status Counts
     const { statusCounts, noLocationCount } = useMemo(() => {
-        const counts = { ALL: 0, LOCKED: 0, UNLOCKED: 0, NA: 0 };
+        const counts = { ALL: 0, NA: 0 };
+        Object.keys(statusConfig).forEach((k) => { counts[k] = 0; });
         let noLoc = 0;
 
         rawList.forEach((item) => {
             counts.ALL++;
             const coord = parseCoordinates(item);
-            const st = String(item.status_aktifitas || item.status || '').toUpperCase();
+            const st = getItemStatus(item);
 
             if (!coord) noLoc++;
 
-            if (!coord || st === 'N/A' || st === '#N/A' || st === '' || (st !== 'LOCKED' && st !== 'UNLOCKED')) {
+            if (!coord || st === 'N/A' || st === '#N/A' || st === '' || !statusConfig[st]) {
                 counts.NA++;
-            } else if (st === 'LOCKED') {
-                counts.LOCKED++;
-            } else if (st === 'UNLOCKED') {
-                counts.UNLOCKED++;
+            } else {
+                counts[st] = (counts[st] || 0) + 1;
             }
         });
 
         return { statusCounts: counts, noLocationCount: noLoc };
-    }, [rawList]);
+    }, [rawList, statusConfig, getItemStatus]);
 
-    // Filter Data Berdasarkan Filter Aktif
+    // Filter List by Status
     const filteredList = useMemo(() => {
         return rawList.filter((item) => {
             const coord = parseCoordinates(item);
             if (!coord) return false;
 
-            const stUpper = String(item.status_aktifitas || item.status || '').toUpperCase();
-            if (selectedStatus === 'LOCKED') return stUpper === 'LOCKED';
-            if (selectedStatus === 'UNLOCKED') return stUpper === 'UNLOCKED';
-            if (selectedStatus === 'NA') return stUpper !== 'LOCKED' && stUpper !== 'UNLOCKED';
-            return true;
+            if (selectedStatus === 'ALL') return true;
+
+            const stUpper = getItemStatus(item);
+            if (selectedStatus === 'NA') {
+                return !statusConfig[stUpper] || stUpper === 'N/A' || stUpper === '#N/A';
+            }
+
+            return stUpper === selectedStatus;
         });
-    }, [rawList, selectedStatus]);
+    }, [rawList, selectedStatus, statusConfig, getItemStatus]);
 
-    // Pembuat Marker Tunggal
+    // Marker Creator
     const createSingleMarker = useCallback((item, lng, lat) => {
-        const statusAct = item.status_aktifitas || item.status || 'N/A';
-        const stUpper = String(statusAct).toUpperCase();
-        
-        let colorMain = '#94a3b8';
-        let colorBg = 'rgba(148,163,184,0.35)';
-        let colorGlow = '#94a3b8';
-        let badgeBg = 'rgba(148,163,184,0.15)';
-        let badgeBorder = 'rgba(148,163,184,0.3)';
+        const stUpper = getItemStatus(item);
+        const cfg = statusConfig[stUpper] || {
+            color: '#94a3b8',
+            bg: 'rgba(148,163,184,0.35)',
+            badgeBg: 'rgba(148,163,184,0.15)',
+            badgeBorder: 'rgba(148,163,184,0.3)',
+        };
 
-        if (stUpper === 'LOCKED') {
-            colorMain = '#38bdf8';
-            colorBg = 'rgba(14,165,233,0.35)';
-            colorGlow = '#0ea5e9';
-            badgeBg = 'rgba(14,165,233,0.15)';
-            badgeBorder = 'rgba(14,165,233,0.3)';
-        } else if (stUpper === 'UNLOCKED') {
-            colorMain = '#fbbf24';
-            colorBg = 'rgba(245,158,11,0.35)';
-            colorGlow = '#f59e0b';
-            badgeBg = 'rgba(245,158,11,0.15)';
-            badgeBorder = 'rgba(245,158,11,0.3)';
-        }
+        const colorMain = cfg.color || '#94a3b8';
+        const colorBg = cfg.bg || 'rgba(148,163,184,0.35)';
+        const colorGlow = colorMain;
+        const badgeBg = cfg.badgeBg || 'rgba(148,163,184,0.15)';
+        const badgeBorder = cfg.badgeBorder || 'rgba(148,163,184,0.3)';
 
-        const siteName = item.site_name || item.nama_site || item.site || 'Site SmartKey';
-        const towerId = item.tower_id || item.site_id || '-';
-        const sn = item.serial_number || item.sn || '-';
+        const popupData = getPopupData(item, lat, lng);
+        const title = popupData.title || 'Location Detail';
+        const details = popupData.details || [];
+        const statusText = popupData.statusText || stUpper;
 
         const el = document.createElement('div');
         el.style.cursor = 'pointer';
@@ -123,16 +161,19 @@ export default function Map({
             </div>
         `;
 
+        const detailsHTML = details.map((d) => `
+            <span style="color: #64748b;">${d.label}:</span> 
+            <span style="${d.isMonospace ? `color: ${colorMain}; font-family: monospace; font-weight: 600;` : ''}">${d.value}</span><br/>
+        `).join('');
+
         const popupHTML = `
             <div style="font-family: system-ui, -apple-system, sans-serif; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); color: #f8fafc; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 20px 30px -10px rgba(0,0,0,0.8); min-width: 180px;">
-                <div style="font-size: 13.5px; font-weight: 700; color: ${colorMain}; margin-bottom: 6px; letter-spacing: -0.01em;">${siteName}</div>
+                <div style="font-size: 13.5px; font-weight: 700; color: ${colorMain}; margin-bottom: 6px; letter-spacing: -0.01em;">${title}</div>
                 <div style="font-size: 11px; color: #94a3b8; line-height: 1.6;">
-                    <span style="color: #64748b;">Tower ID:</span> ${towerId}<br/>
-                    <span style="color: #64748b;">SN:</span> ${sn}<br/>
-                    <span style="color: ${colorMain}; font-family: monospace; font-weight: 600;">Lat, Long: ${item.coord ? item.coord.text : `${lat.toFixed(5)}, ${lng.toFixed(5)}`}</span>
+                    ${detailsHTML}
                 </div>
                 <div style="margin-top: 10px; display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: ${badgeBg}; color: ${colorMain}; border: 1px solid ${badgeBorder};">
-                    ${statusAct}
+                    ${statusText}
                 </div>
             </div>
         `;
@@ -146,9 +187,9 @@ export default function Map({
         return new maplibregl.Marker({ element: el })
             .setLngLat([lng, lat])
             .setPopup(popup);
-    }, []);
+    }, [getItemStatus, statusConfig, getPopupData]);
 
-    // Render Markers / Clusters
+    // Render Markers & Clusters
     const renderMarkers = useCallback(() => {
         if (!map.current) return;
 
@@ -250,7 +291,7 @@ export default function Map({
                     map.current.easeTo({
                         center: [cl.lng, cl.lat],
                         zoom: currentZoom + 2.2,
-                        pitch: 55, // Otomatis miring 3D saat cluster di-klik!
+                        pitch: 55,
                         duration: 600,
                     });
                 });
@@ -268,7 +309,7 @@ export default function Map({
         });
     }, [filteredList, isClustered, createSingleMarker]);
 
-    // Inisialisasi Peta & Fitur Kemiringan 3D
+    // Map Initialization
     useEffect(() => {
         if (map.current || !mapContainer.current) return;
 
@@ -277,8 +318,8 @@ export default function Map({
             style: MAP_STYLES[currentStyle].style,
             center: center,
             zoom: zoom,
-            pitch: 0, // Posisi awal datar
-            maxPitch: 85, // Memungkinkan sudut kemiringan kamera 3D sampai 85 derajat
+            pitch: 0,
+            maxPitch: 85,
             renderWorldCopies: false,
             minZoom: 1,
             maxZoom: 22,
@@ -294,25 +335,21 @@ export default function Map({
             }
         });
 
-        // KONTROL NAVIGASI (Dengan Kompas 3D)
         map.current.addControl(
             new maplibregl.NavigationControl({
-                visualizePitch: true, // Menampilkan indikator kemiringan 3D pada tombol kompas
+                visualizePitch: true,
             }), 
             'top-right'
         );
 
-        // OTOMATIS BERUBAH KE SUDUT 3D SAAT USER ZOOM-IN DALAM (> Level 14)
         map.current.on('zoom', () => {
             if (!map.current) return;
             const currentZoom = map.current.getZoom();
             const currentPitch = map.current.getPitch();
 
-            // Jika zoom in cukup dalam dan peta masih datar, buat kemiringan 3D otomatis
             if (currentZoom > 14 && currentPitch < 30) {
                 map.current.easeTo({ pitch: 60, duration: 400 });
             } else if (currentZoom <= 10 && currentPitch > 20) {
-                // Jika zoom out ke skala pulau/dunia, kembalikan posisi tegak lurus
                 map.current.easeTo({ pitch: 0, duration: 400 });
             }
         });
@@ -335,7 +372,7 @@ export default function Map({
         };
     }, []);
 
-    // Effect Render Marker & Fit Bounds Initial
+    // Render Markers Effect
     useEffect(() => {
         if (!map.current) return;
 
@@ -374,7 +411,7 @@ export default function Map({
         map.current.flyTo({
             center: DEFAULT_INDONESIA_CENTER,
             zoom: DEFAULT_INDONESIA_ZOOM,
-            pitch: 0, // Reset sudut kamera ke datar saat kembali ke wilayah Indonesia
+            pitch: 0,
             duration: 1200,
             essential: true,
         });
@@ -392,6 +429,7 @@ export default function Map({
                 selectedStatus={selectedStatus}
                 onSelectStatus={setSelectedStatus}
                 statusCounts={statusCounts}
+                statusConfig={statusConfig}
             />
 
             <div ref={mapContainer} className="w-full h-full" />

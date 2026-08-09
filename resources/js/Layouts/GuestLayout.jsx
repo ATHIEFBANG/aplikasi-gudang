@@ -1,16 +1,18 @@
-import ApplicationLogo from '@/components/ApplicationLogo';
 import { Link } from '@inertiajs/react';
+import ApplicationLogo from '@/components/ApplicationLogo';
 
 export default function GuestLayout({ children }) {
     return (
-        <div className="flex min-h-screen flex-col items-center bg-gray-100 pt-6 sm:justify-center sm:pt-0">
-            <div>
-                <Link href="/">
-                    <ApplicationLogo className="h-20 w-20 fill-current text-gray-500" />
+        <div className="flex min-h-screen flex-col items-center justify-center bg-slate-100 dark:bg-[#0B1437] text-slate-900 dark:text-slate-100 p-4 transition-colors duration-300">
+            {/* Logo Terpusat */}
+            <div className="mb-6 flex flex-col items-center gap-2">
+                <Link href="/" className="group">
+                    <ApplicationLogo />
                 </Link>
             </div>
 
-            <div className="mt-6 w-full overflow-hidden bg-white px-6 py-4 shadow-md sm:max-w-md sm:rounded-lg">
+            {/* Container tanpa double-border, menyerahkan styling ke <Card> shadcn */}
+            <div className="w-full max-w-md">
                 {children}
             </div>
         </div>

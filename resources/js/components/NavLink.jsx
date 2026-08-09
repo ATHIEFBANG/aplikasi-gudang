@@ -1,23 +1,28 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
+import { cn } from '@/lib/utils';
 
-export default function NavLink({
-    active = false,
-    className = '',
-    children,
-    ...props
-}) {
+export function NavLink({ href, active, children, className, ...props }) {
+    const { url } = usePage();
+    
+    // Otomatis aktif jika URL saat ini cocok dengan href (jika prop 'active' tidak diisi)
+    const isActive = active !== undefined ? active : url.startsWith(href);
+
     return (
         <Link
+            href={href}
             {...props}
-            className={
-                'inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none ' +
-                (active
-                    ? 'border-red-500 text-slate-900 dark:text-white focus:border-red-600'
-                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-700 dark:hover:text-slate-200 focus:border-slate-300 focus:text-slate-700') +
+            className={cn(
+                'inline-flex items-center px-3.5 py-2 text-sm font-medium transition-all duration-200 rounded-lg',
+                isActive
+                    ? 'text-red-600 dark:text-red-400 bg-red-500/10 font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60',
                 className
-            }
+            )}
         >
             {children}
         </Link>
     );
 }
+
+// Tambahkan baris ini di paling bawah:
+export default NavLink;

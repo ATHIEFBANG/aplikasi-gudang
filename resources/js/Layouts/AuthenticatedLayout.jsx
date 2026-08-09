@@ -1,7 +1,14 @@
-import Dropdown from '@/components/Dropdown';
 import { Link, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { Toaster, toast } from 'sonner';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Home,
     Wrench,
@@ -17,11 +24,8 @@ import {
     ChevronUp
 } from 'lucide-react';
 
-// =========================================================================
-// MAPPING FALLBACK URL (Penyelamat Jika Ziggy Route Belum Sync)
-// =========================================================================
 const ROUTE_FALLBACKS = {
-    'home': '/home', // ✅ DIPERBAIKI: Ubah ke 'home'
+    'home': '/home',
     'maintenance.dashboard': '/maintenance/dashboard',
     'maintenance.data-management.index': '/maintenance/data-management',
     'profile.edit': '/profile',
@@ -34,29 +38,26 @@ const getRoute = (routeName, params = undefined) => {
             return route(routeName, params);
         }
     } catch (e) {
-        // Abaikan error Ziggy jika terjadi
+        // Fallback jika Ziggy error
     }
     return ROUTE_FALLBACKS[routeName] || '#';
 };
 
 export default function AuthenticatedLayout({ header, children }) {
-    const { auth, flash, url } = usePage().props;
-    const currentUrl = usePage().url; // Mendapatkan path URL aktif saat ini
+    const { auth, flash } = usePage().props;
+    const currentUrl = usePage().url;
     const user = auth?.user;
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [isNavOpen, setIsNavOpen] = useState(true);
     const [isMaintenanceOpen, setIsMaintenanceOpen] = useState(false);
 
-    // Helper Pengecekan Active Link (Anti Crash)
     const checkActive = (routeName) => {
         try {
             if (typeof route !== 'undefined' && route().has(routeName)) {
                 if (route().current(routeName)) return true;
             }
-        } catch (e) {
-            // Fallback
-        }
+        } catch (e) {}
 
         const fallbackPath = ROUTE_FALLBACKS[routeName];
         if (fallbackPath && currentUrl) {
@@ -65,31 +66,28 @@ export default function AuthenticatedLayout({ header, children }) {
         return false;
     };
 
-            // Logika Theme Switcher
-        const [isDark, setIsDark] = useState(() => {
-            if (typeof window !== 'undefined') {
-                const savedTheme = localStorage.getItem('theme');
-                return savedTheme ? savedTheme === 'dark' : true;
-            }
-            return true;
-        });
+    const [isDark, setIsDark] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const savedTheme = localStorage.getItem('theme');
+            return savedTheme ? savedTheme === 'dark' : true;
+        }
+        return true;
+    });
 
-        // ✅ TAMBAHKAN FUNGSI INI
-        const toggleTheme = () => {
-            setIsDark((prev) => !prev);
-        };
+    const toggleTheme = () => {
+        setIsDark((prev) => !prev);
+    };
 
-        useEffect(() => {
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            }
-        }, [isDark]);
+    useEffect(() => {
+        if (isDark) {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        }
+    }, [isDark]);
 
-    // Auto Pop-Up Toast
     useEffect(() => {
         if (flash?.success) toast.success(flash.success);
         if (flash?.error) toast.error(flash.error);
@@ -97,15 +95,13 @@ export default function AuthenticatedLayout({ header, children }) {
 
     return (
         <div className="min-h-screen bg-slate-100 dark:bg-[#0B1437] text-slate-900 dark:text-slate-100 font-sans selection:bg-red-500 selection:text-white transition-colors duration-300">
-            
             <Toaster position="bottom-right" theme={isDark ? "dark" : "light"} richColors closeButton />
 
             {/* HEADER UTAMA */}
             <header className="sticky top-0 z-50 w-full flex flex-col shadow-sm transition-all duration-300 relative group">
                 
-                {/* --- TIER 1: Topbar --- */}
+                {/* TIER 1: Topbar */}
                 <div className="relative z-50 h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/10 px-4 sm:px-8 flex items-center justify-between">
-                    
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-700 to-red-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-red-600/40">
                             M
@@ -119,20 +115,19 @@ export default function AuthenticatedLayout({ header, children }) {
                             </span>
                         </div>
 
-                       {header && (
-                        <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-slate-200 dark:border-white/10">
-                            <nav aria-label="Breadcrumb" className="flex items-center text-xs text-slate-500 dark:text-slate-400 font-medium gap-1.5">
-                                {/* ✅ DIPERBAIKI: getRoute('home') */}
-                                <Link href={getRoute('home')} className="hover:text-red-600 dark:hover:text-red-400 transition-colors">
-                                    Home
-                                </Link>
-                                <span>/</span>
-                                <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs leading-none">
-                                    {header}
-                                </div>
-                            </nav>
-                        </div>
-                    )}
+                        {header && (
+                            <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-slate-200 dark:border-white/10">
+                                <nav aria-label="Breadcrumb" className="flex items-center text-xs text-slate-500 dark:text-slate-400 font-medium gap-1.5">
+                                    <Link href={getRoute('home')} className="hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                                        Home
+                                    </Link>
+                                    <span>/</span>
+                                    <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs leading-none">
+                                        {header}
+                                    </div>
+                                </nav>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-3 sm:gap-4">
@@ -144,35 +139,39 @@ export default function AuthenticatedLayout({ header, children }) {
                             {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
                         </button>
 
-                        <div className="relative">
-                            <Dropdown>
-                                <Dropdown.Trigger>
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center gap-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 px-3 py-2 text-sm font-medium text-slate-800 dark:text-slate-200 transition duration-150 shadow-sm"
-                                    >
-                                        <div className="w-7 h-7 rounded-lg bg-red-600/20 dark:bg-red-600/30 border border-red-500/40 flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-xs">
-                                            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                                        </div>
-                                        <span className="hidden sm:inline">{user?.name}</span>
-                                        <ChevronDown className="w-4 h-4 text-slate-500" />
-                                    </button>
-                                </Dropdown.Trigger>
-
-                                <Dropdown.Content align="right" width="48" contentClasses="py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl text-slate-800 dark:text-slate-200 relative z-[60]">
-                                    <div className="px-4 py-2 border-b border-slate-100 dark:border-white/10 text-xs">
-                                        <p className="font-semibold text-slate-900 dark:text-white">{user?.name}</p>
-                                        <p className="text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
+                        {/* SHADCN DROPDOWN MENU */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 px-3 py-2 text-sm font-medium text-slate-800 dark:text-slate-200 transition duration-150 shadow-sm outline-none focus:ring-2 focus:ring-red-500/50"
+                                >
+                                    <div className="w-7 h-7 rounded-lg bg-red-600/20 dark:bg-red-600/30 border border-red-500/40 flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-xs">
+                                        {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                                     </div>
-                                    <Dropdown.Link href={getRoute('profile.edit')} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 transition-colors">
+                                    <span className="hidden sm:inline">{user?.name}</span>
+                                    <ChevronDown className="w-4 h-4 text-slate-500" />
+                                </button>
+                            </DropdownMenuTrigger>
+
+                            <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-1 z-[60]">
+                                <DropdownMenuLabel className="px-3 py-2">
+                                    <p className="font-semibold text-slate-900 dark:text-white text-sm">{user?.name}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator className="bg-slate-100 dark:bg-white/10 my-1" />
+                                <DropdownMenuItem asChild className="cursor-pointer rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 focus:bg-slate-100 dark:focus:bg-white/10">
+                                    <Link href={getRoute('profile.edit')} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
                                         <UserIcon className="w-4 h-4 text-slate-400" /> Profile
-                                    </Dropdown.Link>
-                                    <Dropdown.Link href={getRoute('logout')} method="post" as="button" className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm hover:bg-red-500/10 text-red-600 dark:text-red-400 transition-colors">
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild className="cursor-pointer rounded-lg hover:bg-red-500/10 focus:bg-red-500/10 text-red-600 dark:text-red-400">
+                                    <Link href={getRoute('logout')} method="post" as="button" className="w-full flex items-center gap-2 px-3 py-2 text-sm">
                                         <LogOut className="w-4 h-4" /> Log Out
-                                    </Dropdown.Link>
-                                </Dropdown.Content>
-                            </Dropdown>
-                        </div>
+                                    </Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
                         <button
                             onClick={() => setShowingNavigationDropdown(!showingNavigationDropdown)}
@@ -183,15 +182,13 @@ export default function AuthenticatedLayout({ header, children }) {
                     </div>
                 </div>
 
-                {/* --- TIER 2: Navigation Menu --- */}
+                {/* TIER 2: Navigation Menu */}
                 <div 
                     className={`hidden md:block transition-all duration-300 ease-in-out z-40 ${
                         isNavOpen ? 'max-h-16 opacity-100 overflow-visible' : 'max-h-0 opacity-0 overflow-hidden'
                     }`}
                 >
                     <nav className="flex h-14 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/80 dark:border-white/10 px-4 sm:px-8 items-center gap-2">
-                        
-                        {/* ✅ DIPERBAIKI: getRoute('home') dan checkActive('home') */}
                         <Link
                             href={getRoute('home')}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
@@ -247,7 +244,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                 </div>
                             )}
                         </div>
-
                     </nav>
                 </div>
 
@@ -260,11 +256,9 @@ export default function AuthenticatedLayout({ header, children }) {
                     {isNavOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
 
-                {/* Mobile Navigation Drawer */}
+                {/* Mobile Drawer Navigation */}
                 {showingNavigationDropdown && (
                     <div className="md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-b border-slate-200 dark:border-white/10 px-4 py-4 space-y-2 animate-in slide-in-from-top duration-200">
-                        
-                        {/* ✅ DIPERBAIKI: getRoute('home') dan checkActive('home') */}
                         <Link 
                             href={getRoute('home')} 
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${

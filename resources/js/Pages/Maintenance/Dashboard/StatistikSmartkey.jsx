@@ -24,6 +24,37 @@ import {
 } from 'recharts';
 import Map from '@/components/Map';
 
+// ==========================================
+// KONFIGURASI PETA SPESIFIK SMARTKEY
+// ==========================================
+const SMARTKEY_STATUS_CONFIG = {
+    LOCKED: {
+        label: 'LOCKED',
+        color: '#0ea5e9', // Sky 500
+        bg: 'rgba(14,165,233,0.35)',
+        badgeBg: 'rgba(14,165,233,0.15)',
+        badgeBorder: 'rgba(14,165,233,0.3)',
+    },
+    UNLOCKED: {
+        label: 'UNLOCKED',
+        color: '#f59e0b', // Amber 500
+        bg: 'rgba(245,158,11,0.35)',
+        badgeBg: 'rgba(245,158,11,0.15)',
+        badgeBorder: 'rgba(245,158,11,0.3)',
+    },
+};
+
+const getSmartkeyPopupData = (item, lat, lng) => ({
+    title: item.site_name || item.nama_site || item.site || 'Site SmartKey',
+    details: [
+        { label: 'Tower ID', value: item.tower_id || item.site_id || '-' },
+        { label: 'SN Key', value: item.serial_number || item.sn || '-' },
+        { label: 'Infrako', value: item.infrako || '-' },
+        { label: 'Koordinat', value: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, isMonospace: true },
+    ],
+    statusText: item.status_aktifitas || 'N/A',
+});
+
 export default function StatistikSmartkey({ data = [] }) {
     // State untuk toggle visibilitas series BarChart via Legend
     const [hiddenBars, setHiddenBars] = useState({
@@ -113,7 +144,6 @@ export default function StatistikSmartkey({ data = [] }) {
             
             {/* KPI METRICS CARDS WITH SUB-TEXT */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                
                 {/* Total Unit */}
                 <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
                     <div>
@@ -209,10 +239,9 @@ export default function StatistikSmartkey({ data = [] }) {
                         Belum teridentifikasi
                     </p>
                 </div>
-
             </div>
 
-            {/* MAP SECTION */}
+            {/* MAP SECTION - MENGGUNAKAN PROPS MAP UNIVERSAL */}
             <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
                 <div className="px-5 py-3 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-sky-500" />
@@ -221,13 +250,17 @@ export default function StatistikSmartkey({ data = [] }) {
                     </h3>
                 </div>
                 <div className="p-0">
-                    <Map data={data} />
+                    <Map 
+                        data={data}
+                        statusKey="status_aktifitas"
+                        statusConfig={SMARTKEY_STATUS_CONFIG}
+                        getPopupData={getSmartkeyPopupData}
+                    />
                 </div>
             </div>
 
             {/* CHARTS SECTION */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                
                 {/* DONUT CHART */}
                 <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-5 flex flex-col justify-between shadow-sm">
                     <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800/80">
@@ -355,7 +388,6 @@ export default function StatistikSmartkey({ data = [] }) {
                         </ResponsiveContainer>
                     </div>
                 </div>
-
             </div>
         </div>
     );

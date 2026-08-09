@@ -1,65 +1,87 @@
+import React from 'react';
 import {
     Dialog,
-    DialogPanel,
-    Transition,
-    TransitionChild,
-} from '@headlessui/react';
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from 'lucide-react';
 
 export default function Modal({
+    isOpen,
+    onClose,
+    title,
+    description,
     children,
-    show = false,
-    maxWidth = '2xl',
-    closeable = true,
-    onClose = () => {},
+    onSubmit,
+    submitLabel = 'Simpan',
+    cancelLabel = 'Batal',
+    isProcessing = false,
+    maxWidth = 'sm:max-w-3xl',
+    showFooter = true,
+    headerExtra, // Untuk komponen tambahan di header (seperti Badge / Tombol Paste Excel)
+    onPaste,
 }) {
-    const close = () => {
-        if (closeable) {
-            onClose();
-        }
-    };
-
-    const maxWidthClass = {
-        sm: 'sm:max-w-sm',
-        md: 'sm:max-w-md',
-        lg: 'sm:max-w-lg',
-        xl: 'sm:max-w-xl',
-        '2xl': 'sm:max-w-2xl',
-    }[maxWidth];
-
     return (
-        <Transition show={show} leave="duration-200">
-            <Dialog
-                as="div"
-                id="modal"
-                className="fixed inset-0 z-50 flex transform items-center overflow-y-auto px-4 py-6 transition-all sm:px-0"
-                onClose={close}
+        <Dialog open={isOpen} onOpenChange={(open) => !open && !isProcessing && onClose?.()}>
+            <DialogContent 
+                className={`${maxWidth} h-[85vh] flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50`}
+                onPaste={onPaste}
             >
-                <TransitionChild
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="absolute inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm" />
-                </TransitionChild>
+                {/* FIXED HEADER */}
+                {(title || description || headerExtra) && (
+                    <DialogHeader className="shrink-0 pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between pr-6">
+                            <span>{title}</span>
+                            {headerExtra && <div>{headerExtra}</div>}
+                        </DialogTitle>
+                        {description ? (
+                            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                {description}
+                            </DialogDescription>
+                        ) : (
+                            <DialogDescription className="sr-only">
+                                Dialog Modal
+                            </DialogDescription>
+                        )}
+                    </DialogHeader>
+                )}
 
-                <TransitionChild
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                    enterTo="opacity-100 translate-y-0 sm:scale-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-                    leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                >
-                    <DialogPanel
-                        className={`mb-6 transform overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100 shadow-xl dark:shadow-2xl transition-all sm:mx-auto sm:w-full ${maxWidthClass}`}
-                    >
-                        {children}
-                    </DialogPanel>
-                </TransitionChild>
-            </Dialog>
-        </Transition>
+                {/* SCROLLABLE BODY / ISI FORM */}
+                <div className="flex-1 overflow-y-auto py-3 pr-1">
+                    {children}
+                </div>
+
+                {/* FIXED FOOTER */}
+                {showFooter && (
+                    <DialogFooter className="shrink-0 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2 bg-white dark:bg-slate-900">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                            disabled={isProcessing}
+                            className="h-9 text-xs"
+                        >
+                            {cancelLabel}
+                        </Button>
+
+                        {onSubmit && (
+                            <Button
+                                type="button"
+                                onClick={onSubmit}
+                                disabled={isProcessing}
+                                className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors"
+                            >
+                                {isProcessing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                <span>{submitLabel}</span>
+                            </Button>
+                        )}
+                    </DialogFooter>
+                )}
+            </DialogContent>
+        </Dialog>
     );
 }
