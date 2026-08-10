@@ -13,7 +13,7 @@ return new class extends Migration
             
             // Identifikasi Data Utama
             $table->string('rpm_id')->nullable(); 
-            $table->string('site_id')->index();
+            $table->string('site_id')->nullable()->index();
             $table->string('mitra')->nullable();
 
             // Kolom Kunci Pivot Chart (Filters, Columns, Rows)

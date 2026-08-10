@@ -11,7 +11,13 @@ import {
     BarChart3
 } from 'lucide-react';
 
-export default function DashboardIndex({ auth, rpmData = [], smartkeyData = [] }) {
+export default function DashboardIndex({ 
+    auth, 
+    rpmSummary = {}, 
+    smartkeySummary = {}, 
+    filterOptions = {}, 
+    filters = {} 
+}) {
     // Switcher tampilan internal halaman (RPM vs SmartKey)
     const [viewMode, setViewMode] = useState('rpm');
 
@@ -58,12 +64,9 @@ export default function DashboardIndex({ auth, rpmData = [], smartkeyData = [] }
                 </div>
             </div>
 
-            {/* ========================================================================= */}
             {/* VIEW 1: MONITORING RPM */}
-            {/* ========================================================================= */}
             {viewMode === 'rpm' && (
                 <div className="space-y-6 animate-in fade-in duration-300">
-                    {/* Area Komponen Asli RPM */}
                     <div className="p-6 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                             <div>
@@ -77,18 +80,20 @@ export default function DashboardIndex({ auth, rpmData = [], smartkeyData = [] }
                         </div>
 
                         <div className="w-full">
-                            <DashboardRpm data={rpmData} />
+                            {/* Mengirimkan data ringkasan, opsi dropdown, dan state filter ke DashboardRpm */}
+                            <DashboardRpm 
+                                summary={rpmSummary} 
+                                options={filterOptions.rpm || {}} 
+                                filters={filters.rpm || {}} 
+                            />
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ========================================================================= */}
             {/* VIEW 2: STATUS SMARTKEY */}
-            {/* ========================================================================= */}
             {viewMode === 'smartkey' && (
                 <div className="space-y-6 animate-in fade-in duration-300">
-                    {/* Area Komponen SmartKey */}
                     <div className="p-6 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                             <div>
@@ -102,7 +107,11 @@ export default function DashboardIndex({ auth, rpmData = [], smartkeyData = [] }
                         </div>
 
                         <div className="w-full relative z-0">
-                            <DashboardSmartkey data={smartkeyData} />
+                            <DashboardSmartkey 
+                                summary={smartkeySummary} 
+                                options={filterOptions.smartkey || {}} 
+                                filters={filters.smartkey || {}} 
+                            />
                         </div>
                     </div>
                 </div>

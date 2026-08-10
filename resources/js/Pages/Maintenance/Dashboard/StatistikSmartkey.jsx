@@ -24,39 +24,73 @@ import {
 } from 'recharts';
 import Map from '@/components/Map';
 
-// ==========================================
-// KONFIGURASI PETA SPESIFIK SMARTKEY
-// ==========================================
+// Konfigurasi Status
 const SMARTKEY_STATUS_CONFIG = {
     LOCKED: {
         label: 'LOCKED',
-        color: '#0ea5e9', // Sky 500
+        color: '#0ea5e9',
         bg: 'rgba(14,165,233,0.35)',
         badgeBg: 'rgba(14,165,233,0.15)',
         badgeBorder: 'rgba(14,165,233,0.3)',
     },
     UNLOCKED: {
         label: 'UNLOCKED',
-        color: '#f59e0b', // Amber 500
+        color: '#f59e0b',
         bg: 'rgba(245,158,11,0.35)',
         badgeBg: 'rgba(245,158,11,0.15)',
         badgeBorder: 'rgba(245,158,11,0.3)',
     },
+    '#N/A': {
+        label: '#N/A',
+        color: '#64748b',
+        bg: 'rgba(100,116,139,0.35)',
+        badgeBg: 'rgba(100,116,139,0.15)',
+        badgeBorder: 'rgba(100,116,139,0.3)',
+    },
 };
 
-const getSmartkeyPopupData = (item, lat, lng) => ({
-    title: item.site_name || item.nama_site || item.site || 'Site SmartKey',
-    details: [
-        { label: 'Tower ID', value: item.tower_id || item.site_id || '-' },
-        { label: 'SN Key', value: item.serial_number || item.sn || '-' },
-        { label: 'Infrako', value: item.infrako || '-' },
-        { label: 'Koordinat', value: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, isMonospace: true },
-    ],
-    statusText: item.status_aktifitas || 'N/A',
-});
+// Normalisasi Status agar HANYA menghasilkan 3 String Persis
+const normalizeStatus = (statusStr) => {
+    if (!statusStr) return '#N/A';
+    const clean = String(statusStr).toUpperCase().replace(/[^A-Z0-9#]/g, '');
+    if (clean === 'LOCKED') return 'LOCKED';
+    if (clean === 'UNLOCKED') return 'UNLOCKED';
+    return '#N/A';
+};
 
-export default function StatistikSmartkey({ data = [] }) {
-    // State untuk toggle visibilitas series BarChart via Legend
+const getSmartkeyPopupData = (item, lat, lng) => {
+    const props = item?.properties || item || {};
+    return {
+        title: props.site_name || props.site_id || 'Site SmartKey',
+        details: [
+            { label: 'Tower ID', value: props.tower_id || '-' },
+            { label: 'SN Key', value: props.serial_number || props.new_sn || '-' },
+            { label: 'Personil KSM', value: props.ksm || '-' },
+            { label: 'Infrako', value: props.infrako || '-' },
+            { label: 'Kota / Kab', value: props.kota_kab || '-' },
+            { label: 'Posisi Unit', value: props.posisi_unit || '-' },
+            { 
+                label: 'Koordinat', 
+                value: `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`, 
+                isMonospace: true 
+            },
+        ],
+        statusText: normalizeStatus(props.status_aktifitas || props.status),
+    };
+};
+
+export default function StatistikSmartkey({ summary = {} }) {
+    const activeSummary = summary?.summary || summary || {};
+    const activeChart = summary?.chart || summary?.chart_data || [];
+
+    const activeMapRaw = useMemo(() => {
+        if (Array.isArray(summary?.map_data) && summary.map_data.length > 0) return summary.map_data;
+        if (Array.isArray(summary?.mapData) && summary.mapData.length > 0) return summary.mapData;
+        if (Array.isArray(summary?.map) && summary.map.length > 0) return summary.map;
+        if (Array.isArray(summary?.table_data) && summary.table_data.length > 0) return summary.table_data;
+        return [];
+    }, [summary]);
+
     const [hiddenBars, setHiddenBars] = useState({
         Locked: false,
         Unlocked: false,
@@ -70,36 +104,70 @@ export default function StatistikSmartkey({ data = [] }) {
         }
     };
 
-    // 1. KPI & METRICS SUMMARY
-    const totalUnit = data.length;
+    // KPI Summary
+    const totalUnit = Number(activeSummary.total_unit ?? 0);
+    const totalAktif = Number(activeSummary.count_aktif ?? 0);
+    const totalProblem = Number(activeSummary.count_problem ?? 0);
+    const countLocked = Number(activeSummary.count_locked ?? 0);
+    const countUnlocked = Number(activeSummary.count_unlocked ?? 0);
+    const countNA = Number(activeSummary.count_na ?? 0);
 
-    const totalAktif = useMemo(() => {
-        return data.filter((d) => String(d.status || '').toLowerCase() === 'aktif').length;
-    }, [data]);
+    // Normalisasi Data Peta
+    const normalizedMapData = useMemo(() => {
+        if (!Array.isArray(activeMapRaw)) return [];
 
-    const totalProblem = useMemo(() => {
-        return data.filter((d) => {
-            const st = String(d.status || '').toLowerCase();
-            return st === 'rusak' || st === 'hilang';
-        }).length;
-    }, [data]);
+        return activeMapRaw
+            .map((item) => {
+                if (!item) return null;
+                let lat = Number(item.latitude || item.lat);
+                let lng = Number(item.longitude || item.lng);
 
-    const countLocked = useMemo(() => {
-        return data.filter((d) => String(d.status_aktifitas || '').toLowerCase() === 'locked').length;
-    }, [data]);
+                if ((isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) && item.long_lat) {
+                    const parts = String(item.long_lat)
+                        .split(/[\s,;\/]+/)
+                        .map((p) => parseFloat(p.replace(',', '.')))
+                        .filter((n) => !isNaN(n));
+                    if (parts.length >= 2) {
+                        if (Math.abs(parts[0]) > 50) { lng = parts[0]; lat = parts[1]; }
+                        else if (Math.abs(parts[1]) > 50) { lat = parts[0]; lng = parts[1]; }
+                        else { lng = parts[0]; lat = parts[1]; }
+                    }
+                }
 
-    const countUnlocked = useMemo(() => {
-        return data.filter((d) => String(d.status_aktifitas || '').toLowerCase() === 'unlocked').length;
-    }, [data]);
+                if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
 
-    const countNA = useMemo(() => {
-        return data.filter((d) => {
-            const sa = String(d.status_aktifitas || '').trim().toUpperCase();
-            return sa === '#N/A' || sa === 'N/A' || !sa || sa === 'NULL' || sa === 'UNDEFINED';
-        }).length;
-    }, [data]);
+                const statusClean = normalizeStatus(item.status_aktifitas || item.status);
 
-    // 2. DONUT CHART DATA
+                return {
+                    ...item,
+                    latitude: lat,
+                    longitude: lng,
+                    lat: lat,
+                    lng: lng,
+                    position: [lat, lng],
+                    coordinates: [lng, lat],
+
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [lng, lat]
+                    },
+                    properties: {
+                        ...item,
+                        site_name: item.site_name || item.site_id || 'Site SmartKey',
+                        status: statusClean,
+                        status_aktifitas: statusClean,
+                        latitude: lat,
+                        longitude: lng,
+                    },
+
+                    status_aktifitas: statusClean,
+                    status: statusClean,
+                };
+            })
+            .filter(Boolean);
+    }, [activeMapRaw]);
+
     const donutData = useMemo(() => {
         const raw = [
             { name: 'Locked', value: countLocked, color: '#0ea5e9', badgeClass: 'bg-sky-500' },
@@ -112,39 +180,31 @@ export default function StatistikSmartkey({ data = [] }) {
         }));
     }, [countLocked, countUnlocked, countNA, totalUnit]);
 
-    // 3. BAR CHART DATA (TOP 6 REGION INFRAKO)
     const barInfrakoData = useMemo(() => {
-        const infraMap = {};
+        if (!Array.isArray(activeChart)) return [];
+        return activeChart
+            .map((item) => {
+                const locked = Number(item.locked || 0);
+                const unlocked = Number(item.unlocked || 0);
+                const total = Number(item.total || 0);
+                const naCalculated = item.na !== undefined ? Number(item.na) : Math.max(0, total - (locked + unlocked));
 
-        data.forEach((item) => {
-            const infraName = item.infrako || 'Unassigned';
-            if (!infraMap[infraName]) {
-                infraMap[infraName] = { name: infraName, Locked: 0, Unlocked: 0, '#N/A': 0, total: 0 };
-            }
-
-            const sa = String(item.status_aktifitas || '').trim().toLowerCase();
-            if (sa === 'locked') {
-                infraMap[infraName].Locked += 1;
-            } else if (sa === 'unlocked') {
-                infraMap[infraName].Unlocked += 1;
-            } else {
-                infraMap[infraName]['#N/A'] += 1;
-            }
-
-            infraMap[infraName].total += 1;
-        });
-
-        return Object.values(infraMap)
+                return {
+                    name: item.infrako || 'Unassigned',
+                    Locked: locked,
+                    Unlocked: unlocked,
+                    '#N/A': naCalculated,
+                    total: total || (locked + unlocked + naCalculated),
+                };
+            })
             .sort((a, b) => b.total - a.total)
             .slice(0, 6);
-    }, [data]);
+    }, [activeChart]);
 
     return (
         <div className="space-y-4">
-            
-            {/* KPI METRICS CARDS WITH SUB-TEXT */}
+            {/* KPI CARDS GRID */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {/* Total Unit */}
                 <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
                     <div>
                         <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
@@ -155,12 +215,9 @@ export default function StatistikSmartkey({ data = [] }) {
                             {totalUnit.toLocaleString('id-ID')}
                         </div>
                     </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 font-normal leading-tight">
-                        Total terdaftar di sistem
-                    </p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 font-normal leading-tight">Total terdaftar di sistem</p>
                 </div>
 
-                {/* Unit Aktif */}
                 <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
                     <div>
                         <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
@@ -171,12 +228,9 @@ export default function StatistikSmartkey({ data = [] }) {
                             {totalAktif.toLocaleString('id-ID')}
                         </div>
                     </div>
-                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/60 mt-2 font-normal leading-tight">
-                        Operasional normal
-                    </p>
+                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/60 mt-2 font-normal leading-tight">Operasional normal</p>
                 </div>
 
-                {/* Rusak / Hilang */}
                 <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
                     <div>
                         <div className="flex items-center justify-between text-rose-600 dark:text-rose-400">
@@ -187,12 +241,9 @@ export default function StatistikSmartkey({ data = [] }) {
                             {totalProblem.toLocaleString('id-ID')}
                         </div>
                     </div>
-                    <p className="text-[10px] text-rose-600/70 dark:text-rose-400/60 mt-2 font-normal leading-tight">
-                        Perlu tindak lanjut
-                    </p>
+                    <p className="text-[10px] text-rose-600/70 dark:text-rose-400/60 mt-2 font-normal leading-tight">Perlu tindak lanjut</p>
                 </div>
 
-                {/* Locked */}
                 <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
                     <div>
                         <div className="flex items-center justify-between text-sky-600 dark:text-sky-400">
@@ -203,12 +254,9 @@ export default function StatistikSmartkey({ data = [] }) {
                             {countLocked.toLocaleString('id-ID')}
                         </div>
                     </div>
-                    <p className="text-[10px] text-sky-600/70 dark:text-sky-400/60 mt-2 font-normal leading-tight">
-                        Status posisi terkunci
-                    </p>
+                    <p className="text-[10px] text-sky-600/70 dark:text-sky-400/60 mt-2 font-normal leading-tight">Status posisi terkunci</p>
                 </div>
 
-                {/* Unlocked */}
                 <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
                     <div>
                         <div className="flex items-center justify-between text-amber-600 dark:text-amber-400">
@@ -219,12 +267,9 @@ export default function StatistikSmartkey({ data = [] }) {
                             {countUnlocked.toLocaleString('id-ID')}
                         </div>
                     </div>
-                    <p className="text-[10px] text-amber-600/70 dark:text-amber-400/60 mt-2 font-normal leading-tight">
-                        Sedang terbuka / diakses
-                    </p>
+                    <p className="text-[10px] text-amber-600/70 dark:text-amber-400/60 mt-2 font-normal leading-tight">Sedang terbuka / diakses</p>
                 </div>
 
-                {/* #N/A */}
                 <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
                     <div>
                         <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
@@ -235,23 +280,26 @@ export default function StatistikSmartkey({ data = [] }) {
                             {countNA.toLocaleString('id-ID')}
                         </div>
                     </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 font-normal leading-tight">
-                        Belum teridentifikasi
-                    </p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 font-normal leading-tight">Belum teridentifikasi</p>
                 </div>
             </div>
 
-            {/* MAP SECTION - MENGGUNAKAN PROPS MAP UNIVERSAL */}
+            {/* MAP SECTION */}
             <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
-                <div className="px-5 py-3 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-sky-500" />
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                        Peta Sebaran SmartKey
-                    </h3>
+                <div className="px-5 py-3 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-sky-500" />
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                            Peta Sebaran SmartKey
+                        </h3>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                        {normalizedMapData.length} Pin Terdeteksi
+                    </span>
                 </div>
                 <div className="p-0">
                     <Map 
-                        data={data}
+                        data={activeMapRaw} // <--- Kirim activeMapRaw (BUKAN normalizedMapData)
                         statusKey="status_aktifitas"
                         statusConfig={SMARTKEY_STATUS_CONFIG}
                         getPopupData={getSmartkeyPopupData}
@@ -305,7 +353,6 @@ export default function StatistikSmartkey({ data = [] }) {
                                         fontSize: '12px',
                                         color: '#f8fafc',
                                         padding: '8px 12px',
-                                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)'
                                     }}
                                     formatter={(val, name) => [`${val.toLocaleString('id-ID')} unit`, name]}
                                 />
@@ -323,7 +370,7 @@ export default function StatistikSmartkey({ data = [] }) {
                                     </span>
                                 </div>
                                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1">
-                                    {item.value} <span className="text-[10px] font-normal text-slate-400">({item.pct}%)</span>
+                                    {item.value.toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-400">({item.pct}%)</span>
                                 </span>
                             </div>
                         ))}
@@ -343,17 +390,8 @@ export default function StatistikSmartkey({ data = [] }) {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={barInfrakoData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
-                                <XAxis 
-                                    dataKey="name" 
-                                    tick={{ fontSize: 10, fill: '#94a3b8' }} 
-                                    axisLine={false}
-                                    tickLine={false}
-                                />
-                                <YAxis 
-                                    tick={{ fontSize: 10, fill: '#94a3b8' }} 
-                                    axisLine={false}
-                                    tickLine={false}
-                                />
+                                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                                 <Tooltip
                                     cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                                     contentStyle={{
@@ -363,7 +401,6 @@ export default function StatistikSmartkey({ data = [] }) {
                                         fontSize: '12px',
                                         color: '#f8fafc',
                                         padding: '8px 12px',
-                                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)'
                                     }}
                                 />
                                 <Legend 

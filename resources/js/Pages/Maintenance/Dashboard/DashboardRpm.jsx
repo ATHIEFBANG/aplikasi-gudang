@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useRef } from 'react';
+import { router } from '@inertiajs/react';
 import {
     DropdownMenu,
     DropdownMenuTrigger,
@@ -18,13 +19,11 @@ function FilterSelect({ options = [], value, onChange, placeholder = "Pilih...",
     const [search, setSearch] = useState('');
     const showSearch = options.length > 10;
 
-    const filteredOptions = useMemo(() => {
-        if (!search.trim() || !showSearch) return options;
-        return options.filter((opt) => {
-            const label = formatLabel ? formatLabel(opt) : (opt === 'ALL' ? placeholder : String(opt));
-            return label.toLowerCase().includes(search.toLowerCase());
-        });
-    }, [options, search, showSearch, placeholder, formatLabel]);
+    const filteredOptions = options.filter((opt) => {
+        if (!search.trim() || !showSearch) return true;
+        const label = formatLabel ? formatLabel(opt) : (opt === 'ALL' ? placeholder : String(opt));
+        return label.toLowerCase().includes(search.toLowerCase());
+    });
 
     const currentLabel = formatLabel ? formatLabel(value) : (value === 'ALL' ? placeholder : value);
 
@@ -71,24 +70,32 @@ function FilterSelect({ options = [], value, onChange, placeholder = "Pilih...",
 }
 
 // --- MAIN DASHBOARD CONTAINER ---
-export default function DashboardRpm({ data = [] }) {
-    const [selectedTahun, setSelectedTahun] = useState('ALL');
-    const [selectedRtp, setSelectedRtp] = useState('ALL');
+export default function DashboardRpm({ summary = {}, options = {}, filters = {} }) {
     const [isExporting, setIsExporting] = useState(false);
-
     const dashboardRef = useRef(null);
 
-    const listTahun = useMemo(() => ['ALL', ...new Set(data.map((i) => i.tahun).filter(Boolean))], [data]);
-    const listRtp = useMemo(() => ['ALL', ...new Set(data.map((i) => i.rtp).filter(Boolean))], [data]);
+    // Membaca opsi dropdown dari server (Laravel)
+    const listTahun = ['ALL', ...(options.tahun || [])];
+    const listRtp = ['ALL', ...(options.rtp || [])];
 
-    // FILTER DATA UTAMA
-    const filteredData = useMemo(() => {
-        return data.filter((item) => {
-            const matchTahun = selectedTahun === 'ALL' || String(item.tahun) === selectedTahun;
-            const matchRtp = selectedRtp === 'ALL' || item.rtp === selectedRtp;
-            return matchTahun && matchRtp;
-        });
-    }, [data, selectedTahun, selectedRtp]);
+    const selectedTahun = filters.tahun || 'ALL';
+    const selectedRtp = filters.rtp || 'ALL';
+
+    // Handler untuk mengirim filter baru ke Laravel via Inertia request
+    const handleFilterChange = (key, value) => {
+        router.get(
+            window.location.pathname,
+            {
+                ...filters,
+                [key]: value
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true
+            }
+        );
+    };
 
     // EXPORT PNG SNAPSHOT
     const handleDownloadDashboardImage = async () => {
@@ -122,14 +129,12 @@ export default function DashboardRpm({ data = [] }) {
         <div className="space-y-5">
             {/* CSS UNTUK MENYEMBUNYIKAN SEMUA SCROLLBAR DI AREA CAPTURE & TABEL */}
             <style>{`
-                /* Menyembunyikan Scrollbar di Chrome, Safari, Opera, Edge */
                 .capture-area *::-webkit-scrollbar {
                     display: none !important;
                     width: 0 !important;
                     height: 0 !important;
                     background: transparent !important;
                 }
-                /* Menyembunyikan Scrollbar di Firefox & IE */
                 .capture-area * {
                     -ms-overflow-style: none !important;
                     scrollbar-width: none !important;
@@ -146,15 +151,21 @@ export default function DashboardRpm({ data = [] }) {
                     <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block" />
                     <div className="w-full sm:w-44">
                         <FilterSelect
-                            options={listTahun} value={selectedTahun} onChange={setSelectedTahun}
-                            placeholder="Semua Tahun" searchPlaceholder="Cari tahun..."
+                            options={listTahun} 
+                            value={selectedTahun} 
+                            onChange={(val) => handleFilterChange('tahun', val)}
+                            placeholder="Semua Tahun" 
+                            searchPlaceholder="Cari tahun..."
                             formatLabel={(t) => t === 'ALL' ? 'Semua Tahun' : `Tahun ${t}`}
                         />
                     </div>
                     <div className="w-full sm:w-56">
                         <FilterSelect
-                            options={listRtp} value={selectedRtp} onChange={setSelectedRtp}
-                            placeholder="Semua RTP/Area" searchPlaceholder="Cari RTP / Area..."
+                            options={listRtp} 
+                            value={selectedRtp} 
+                            onChange={(val) => handleFilterChange('rtp', val)}
+                            placeholder="Semua RTP/Area" 
+                            searchPlaceholder="Cari RTP / Area..."
                         />
                     </div>
                 </div>
@@ -180,7 +191,7 @@ export default function DashboardRpm({ data = [] }) {
                 </div>
             </div>
 
-            {/* CAPTURE AREA (Ditambahkan class 'capture-area' agar CSS pembersih scrollbar aktif) */}
+            {/* CAPTURE AREA */}
             <div ref={dashboardRef} className="capture-area space-y-5 p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-900 rounded-xl overflow-hidden transition-colors duration-200">
                 <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800/80 pb-3">
                     <div>
@@ -195,10 +206,10 @@ export default function DashboardRpm({ data = [] }) {
                 </div>
 
                 {/* 1. SEKSI STATISTIK & GRAFIK */}
-                <StatistikRpm data={filteredData} />
+                <StatistikRpm summary={summary} />
 
                 {/* 2. SEKSI TABEL PIVOT */}
-                <TabelRpm data={filteredData} />
+                <TabelRpm monthlyPivot={summary.monthlyPivot || {}} rtpPivot={summary.rtpPivot || []} />
             </div>
         </div>
     );

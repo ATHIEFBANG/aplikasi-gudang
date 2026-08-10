@@ -93,9 +93,13 @@ export default function Map({
 
     // Calculate Status Counts
     const { statusCounts, noLocationCount } = useMemo(() => {
-        const counts = { ALL: 0, NA: 0 };
+        const counts = { ALL: 0 };
         Object.keys(statusConfig).forEach((k) => { counts[k] = 0; });
         let noLoc = 0;
+
+        const naKey = Object.keys(statusConfig).find(k => 
+            ['#N/A', 'N/A', 'NA', 'NO_LOCATION'].includes(k.trim().toUpperCase())
+        ) || '#N/A';
 
         rawList.forEach((item) => {
             counts.ALL++;
@@ -104,8 +108,13 @@ export default function Map({
 
             if (!coord) noLoc++;
 
+            // Jika LongLat TIDAK ADA/N/A ATAU status bernilai N/A/kosong -> Masukkan ke count #N/A
             if (!coord || st === 'N/A' || st === '#N/A' || st === '' || !statusConfig[st]) {
-                counts.NA++;
+                if (counts[naKey] !== undefined) {
+                    counts[naKey] = counts[naKey] + 1;
+                } else {
+                    counts['#N/A'] = (counts['#N/A'] || 0) + 1;
+                }
             } else {
                 counts[st] = (counts[st] || 0) + 1;
             }
@@ -118,12 +127,12 @@ export default function Map({
     const filteredList = useMemo(() => {
         return rawList.filter((item) => {
             const coord = parseCoordinates(item);
-            if (!coord) return false;
+            if (!coord) return false; // Hanya tampilkan di peta jika punya koordinat
 
             if (selectedStatus === 'ALL') return true;
 
             const stUpper = getItemStatus(item);
-            if (selectedStatus === 'NA') {
+            if (selectedStatus === 'NA' || selectedStatus === '#N/A') {
                 return !statusConfig[stUpper] || stUpper === 'N/A' || stUpper === '#N/A';
             }
 
@@ -309,6 +318,12 @@ export default function Map({
         });
     }, [filteredList, isClustered, createSingleMarker]);
 
+    // Simpan reference renderMarkers terbaru untuk event listener
+    const renderMarkersRef = useRef(renderMarkers);
+    useEffect(() => {
+        renderMarkersRef.current = renderMarkers;
+    }, [renderMarkers]);
+
     // Map Initialization
     useEffect(() => {
         if (map.current || !mapContainer.current) return;
@@ -354,8 +369,9 @@ export default function Map({
             }
         });
 
-        map.current.on('move', () => {
-            if (isClustered) renderMarkers();
+        // 💡 PERBAIKAN: Gunakan moveend agar smooth (tidak lag) dan pakai ref.current
+        map.current.on('moveend', () => {
+            if (renderMarkersRef.current) renderMarkersRef.current();
         });
 
         const resizeObserver = new ResizeObserver(() => {
@@ -406,12 +422,14 @@ export default function Map({
         });
     };
 
+    // Fungsi Reset Tampilan Peta ke Indonesia
     const handleResetViewIndonesia = () => {
         if (!map.current) return;
         map.current.flyTo({
             center: DEFAULT_INDONESIA_CENTER,
             zoom: DEFAULT_INDONESIA_ZOOM,
             pitch: 0,
+            bearing: 0,
             duration: 1200,
             essential: true,
         });

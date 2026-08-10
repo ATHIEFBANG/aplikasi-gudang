@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
+import { router } from '@inertiajs/react';
 import {
     DropdownMenu,
     DropdownMenuTrigger,
@@ -6,10 +7,10 @@ import {
     DropdownMenuCheckboxItem,
     DropdownMenuSearchInput
 } from '@/components/ui/dropdown-menu';
-import { Filter, ChevronDown, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Filter, ChevronDown, Image as ImageIcon, Loader2, RotateCcw } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
-// Import Komponen Terpisah
+// Import Sub-Komponen
 import StatistikSmartkey from './StatistikSmartkey';
 import TabelSmartkey from './TabelSmartkey';
 
@@ -24,15 +25,12 @@ function FilterMultiSelect({
     const [search, setSearch] = useState('');
     const showSearch = options.length > 5;
 
-    // Filter daftar opsi berdasarkan input pencarian dropdown
     const filteredOptions = useMemo(() => {
         if (!search.trim()) return options;
-        return options.filter((opt) => 
-            String(opt).toLowerCase().includes(search.toLowerCase())
-        );
+        const q = search.toLowerCase();
+        return options.filter((opt) => String(opt).toLowerCase().includes(q));
     }, [options, search]);
 
-    // Handle toggle pilih 1 item
     const handleToggle = (opt) => {
         if (selectedValues.includes(opt)) {
             onChange(selectedValues.filter((item) => item !== opt));
@@ -41,7 +39,6 @@ function FilterMultiSelect({
         }
     };
 
-    // Handle Select All / Clear All
     const handleSelectAll = () => {
         if (selectedValues.length === options.length) {
             onChange([]);
@@ -50,7 +47,6 @@ function FilterMultiSelect({
         }
     };
 
-    // Label yang tampil pada tombol Trigger
     const getTriggerLabel = () => {
         if (selectedValues.length === 0) return placeholder;
         if (selectedValues.length === 1) return selectedValues[0];
@@ -65,17 +61,16 @@ function FilterMultiSelect({
             </DropdownMenuTrigger>
 
             <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 z-50 shadow-md p-1">
-                {/* Search Input */}
                 {showSearch && (
                     <DropdownMenuSearchInput
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
                         placeholder={searchPlaceholder}
                         className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 mb-1"
                     />
                 )}
 
-                {/* Header Action: Pilih Semua & Reset */}
                 <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-slate-100 dark:border-slate-800 text-[11px]">
                     <button
                         type="button"
@@ -95,7 +90,6 @@ function FilterMultiSelect({
                     )}
                 </div>
 
-                {/* List Option Items */}
                 {filteredOptions.length === 0 ? (
                     <div className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500 text-center">Tidak ditemukan</div>
                 ) : (
@@ -105,6 +99,7 @@ function FilterMultiSelect({
                             <DropdownMenuCheckboxItem
                                 key={opt}
                                 checked={isChecked}
+                                onSelect={(e) => e.preventDefault()}
                                 onCheckedChange={() => handleToggle(opt)}
                                 className="text-xs py-1.5 cursor-pointer text-slate-700 dark:text-slate-200 focus:bg-slate-100 dark:focus:bg-slate-800/60"
                             >
@@ -119,42 +114,59 @@ function FilterMultiSelect({
 }
 
 // --- MAIN DASHBOARD CONTAINER SMARTKEY ---
-export default function DashboardSmartkey({ data = [] }) {
-    // 1. STATE FILTER & EXPORT
-    const [selectedInfrako, setSelectedInfrako] = useState([]);
-    const [selectedStatus, setSelectedStatus] = useState([]);
-    const [selectedSN, setSelectedSN] = useState([]); // State Multi-Select Dropdown Serial Number (SN)
+export default function DashboardSmartkey({ 
+    summary = {}, 
+    tableData = [], 
+    options = {},
+    filters = {}
+}) {
     const [isExporting, setIsExporting] = useState(false);
-
     const dashboardRef = useRef(null);
 
-    // List unik tanpa opsi 'ALL' keras (di-handle dinamis oleh array kosong)
-    const listInfrako = useMemo(() => [...new Set(data.map((i) => i.infrako).filter(Boolean))], [data]);
-    const listStatus = useMemo(() => [...new Set(data.map((i) => i.status).filter(Boolean))], [data]);
-    
-    // List unik Serial Number (SN) dari masterdata
-    const listSN = useMemo(() => {
-        const uniqueSN = data
-            .map((i) => i.serial_number || i.sn || i.serialNumber)
-            .filter((sn) => sn && String(sn).trim() !== '' && String(sn).toUpperCase() !== '#N/A');
-        
-        return [...new Set(uniqueSN)].sort();
-    }, [data]);
+    // Opsi dropdown
+    const listInfrako = options.infrako || [];
+    const listStatus = options.status || [];
+    const listSN = options.sn || [];
 
-    // 2. LOGIKA FILTERING DATA (MULTI-SELECT INFRAKO, STATUS, & SERIAL NUMBER)
-    const filteredData = useMemo(() => {
-        return data.filter((item) => {
-            const matchInfrako = selectedInfrako.length === 0 || selectedInfrako.includes(item.infrako);
-            const matchStatus = selectedStatus.length === 0 || selectedStatus.includes(item.status);
+    // State filter dari URL
+    const selectedInfrako = filters.infrako || [];
+    const selectedStatus = filters.status || [];
+    const selectedSN = filters.sn || [];
 
-            const itemSN = item.serial_number || item.sn || item.serialNumber;
-            const matchSN = selectedSN.length === 0 || selectedSN.includes(itemSN);
+    const isFiltered = selectedInfrako.length > 0 || selectedStatus.length > 0 || selectedSN.length > 0;
 
-            return matchInfrako && matchStatus && matchSN;
-        });
-    }, [data, selectedInfrako, selectedStatus, selectedSN]);
+    // Deteksi data tabel dari prop direct atau dari dalam summary
+    const resolvedTableData = useMemo(() => {
+        if (Array.isArray(tableData) && tableData.length > 0) return tableData;
+        if (summary?.table_data) return summary.table_data;
+        if (summary?.tableData) return summary.tableData;
+        if (summary?.pivot) return summary.pivot;
+        return tableData;
+    }, [tableData, summary]);
 
-    // EXPORT PNG SNAPSHOT (DISESUAIKAN UNTUK MENGELIMINASI GLITCH MAP)
+    const handleFilterChange = (key, values) => {
+        router.get(
+            window.location.pathname,
+            {
+                ...filters,
+                [key]: values
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true
+            }
+        );
+    };
+
+    const handleResetAllFilters = () => {
+        router.get(
+            window.location.pathname,
+            {},
+            { preserveState: true, preserveScroll: true, replace: true }
+        );
+    };
+
     const handleDownloadDashboardImage = async () => {
         if (!dashboardRef.current) return;
         setIsExporting(true);
@@ -162,10 +174,7 @@ export default function DashboardSmartkey({ data = [] }) {
         const isDarkMode = document.documentElement.classList.contains('dark');
 
         try {
-            // 1. Tambahkan class penanda untuk mematikan backdrop-filter sementara
             dashboardRef.current.classList.add('exporting-mode');
-
-            // 2. Jeda singkat agar render canvas peta stabil
             await new Promise((resolve) => setTimeout(resolve, 300));
 
             const dataUrl = await toPng(dashboardRef.current, { 
@@ -173,16 +182,13 @@ export default function DashboardSmartkey({ data = [] }) {
                 quality: 1.0,
                 pixelRatio: 2,
                 backgroundColor: isDarkMode ? '#020617' : '#f8fafc',
-                fetchRequestInit: {
-                    mode: 'cors',
-                },
+                fetchRequestInit: { mode: 'cors' },
             });
 
             const link = document.createElement('a');
             const infraName = selectedInfrako.length === 0 ? 'Semua' : selectedInfrako.join('-');
             const statusName = selectedStatus.length === 0 ? 'Semua' : selectedStatus.join('-');
-            const snFilterName = selectedSN.length === 0 ? 'Semua' : selectedSN.join('-');
-            const fileName = `Dashboard_SmartKey_${infraName}_${statusName}_SN-${snFilterName}_${new Date().toISOString().slice(0,10)}.png`;
+            const fileName = `Dashboard_SmartKey_${infraName}_${statusName}_${new Date().toISOString().slice(0,10)}.png`;
             
             link.download = fileName;
             link.href = dataUrl;
@@ -191,7 +197,6 @@ export default function DashboardSmartkey({ data = [] }) {
             console.error("Gagal mendownload gambar dashboard:", err);
             alert("Terjadi kesalahan saat memproses gambar.");
         } finally {
-            // 3. Kembalikan kondisi normal
             if (dashboardRef.current) {
                 dashboardRef.current.classList.remove('exporting-mode');
             }
@@ -201,7 +206,6 @@ export default function DashboardSmartkey({ data = [] }) {
 
     return (
         <div className="space-y-5">
-            {/* CSS UNTUK MENYEMBUNYIKAN SCROLLBAR DAN PERBAIKAN GLITCH CAPTURE PETA */}
             <style>{`
                 .capture-area *::-webkit-scrollbar {
                     display: none !important;
@@ -213,8 +217,6 @@ export default function DashboardSmartkey({ data = [] }) {
                     -ms-overflow-style: none !important;
                     scrollbar-width: none !important;
                 }
-
-                /* Hapus efek backdrop-blur saat export agar tidak menciptakan kotak hitam/glitch pada map */
                 .capture-area.exporting-mode * {
                     backdrop-filter: none !important;
                     -webkit-backdrop-filter: none !important;
@@ -230,41 +232,47 @@ export default function DashboardSmartkey({ data = [] }) {
                     </div>
                     <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block" />
                     
-                    {/* Filter Infrako (Multi-select) */}
                     <div className="w-full sm:w-48">
                         <FilterMultiSelect
                             options={listInfrako} 
                             selectedValues={selectedInfrako} 
-                            onChange={setSelectedInfrako}
+                            onChange={(val) => handleFilterChange('infrako', val)}
                             placeholder="Semua Infrako" 
                             searchPlaceholder="Cari Infrako..."
                         />
                     </div>
 
-                    {/* Filter Status Unit (Multi-select) */}
                     <div className="w-full sm:w-44">
                         <FilterMultiSelect
                             options={listStatus} 
                             selectedValues={selectedStatus} 
-                            onChange={setSelectedStatus}
+                            onChange={(val) => handleFilterChange('status', val)}
                             placeholder="Semua Status Unit" 
                             searchPlaceholder="Cari Status..."
                         />
                     </div>
 
-                    {/* Filter Serial Number / SN (Multi-select Dropdown) */}
                     <div className="w-full sm:w-52">
                         <FilterMultiSelect
                             options={listSN}
                             selectedValues={selectedSN}
-                            onChange={setSelectedSN}
+                            onChange={(val) => handleFilterChange('sn', val)}
                             placeholder="Semua Serial Number"
                             searchPlaceholder="Cari Serial Number..."
                         />
                     </div>
+
+                    {isFiltered && (
+                        <button
+                            onClick={handleResetAllFilters}
+                            className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:underline font-medium px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                        >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Reset Filter</span>
+                        </button>
+                    )}
                 </div>
 
-                {/* Tombol Download PNG */}
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                     <button
                         onClick={handleDownloadDashboardImage}
@@ -301,10 +309,10 @@ export default function DashboardSmartkey({ data = [] }) {
                 </div>
 
                 {/* 1. SEKSI STATISTIK & MAP */}
-                <StatistikSmartkey data={filteredData} />
+                <StatistikSmartkey summary={summary} />
 
-                {/* 2. SEKSI TABEL PIVOT KSM */}
-                <TabelSmartkey data={filteredData} />
+                {/* 2. SEKSI TABEL PIVOT KSM (Hanya dipanggil sekali di sini) */}
+                <TabelSmartkey tableData={resolvedTableData} />
             </div>
         </div>
     );
