@@ -57,8 +57,8 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        // Hanya memproses bulan bernilai angka (1-12) agar CAST ke INTEGER tidak error
-        $validMonths = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '01', '02', '03', '04', '05', '06', '07', '08', '09'];
+        // Menyediakan format bulan 1-12 dan 01-12
+        $validMonths = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
         // ==========================================
         // 1. DASHBOARD RPM LOGIC
@@ -80,10 +80,11 @@ class DashboardController extends Controller
         $rpmKpi = (clone $rpmQuery)
             ->selectRaw("
                 COUNT(*) as total_site,
-                SUM(CASE WHEN UPPER(TRIM(approve)) = 'OK' THEN 1 ELSE 0 END) as total_approved,
-                SUM(CASE WHEN UPPER(TRIM(approve)) IN ('BELUM', 'REVIEWED') OR approve IS NULL THEN 1 ELSE 0 END) as total_pending,
-                SUM(CASE WHEN UPPER(TRIM(approve)) IN ('REJECT', 'TIDAKOM', 'TIDAK OM') THEN 1 ELSE 0 END) as total_reject,
-                SUM(CASE WHEN UPPER(TRIM(approve)) = 'RETURN' THEN 1 ELSE 0 END) as total_return
+                SUM(CASE WHEN LOWER(TRIM(approve)) = 'ok' THEN 1 ELSE 0 END) as total_approved,
+                SUM(CASE WHEN LOWER(TRIM(approve)) IN ('belum', 'reviewed', 'tidakom', 'tidak om') OR approve IS NULL OR TRIM(approve) = '' THEN 1 ELSE 0 END) as total_pending,
+                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%tidak%' THEN 1 ELSE 0 END) as total_tidak_om,
+                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%reject%' THEN 1 ELSE 0 END) as total_reject,
+                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%return%' THEN 1 ELSE 0 END) as total_return
             ", [])
             ->first();
 
@@ -91,10 +92,10 @@ class DashboardController extends Controller
         $pivotMonthlyRaw = (clone $rpmQuery)
             ->selectRaw("
                 CAST(bulan AS INTEGER) as month_num,
-                SUM(CASE WHEN UPPER(TRIM(approve)) = 'OK' THEN 1 ELSE 0 END) as ok,
-                SUM(CASE WHEN UPPER(TRIM(approve)) IN ('BELUM', 'REVIEWED') OR approve IS NULL THEN 1 ELSE 0 END) as belum,
-                SUM(CASE WHEN UPPER(TRIM(approve)) IN ('REJECT', 'TIDAKOM', 'TIDAK OM') THEN 1 ELSE 0 END) as reject,
-                SUM(CASE WHEN UPPER(TRIM(approve)) = 'RETURN' THEN 1 ELSE 0 END) as returnVal
+                SUM(CASE WHEN LOWER(TRIM(approve)) = 'ok' THEN 1 ELSE 0 END) as ok,
+                SUM(CASE WHEN LOWER(TRIM(approve)) IN ('belum', 'reviewed', 'tidakom', 'tidak om') OR approve IS NULL OR TRIM(approve) = '' THEN 1 ELSE 0 END) as belum,
+                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%reject%' THEN 1 ELSE 0 END) as reject,
+                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%return%' THEN 1 ELSE 0 END) as returnVal
             ", [])
             ->whereIn('bulan', $validMonths)
             ->groupBy(DB::raw("CAST(bulan AS INTEGER)"))
@@ -105,7 +106,7 @@ class DashboardController extends Controller
         $fullMonthsName = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
         $rpmChartData = [];
-        $counts = ['OK' => [], 'BELUM' => [], 'REJECT' => [], 'RETURN' => []];
+        $rawCounts = ['OK' => [], 'BELUM' => [], 'REJECT' => [], 'RETURN' => []];
         $monthTotals = [];
         $monthPct = [];
 
@@ -116,10 +117,10 @@ class DashboardController extends Controller
             $rejectVal = (int) ($row->reject ?? 0);
             $retVal    = (int) ($row->returnVal ?? 0);
 
-            $counts['OK'][]     = $okVal;
-            $counts['BELUM'][]  = $belumVal;
-            $counts['REJECT'][] = $rejectVal;
-            $counts['RETURN'][] = $retVal;
+            $rawCounts['OK'][]     = $okVal;
+            $rawCounts['BELUM'][]  = $belumVal;
+            $rawCounts['REJECT'][] = $rejectVal;
+            $rawCounts['RETURN'][] = $retVal;
 
             $mTotal = $okVal + $belumVal + $rejectVal + $retVal;
             $monthTotals[] = $mTotal;
@@ -133,14 +134,46 @@ class DashboardController extends Controller
             ];
         }
 
-        $rowTotals = [
-            'OK'     => array_sum($counts['OK']),
-            'BELUM'  => array_sum($counts['BELUM']),
-            'REJECT' => array_sum($counts['REJECT']),
-            'RETURN' => array_sum($counts['RETURN']),
+        // Menyediakan Alias Variasi Key untuk Frontend React
+        $counts = [
+            'OK'     => $rawCounts['OK'],
+            'BELUM'  => $rawCounts['BELUM'],
+            'REJECT' => $rawCounts['REJECT'],
+            'RETURN' => $rawCounts['RETURN'],
+
+            'ok'     => $rawCounts['OK'],
+            'belum'  => $rawCounts['BELUM'],
+            'reject' => $rawCounts['REJECT'],
+            'return' => $rawCounts['RETURN'],
+
+            'Belum'  => $rawCounts['BELUM'],
+            'Reject' => $rawCounts['REJECT'],
+            'Return' => $rawCounts['RETURN'],
         ];
+
+        $sumOk     = array_sum($rawCounts['OK']);
+        $sumBelum  = array_sum($rawCounts['BELUM']);
+        $sumReject = array_sum($rawCounts['REJECT']);
+        $sumReturn = array_sum($rawCounts['RETURN']);
+
+        $rowTotals = [
+            'OK'     => $sumOk,
+            'BELUM'  => $sumBelum,
+            'REJECT' => $sumReject,
+            'RETURN' => $sumReturn,
+
+            'ok'     => $sumOk,
+            'belum'  => $sumBelum,
+            'reject' => $sumReject,
+            'return' => $sumReturn,
+
+            'Belum'  => $sumBelum,
+            'Reject' => $sumReject,
+            'Return' => $sumReturn,
+        ];
+
         $overallTotal = array_sum($monthTotals);
-        $overallPct   = $overallTotal > 0 ? round(($rowTotals['OK'] / $overallTotal) * 100) : 0;
+        $overallPct   = $overallTotal > 0 ? round(($sumOk / $overallTotal) * 100) : 0;
 
         $rpmMonthlyPivot = [
             'counts'       => $counts,
@@ -154,26 +187,29 @@ class DashboardController extends Controller
         // --- 1C. RTP Pivot Table Data ---
         $rpmRtpPivot = (clone $rpmQuery)
             ->selectRaw("
-                rtp,
-                SUM(CASE WHEN UPPER(TRIM(approve)) = 'OK' THEN 1 ELSE 0 END) as ok,
-                SUM(CASE WHEN UPPER(TRIM(approve)) IN ('BELUM', 'REVIEWED') OR approve IS NULL THEN 1 ELSE 0 END) as belum,
-                SUM(CASE WHEN UPPER(TRIM(approve)) IN ('REJECT', 'TIDAKOM', 'TIDAK OM') THEN 1 ELSE 0 END) as reject,
-                SUM(CASE WHEN UPPER(TRIM(approve)) = 'RETURN' THEN 1 ELSE 0 END) as returnVal,
+                COALESCE(NULLIF(TRIM(rtp), ''), 'Unassigned') as rtp_name,
+                SUM(CASE WHEN LOWER(TRIM(approve)) = 'ok' THEN 1 ELSE 0 END) as ok,
+                SUM(CASE WHEN LOWER(TRIM(approve)) IN ('belum', 'reviewed', 'tidakom', 'tidak om') OR approve IS NULL OR TRIM(approve) = '' THEN 1 ELSE 0 END) as belum,
+                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%reject%' THEN 1 ELSE 0 END) as reject,
+                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%return%' THEN 1 ELSE 0 END) as returnVal,
                 COUNT(*) as total
             ", [])
-            ->groupBy('rtp')
+            ->groupBy(DB::raw("COALESCE(NULLIF(TRIM(rtp), ''), 'Unassigned')"))
             ->get()
             ->map(function ($item) {
-                $tot = (int) $item->total;
-                $ok  = (int) $item->ok;
+                $tot    = (int) $item->total;
+                $ok     = (int) $item->ok;
+                $retVal = (int) $item->returnVal;
                 return [
-                    'rtp'       => $item->rtp ?? 'Unassigned',
-                    'ok'        => $ok,
-                    'belum'     => (int) $item->belum,
-                    'reject'    => (int) $item->reject,
-                    'returnVal' => (int) $item->returnVal,
-                    'total'     => $tot,
-                    'pct'       => $tot > 0 ? round(($ok / $tot) * 100) : 0,
+                    'rtp'        => $item->rtp_name,
+                    'ok'         => $ok,
+                    'belum'      => (int) $item->belum,
+                    'reject'     => (int) $item->reject,
+                    'return'     => $retVal,       // Alias 1
+                    'returnVal'  => $retVal,       // Alias 2
+                    'return_val' => $retVal,       // Alias 3
+                    'total'      => $tot,
+                    'pct'        => $tot > 0 ? round(($ok / $tot) * 100) : 0,
                 ];
             });
 
@@ -192,26 +228,25 @@ class DashboardController extends Controller
         // --- 2A. Smartkey Summary Cards ---
         $skSummary = (clone $skQuery)->selectRaw("
             COUNT(*) as total_unit,
-            SUM(CASE WHEN LOWER(status) = 'aktif' THEN 1 ELSE 0 END) as count_aktif,
-            SUM(CASE WHEN LOWER(status) IN ('rusak', 'hilang', 'problem') THEN 1 ELSE 0 END) as count_problem,
-            SUM(CASE WHEN LOWER(status_aktifitas) = 'locked' THEN 1 ELSE 0 END) as count_locked,
-            SUM(CASE WHEN LOWER(status_aktifitas) = 'unlocked' THEN 1 ELSE 0 END) as count_unlocked,
-            SUM(CASE WHEN status_aktifitas IS NULL OR status_aktifitas = '' OR status_aktifitas = '#N/A' THEN 1 ELSE 0 END) as count_na
+            SUM(CASE WHEN LOWER(TRIM(status)) = 'aktif' THEN 1 ELSE 0 END) as count_aktif,
+            SUM(CASE WHEN LOWER(TRIM(status)) IN ('rusak', 'hilang', 'problem') THEN 1 ELSE 0 END) as count_problem,
+            SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'locked' THEN 1 ELSE 0 END) as count_locked,
+            SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'unlocked' THEN 1 ELSE 0 END) as count_unlocked,
+            SUM(CASE WHEN status_aktifitas IS NULL OR TRIM(status_aktifitas) = '' OR status_aktifitas = '#N/A' THEN 1 ELSE 0 END) as count_na
         ", [])->first();
 
         // --- 2B. Smartkey Chart ---
         $skChart = (clone $skQuery)
             ->selectRaw("
-                infrako,
-                SUM(CASE WHEN LOWER(status_aktifitas) = 'locked' THEN 1 ELSE 0 END) as locked,
-                SUM(CASE WHEN LOWER(status_aktifitas) = 'unlocked' THEN 1 ELSE 0 END) as unlocked,
-                SUM(CASE WHEN status_aktifitas IS NULL OR status_aktifitas = '' OR status_aktifitas = '#N/A' THEN 1 ELSE 0 END) as na,
+                COALESCE(NULLIF(TRIM(infrako), ''), 'Unassigned') as infrako,
+                SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'locked' THEN 1 ELSE 0 END) as locked,
+                SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'unlocked' THEN 1 ELSE 0 END) as unlocked,
+                SUM(CASE WHEN status_aktifitas IS NULL OR TRIM(status_aktifitas) = '' OR status_aktifitas = '#N/A' THEN 1 ELSE 0 END) as na,
                 COUNT(*) as total
             ", [])
-            ->groupBy('infrako')
+            ->groupBy(DB::raw("COALESCE(NULLIF(TRIM(infrako), ''), 'Unassigned')"))
             ->get();
 
-        // --- 2C. Smartkey Map Data (DIPERBAIKI: Smart Parser Longitude & Latitude) ---
         // --- 2C. Smartkey Map Data ---
         $skMapData = (clone $skQuery)
             ->select('long_lat', 'site_name', 'tower_id', 'serial_number', 'new_sn', 'infrako', 'status_aktifitas', 'kota_kab', 'posisi_unit', 'ksm')
@@ -230,7 +265,6 @@ class DashboardController extends Controller
 
                 if ($v1 == 0 && $v2 == 0) return null;
 
-                // Deteksi Wilayah Indonesia
                 if (abs($v1) > 50) {
                     $lng = $v1;
                     $lat = $v2;
@@ -244,7 +278,6 @@ class DashboardController extends Controller
 
                 if ($lat < -90 || $lat > 90) return null;
 
-                // Standardisasi Status Aktifitas
                 $rawStatus = strtoupper(trim($item->status_aktifitas ?? ''));
                 if ($rawStatus === 'LOCKED') {
                     $cleanStatus = 'LOCKED';
@@ -259,8 +292,8 @@ class DashboardController extends Controller
                     'longitude'        => $lng,
                     'lat'              => $lat,
                     'lng'              => $lng,
-                    'position'         => [$lat, $lng],          // Format Leaflet
-                    'coordinates'      => [$lng, $lat],          // Format MapLibre/Mapbox
+                    'position'         => [$lat, $lng],
+                    'coordinates'      => [$lng, $lat],
                     'site_name'        => $item->site_name ?? '-',
                     'tower_id'         => $item->tower_id ?? '-',
                     'serial_number'    => $item->serial_number ?? $item->new_sn ?? '-',
@@ -275,13 +308,13 @@ class DashboardController extends Controller
             ->filter()
             ->values();
 
-        // --- 2D. Smartkey Table Pivot Data (COALESCE NULL KSM) ---
+        // --- 2D. Smartkey Table Pivot Data ---
         $skTableData = (clone $skQuery)
             ->selectRaw("
                 COALESCE(NULLIF(TRIM(ksm), ''), 'Unassigned') as ksm_name,
-                SUM(CASE WHEN LOWER(status_aktifitas) = 'locked' THEN 1 ELSE 0 END) as locked,
-                SUM(CASE WHEN LOWER(status_aktifitas) = 'unlocked' THEN 1 ELSE 0 END) as unlocked,
-                SUM(CASE WHEN status_aktifitas IS NULL OR status_aktifitas = '' OR status_aktifitas = '#N/A' THEN 1 ELSE 0 END) as na,
+                SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'locked' THEN 1 ELSE 0 END) as locked,
+                SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'unlocked' THEN 1 ELSE 0 END) as unlocked,
+                SUM(CASE WHEN status_aktifitas IS NULL OR TRIM(status_aktifitas) = '' OR status_aktifitas = '#N/A' THEN 1 ELSE 0 END) as na,
                 COUNT(*) as total
             ", [])
             ->groupBy(DB::raw("COALESCE(NULLIF(TRIM(ksm), ''), 'Unassigned')"))
@@ -301,14 +334,14 @@ class DashboardController extends Controller
         // 3. DROPDOWN FILTER OPTIONS
         // ==========================================
         try {
-            $rpmFilterOptions = Cache::remember('rpm_filter_options_v4', 3600, function () {
+            $rpmFilterOptions = Cache::remember('rpm_filter_options_v6', 3600, function () {
                 return [
                     'tahun' => array_values(RpmMaster::select('tahun')->whereNotNull('tahun')->where('tahun', '!=', '')->distinct()->pluck('tahun')->filter()->toArray()),
                     'rtp'   => array_values(RpmMaster::select('rtp')->whereNotNull('rtp')->where('rtp', '!=', '')->distinct()->pluck('rtp')->filter()->toArray()),
                 ];
             });
 
-            $skFilterOptions = Cache::remember('sk_filter_options_v4', 3600, function () {
+            $skFilterOptions = Cache::remember('sk_filter_options_v6', 3600, function () {
                 return [
                     'infrako' => array_values(SmartkeyMaster::select('infrako')->whereNotNull('infrako')->where('infrako', '!=', '')->distinct()->pluck('infrako')->filter()->toArray()),
                     'status'  => array_values(SmartkeyMaster::select('status')->whereNotNull('status')->where('status', '!=', '')->distinct()->pluck('status')->filter()->toArray()),
@@ -337,12 +370,14 @@ class DashboardController extends Controller
                 'totalPending'  => (int) ($rpmKpi->total_pending ?? 0),
                 'totalReject'   => (int) ($rpmKpi->total_reject ?? 0),
                 'totalReturn'   => (int) ($rpmKpi->total_return ?? 0),
+                'totalTidakOm'  => (int) ($rpmKpi->total_tidak_om ?? 0),
 
                 'total_site'     => (int) ($rpmKpi->total_site ?? 0),
                 'total_approved' => (int) ($rpmKpi->total_approved ?? 0),
                 'total_pending'  => (int) ($rpmKpi->total_pending ?? 0),
                 'total_reject'   => (int) ($rpmKpi->total_reject ?? 0),
                 'total_return'   => (int) ($rpmKpi->total_return ?? 0),
+                'total_tidak_om' => (int) ($rpmKpi->total_tidak_om ?? 0),
 
                 'chartData'     => $rpmChartData,
                 'monthlyPivot'  => $rpmMonthlyPivot,
@@ -352,7 +387,6 @@ class DashboardController extends Controller
                 'summary'    => $skSummary,
                 'chart'      => $skChart,
 
-                // Mendukung penamaan snake_case & camelCase sekaligus
                 'map_data'   => $skMapData,
                 'mapData'    => $skMapData,
 

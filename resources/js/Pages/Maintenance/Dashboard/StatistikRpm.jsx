@@ -33,17 +33,22 @@ const CustomBarTooltip = ({ active, payload }) => {
 };
 
 export default function StatistikRpm({ summary = {} }) {
-  // Ambil data hasil kalkulasi langsung dari Database / Controller
-  const totalSite = summary.totalSite || 0;
-  const totalApproved = summary.totalApproved || 0;
-  const totalPending = summary.totalPending || 0;
-  const totalReject = summary.totalReject || 0;
-  const totalReturn = summary.totalReturn || 0;
+  // Ambil data hasil kalkulasi dari Database / Controller dengan fallback property
+  const totalSite = summary.totalSite || summary.total_site || 0;
+  const totalApproved = summary.totalApproved || summary.total_approved || 0;
+  
+  // Gabungkan nilai Pending (Belum) dengan Tidak OM secara otomatis
+  const rawPending = summary.totalPending || summary.total_pending || summary.totalBelum || summary.total_belum || 0;
+  const rawTidakOm = summary.totalTidakOm || summary.total_tidak_om || summary.total_tidakOm || 0;
+  const totalPending = rawPending + rawTidakOm;
+
+  const totalReject = summary.totalReject || summary.total_reject || 0;
+  const totalReturn = summary.totalReturn || summary.total_return || 0;
 
   // Chart data dikirim langsung berupa Array 12 Bulan dari Backend
   const chartData = summary.chartData || [];
 
-  // Donut chart hanya menghitung persentase dari 4 angka total saja (Sangat Ringan)
+  // Donut chart menghitung persentase dari 4 status baku
   const donutData = useMemo(() => {
     const raw = [
       { name: 'Approved (OK)', value: totalApproved, color: '#10b981', badgeClass: 'bg-emerald-500' },

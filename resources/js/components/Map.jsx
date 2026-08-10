@@ -93,29 +93,31 @@ export default function Map({
 
     // Calculate Status Counts
     const { statusCounts, noLocationCount } = useMemo(() => {
-        const counts = { ALL: 0 };
+    const counts = { ALL: rawList.length };
+    
+        // Inisialisasi awal key status dari config
         Object.keys(statusConfig).forEach((k) => { counts[k] = 0; });
+        if (counts['#N/A'] === undefined) counts['#N/A'] = 0;
+
         let noLoc = 0;
 
-        const naKey = Object.keys(statusConfig).find(k => 
-            ['#N/A', 'N/A', 'NA', 'NO_LOCATION'].includes(k.trim().toUpperCase())
-        ) || '#N/A';
-
         rawList.forEach((item) => {
-            counts.ALL++;
             const coord = parseCoordinates(item);
-            const st = getItemStatus(item);
+            const st = getItemStatus(item); // Membaca status_aktifitas
 
-            if (!coord) noLoc++;
+            const isMissingCoord = !coord;
+            const isStatusNA = !st || st === 'N/A' || st === '#N/A' || st === '' || !statusConfig[st];
 
-            // Jika LongLat TIDAK ADA/N/A ATAU status bernilai N/A/kosong -> Masukkan ke count #N/A
-            if (!coord || st === 'N/A' || st === '#N/A' || st === '' || !statusConfig[st]) {
-                if (counts[naKey] !== undefined) {
-                    counts[naKey] = counts[naKey] + 1;
-                } else {
-                    counts['#N/A'] = (counts['#N/A'] || 0) + 1;
-                }
+            if (isMissingCoord) {
+                noLoc++;
+            }
+
+            // LOGIKA GABUNGAN:
+            // Jika TIDAK ADA KOORDINAT *ATAU* STATUSNYA MEMANG 'N/A' -> Masuk ke #N/A
+            if (isMissingCoord || isStatusNA) {
+                counts['#N/A'] = (counts['#N/A'] || 0) + 1;
             } else {
+                // Jika Punya Koordinat DAN Statusnya Valid (LOCKED / UNLOCKED)
                 counts[st] = (counts[st] || 0) + 1;
             }
         });
@@ -328,17 +330,18 @@ export default function Map({
     useEffect(() => {
         if (map.current || !mapContainer.current) return;
 
-        map.current = new maplibregl.Map({
-            container: mapContainer.current,
-            style: MAP_STYLES[currentStyle].style,
-            center: center,
-            zoom: zoom,
-            pitch: 0,
-            maxPitch: 85,
-            renderWorldCopies: false,
-            minZoom: 1,
-            maxZoom: 22,
-        });
+       map.current = new maplibregl.Map({
+        container: mapContainer.current,
+        style: MAP_STYLES[currentStyle].style,
+        center: center,
+        zoom: zoom,
+        pitch: 0,
+        maxPitch: 85,
+        renderWorldCopies: false,
+        minZoom: 1,
+        maxZoom: 22,
+        attributionControl: false, // 💡 TAMBAHKAN INI (Menghapus info "© Esri | MapLibre ⓘ")
+    });
 
         map.current.once('load', () => {
             if (map.current && typeof map.current.setProjection === 'function') {

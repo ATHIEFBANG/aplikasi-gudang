@@ -1,4 +1,5 @@
 import React from 'react';
+import { Globe } from 'lucide-react';
 
 export const MAP_STYLES = {
     dark: {
@@ -196,15 +197,14 @@ export default function MapControls({
                     ))}
                 </div>
 
+                {/* 🌐 TOMBOL RESET ZOOM INDONESIA MENGGUNAKAN LUCIDE GLOBE */}
                 <button
                     type="button"
                     onClick={onResetView}
                     title="Zoom Out ke Peta Indonesia"
-                    className="p-2 rounded-full bg-slate-900/80 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 hover:bg-sky-500/10 transition-all duration-200 shadow-2xl group"
+                    className="p-2 rounded-full bg-slate-900/80 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 hover:bg-sky-500/10 transition-all duration-200 shadow-2xl group flex items-center justify-center"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 transition-transform group-hover:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V7a2 2 0 00-2-2h-1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <Globe className="w-4 h-4 transition-transform group-hover:scale-110" />
                 </button>
 
                 <button
@@ -227,31 +227,34 @@ export default function MapControls({
             {/* STATUS BAR BAWAH */}
             {Object.keys(statusConfig).length > 0 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 max-w-[90vw] overflow-x-auto no-scrollbar py-1 px-2">
-                    {Object.entries(statusConfig).map(([key, cfg]) => {
-                        const count = statusCounts[key] || 0;
-                        const isSelected = selectedStatus === key;
-                        const color = cfg.color || '#3b82f6';
+                    {Object.entries(statusConfig)
+                        // 💡 FILTER INI UNTUK MENYEMBUNYIKAN BADGE #N/A
+                        .filter(([key]) => key !== '#N/A' && key !== 'N/A' && key !== 'NA') 
+                        .map(([key, cfg]) => {
+                            const count = statusCounts[key] || 0;
+                            const isSelected = selectedStatus === key;
+                            const color = cfg.color || '#3b82f6';
 
-                        return (
-                            <button
-                                key={key}
-                                type="button"
-                                onClick={() => onSelectStatus && onSelectStatus(isSelected ? 'ALL' : key)}
-                                style={{
-                                    backgroundColor: isSelected ? cfg.bg || 'rgba(59,130,246,0.3)' : 'rgba(15, 23, 42, 0.85)',
-                                    borderColor: isSelected ? color : 'rgba(255, 255, 255, 0.1)',
-                                    color: isSelected ? '#ffffff' : '#94a3b8',
-                                }}
-                                className="px-3 py-1.5 rounded-full text-xs font-semibold border backdrop-blur-xl transition-all shadow-lg flex items-center gap-2 whitespace-nowrap"
-                            >
-                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                                <span>{cfg.label || key}</span>
-                                <span className="px-1.5 py-0.5 rounded-full bg-black/40 text-[10px] text-white/90">
-                                    {count}
-                                </span>
-                            </button>
-                        );
-                    })}
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => onSelectStatus && onSelectStatus(isSelected ? 'ALL' : key)}
+                                    style={{
+                                        backgroundColor: isSelected ? cfg.bg || 'rgba(59,130,246,0.3)' : 'rgba(15, 23, 42, 0.85)',
+                                        borderColor: isSelected ? color : 'rgba(255, 255, 255, 0.1)',
+                                        color: isSelected ? '#ffffff' : '#94a3b8',
+                                    }}
+                                    className="px-3 py-1.5 rounded-full text-xs font-semibold border backdrop-blur-xl transition-all shadow-lg flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                                    <span>{cfg.label || key}</span>
+                                    <span className="px-1.5 py-0.5 rounded-full bg-black/40 text-[10px] text-white/90">
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
                 </div>
             )}
         </>
