@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import InputError from '@/components/InputError';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Input } from '@/components/ui/input';
@@ -7,10 +7,44 @@ import { Button } from '@/components/ui/button';
 import { 
     Signal, 
     Mail, 
-    ArrowLeft
+    ArrowLeft,
+    Wifi,
+    BatteryCharging,
+    Server,
+    Activity,
+    Folder,
+    Volume2,
+    Search,
+    ShieldCheck,
+    Image as ImageIcon,
+    KeyRound
 } from 'lucide-react';
 
 export default function ForgotPassword({ status }) {
+    const [currentTime, setCurrentTime] = useState('');
+    const [currentDate, setCurrentDate] = useState('');
+    const [bgIndex, setBgIndex] = useState(0);
+
+    // Real-time clock & date for Windows Taskbar
+    useEffect(() => {
+        const updateClock = () => {
+            const now = new Date();
+            setCurrentTime(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
+            setCurrentDate(now.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }));
+        };
+        updateClock();
+        const interval = setInterval(updateClock, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Auto-switch background wallpaper every 7 seconds
+    useEffect(() => {
+        const bgTimer = setInterval(() => {
+            setBgIndex((prev) => (prev + 1) % 3);
+        }, 7000);
+        return () => clearInterval(bgTimer);
+    }, []);
+
     const { data, setData, post, processing, errors } = useForm({
         email: '',
     });
@@ -22,11 +56,39 @@ export default function ForgotPassword({ status }) {
 
     return (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-hidden font-sans selection:bg-red-600 selection:text-white">
-            <Head title="Lupa Password - Mitratel Dashboard" />
+            <Head title="Lupa Password - Mitratel Desktop" />
 
-            {/* ========================================================================= */}
-            {/* LOGO & BRAND MITRATEL (DILUAR LAPTOP - POJOK KIRI ATAS & BISA DIKLIK) */}
-            {/* ========================================================================= */}
+            {/* CUSTOM ANIMATION STYLES UNTUK GRAFIK BERGERAK */}
+            <style>{`
+                @keyframes flowLine {
+                    0% { stroke-dashoffset: 100; }
+                    100% { stroke-dashoffset: 0; }
+                }
+                @keyframes scanMove {
+                    0% { transform: translateX(10px); opacity: 0.2; }
+                    50% { opacity: 0.8; }
+                    100% { transform: translateX(320px); opacity: 0.2; }
+                }
+                @keyframes signalRipple {
+                    0% { r: 5px; opacity: 0.9; stroke-width: 2px; }
+                    100% { r: 75px; opacity: 0; stroke-width: 0.5px; }
+                }
+                .animate-flow-dash {
+                    stroke-dasharray: 12 6;
+                    animation: flowLine 2s linear infinite;
+                }
+                .animate-scanline {
+                    animation: scanMove 4s ease-in-out infinite alternate;
+                }
+                .animate-ripple-1 {
+                    animation: signalRipple 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+                }
+                .animate-ripple-2 {
+                    animation: signalRipple 3s cubic-bezier(0.1, 0.8, 0.3, 1) 1.5s infinite;
+                }
+            `}</style>
+
+            {/* LOGO & BRAND MITRATEL (POJOK KIRI ATAS HALAMAN) */}
             <Link 
                 href="/" 
                 className="absolute top-6 left-6 sm:top-8 sm:left-8 z-50 flex items-center gap-2.5 group transition-transform duration-200 hover:scale-105"
@@ -40,74 +102,226 @@ export default function ForgotPassword({ status }) {
                         Mitratel
                     </h2>
                     <span className="text-[10px] text-slate-400 font-medium group-hover:text-slate-300 transition-colors">
-                        Dashboard System
+                        Enterprise System
                     </span>
                 </div>
             </Link>
 
-            {/* ========================================================================= */}
-            {/* BACKGROUND PATTERN & LIGHTING */}
-            {/* ========================================================================= */}
-            <div 
-                className="absolute inset-0 opacity-[0.05] pointer-events-none"
-                style={{
-                    backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px)`,
-                    backgroundSize: '28px 28px'
-                }}
-            />
-
-            {/* Ambient Red Glow */}
+            {/* AMBIENT LIGHTING OUTSIDE LAPTOP */}
             <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 blur-[140px] rounded-full pointer-events-none animate-pulse duration-[5000ms]" />
             <div className="absolute bottom-1/3 right-1/3 translate-x-1/2 translate-y-1/2 w-[450px] h-[450px] bg-rose-700/10 blur-[130px] rounded-full pointer-events-none" />
 
-            {/* ========================================================================= */}
             {/* LAPTOP MOCKUP CONTAINER */}
-            {/* ========================================================================= */}
             <div className="w-full max-w-4xl relative z-10 my-auto pt-12 sm:pt-0">
                 
-                {/* 1. SCREEN FRAME */}
-                <div className="bg-slate-900 border border-slate-700/80 rounded-t-2xl p-3 sm:p-4 shadow-2xl relative z-20">
+                {/* 1. SCREEN FRAME (BEZEL) */}
+                <div className="bg-slate-900 border border-slate-700/80 rounded-t-2xl p-2.5 sm:p-3.5 shadow-2xl relative z-20">
                     
                     {/* Webcam Notch */}
-                    <div className="flex justify-center items-center pb-3 pt-0.5">
+                    <div className="flex justify-center items-center pb-2 pt-0.5">
                         <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-950 border border-slate-800">
                             <div className="w-2 h-2 rounded-full bg-slate-800" />
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         </div>
                     </div>
 
-                    {/* Inner Display */}
-                    <div className="bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80 grid grid-cols-1 lg:grid-cols-12 min-h-[460px]">
+                    {/* ========================================================================= */}
+                    {/* INNER DISPLAY - WINDOWS DESKTOP OS CANVAS */}
+                    {/* ========================================================================= */}
+                    <div className="relative w-full min-h-[480px] sm:min-h-[520px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800/80 flex flex-col justify-between">
                         
-                        {/* ========================================================================= */}
-                        {/* KIRI: FORM LUPA PASSWORD */}
-                        {/* ========================================================================= */}
-                        <div className="lg:col-span-6 bg-slate-900/90 p-8 sm:p-10 flex flex-col justify-between border-r border-slate-800/80">
+                        {/* --------------------------------------------------------------------- */}
+                        {/* MAIN WORKSPACE: ANIMATED GRAPHIC BACKGROUNDS & FORM */}
+                        {/* --------------------------------------------------------------------- */}
+                        <div className="relative flex-1 py-6 px-6 sm:px-10 md:px-12 flex items-center justify-between overflow-hidden">
                             
-                            {/* Form Header */}
-                            <div className="my-auto py-2">
-                                <h1 className="text-xl font-bold tracking-tight text-white">
-                                    Lupa Password?
-                                </h1>
-                                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                                    Masukkan email kamu dan kami akan mengirimkan tautan untuk mengatur ulang password akunmu.
-                                </p>
+                            {/* LAYER BACKGROUND GRAFIK ANIMASI SEMENTARA */}
+                            <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
+                                {/* Grid Base Pattern */}
+                                <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b20_1px,transparent_1px),linear-gradient(to_bottom,#1e293b20_1px,transparent_1px)] bg-[size:32px_32px] z-10" />
+
+                                {/* BACKGROUND TEMA 1: RED LIVE TOWER & SCANNING GRAPH */}
+                                <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${bgIndex === 0 ? 'opacity-100' : 'opacity-0'}`}>
+                                    <div className="absolute right-10 top-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-red-600/15 rounded-full blur-3xl" />
+                                    
+                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-40">
+                                        <svg viewBox="0 0 380 300" className="w-full h-auto max-h-[350px] drop-shadow-[0_0_20px_rgba(239,68,68,0.25)]">
+                                            <defs>
+                                                <linearGradient id="areaGlowRed" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#ef4444" stopOpacity="0.35" />
+                                                    <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
+                                                </linearGradient>
+                                                <linearGradient id="scanGradient" x1="0" y1="0" x2="1" y2="0">
+                                                    <stop offset="0%" stopColor="#ef4444" stopOpacity="0" />
+                                                    <stop offset="100%" stopColor="#ef4444" stopOpacity="0.8" />
+                                                </linearGradient>
+                                            </defs>
+
+                                            {/* Ripple Waves dari Puncak Menara */}
+                                            <circle cx="190" cy="45" r="10" fill="none" stroke="#ef4444" className="animate-ripple-1" />
+                                            <circle cx="190" cy="45" r="10" fill="none" stroke="#ef4444" className="animate-ripple-2" />
+
+                                            {/* Radar Ring */}
+                                            <circle cx="190" cy="150" r="100" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
+                                            <circle cx="190" cy="150" r="70" fill="none" stroke="#ef4444" strokeWidth="1" className="animate-spin duration-[20s]" strokeDasharray="8 8" />
+
+                                            {/* Menara Telekomunikasi */}
+                                            <g stroke="#f43f5e" strokeLinecap="round">
+                                                <line x1="190" y1="45" x2="155" y2="235" strokeWidth="2" />
+                                                <line x1="190" y1="45" x2="225" y2="235" strokeWidth="2" />
+                                                <line x1="178" y1="95" x2="202" y2="95" strokeWidth="1.5" />
+                                                <line x1="170" y1="145" x2="210" y2="145" strokeWidth="1.5" />
+                                                <line x1="162" y1="195" x2="218" y2="195" strokeWidth="1.5" />
+                                                <circle cx="190" cy="45" r="4.5" fill="#ef4444" className="animate-pulse" />
+                                            </g>
+
+                                            {/* Scanning Bar Vertikal Bergerak Kiri-Kanan */}
+                                            <rect x="20" y="40" width="30" height="200" fill="url(#scanGradient)" className="animate-scanline" />
+
+                                            {/* Grafik Sinyal Yang Beneran Mengalir (Flowing Wave) */}
+                                            <path d="M 20 200 Q 70 130 110 170 T 190 90 T 270 150 T 360 100 L 360 240 L 20 240 Z" fill="url(#areaGlowRed)" />
+                                            <path d="M 20 200 Q 70 130 110 170 T 190 90 T 270 150 T 360 100" fill="none" stroke="#ef4444" strokeWidth="2.5" className="animate-flow-dash" />
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                {/* BACKGROUND TEMA 2: CYAN FIBER OPTIC STREAMING DATA */}
+                                <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${bgIndex === 1 ? 'opacity-100' : 'opacity-0'}`}>
+                                    <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-sky-500/15 rounded-full blur-3xl" />
+                                    
+                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-40">
+                                        <svg viewBox="0 0 380 300" className="w-full h-auto max-h-[350px] drop-shadow-[0_0_20px_rgba(56,189,248,0.25)]">
+                                            <defs>
+                                                <linearGradient id="areaGlowCyan" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
+                                                    <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+                                                </linearGradient>
+                                            </defs>
+
+                                            {/* Aliran Jalur Kabel Fiber Optik */}
+                                            <path d="M 10 100 Q 100 200 190 120 T 370 180" fill="none" stroke="#0284c7" strokeWidth="1.5" strokeDasharray="4 4" />
+                                            <path d="M 10 140 Q 120 80 200 160 T 370 110" fill="none" stroke="#38bdf8" strokeWidth="2.5" className="animate-flow-dash" />
+
+                                            {/* Pulse Node Points */}
+                                            <circle cx="200" cy="160" r="6" fill="#38bdf8" className="animate-ping" />
+                                            <circle cx="120" cy="80" r="4" fill="#0284c7" />
+                                            <circle cx="290" cy="135" r="5" fill="#38bdf8" className="animate-pulse" />
+
+                                            {/* Equalizer Bar Bergerak */}
+                                            <g fill="#38bdf8" opacity="0.6">
+                                                <rect x="50" y="180" width="4" height="40" className="animate-pulse" />
+                                                <rect x="60" y="160" width="4" height="60" className="animate-pulse" style={{ animationDelay: '0.2s' }} />
+                                                <rect x="70" y="190" width="4" height="30" className="animate-pulse" style={{ animationDelay: '0.4s' }} />
+                                                <rect x="80" y="150" width="4" height="70" className="animate-pulse" style={{ animationDelay: '0.1s' }} />
+                                            </g>
+
+                                            {/* Area Wave */}
+                                            <path d="M 30 220 Q 100 150 180 210 T 350 160 L 350 260 L 30 260 Z" fill="url(#areaGlowCyan)" />
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                {/* BACKGROUND TEMA 3: EMERALD 5G MATRIX & NETWORK NODES */}
+                                <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${bgIndex === 2 ? 'opacity-100' : 'opacity-0'}`}>
+                                    <div className="absolute right-10 bottom-10 w-[450px] h-[450px] bg-emerald-500/15 rounded-full blur-3xl" />
+                                    
+                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-40">
+                                        <svg viewBox="0 0 380 300" className="w-full h-auto max-h-[350px] drop-shadow-[0_0_20px_rgba(52,211,153,0.25)]">
+                                            <defs>
+                                                <linearGradient id="areaGlowEmerald" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#34d399" stopOpacity="0.4" />
+                                                    <stop offset="100%" stopColor="#34d399" stopOpacity="0.0" />
+                                                </linearGradient>
+                                            </defs>
+
+                                            {/* Rotating Hexagon Network Mesh */}
+                                            <polygon points="190,40 280,100 280,200 190,260 100,200 100,100" fill="none" stroke="#059669" strokeWidth="1.5" strokeDasharray="6 6" className="animate-spin duration-[30s]" />
+                                            <polygon points="190,70 250,110 250,180 190,220 130,180 130,110" fill="none" stroke="#34d399" strokeWidth="2" className="animate-flow-dash" />
+
+                                            {/* Central Core Signal Ripple */}
+                                            <circle cx="190" cy="145" r="8" fill="#10b981" className="animate-ping" />
+                                            <circle cx="190" cy="145" r="10" fill="none" stroke="#34d399" className="animate-ripple-1" />
+
+                                            {/* Dynamic Wave line */}
+                                            <path d="M 40 180 Q 110 230 190 145 T 340 210" fill="none" stroke="#34d399" strokeWidth="2.5" className="animate-flow-dash" />
+                                            <path d="M 40 180 Q 110 230 190 145 T 340 210 Z" fill="url(#areaGlowEmerald)" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SHORTCUT DESKTOP ICONS (POJOK KIRI ATAS) */}
+                            <div className="hidden lg:flex flex-col gap-4 z-10 select-none absolute top-6 left-6 xl:left-8">
+                                <div className="flex flex-col items-center gap-1 group cursor-pointer w-16">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-red-400 group-hover:bg-red-600 group-hover:text-white transition-all shadow-md backdrop-blur-sm">
+                                        <Server className="w-5 h-5" />
+                                    </div>
+                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Assets</span>
+                                </div>
+
+                                <div className="flex flex-col items-center gap-1 group cursor-pointer w-16">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-sky-400 group-hover:bg-sky-600 group-hover:text-white transition-all shadow-md backdrop-blur-sm">
+                                        <Activity className="w-5 h-5" />
+                                    </div>
+                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Maintenance</span>
+                                </div>
+
+                                <div className="flex flex-col items-center gap-1 group cursor-pointer w-16">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-md backdrop-blur-sm">
+                                        <Folder className="w-5 h-5" />
+                                    </div>
+                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Data Management</span>
+                                </div>
+                            </div>
+
+                            {/* WALLPAPER SWITCHER INDICATOR (POJOK KANAN ATAS DESKTOP) */}
+                            <div className="absolute top-5 right-6 sm:right-8 z-20 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-800 shadow-lg">
+                                <ImageIcon className="w-3 h-3 text-slate-400 mr-1" />
+                                {[0, 1, 2].map((idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setBgIndex(idx)}
+                                        className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                                            bgIndex === idx 
+                                                ? (idx === 0 ? 'bg-red-500 w-4' : idx === 1 ? 'bg-sky-400 w-4' : 'bg-emerald-400 w-4')
+                                                : 'bg-slate-700 hover:bg-slate-500'
+                                        }`}
+                                        title={`Switch wallpaper theme ${idx + 1}`}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* ----------------------------------------------------------------- */}
+                            {/* FORM LUPA PASSWORD DI SEBELAH KANAN */}
+                            {/* ----------------------------------------------------------------- */}
+                            <div className="relative z-10 w-full max-w-sm ml-auto my-auto py-2 pr-1 sm:pr-2">
+                                
+                                {/* Form Header */}
+                                <div>
+                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white drop-shadow-md">
+                                        Lupa Password?
+                                    </h1>
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                        Masukkan email kamu dan kami akan mengirimkan tautan untuk mengatur ulang password akunmu.
+                                    </p>
+                                </div>
 
                                 {/* Status Alert Success */}
                                 {status && (
-                                    <div className="mt-4 text-xs font-medium text-emerald-400 bg-emerald-950/50 p-3 rounded-xl border border-emerald-800/50">
+                                    <div className="mt-4 text-xs font-medium text-emerald-400 bg-emerald-950/80 p-3 rounded-xl border border-emerald-800/80 backdrop-blur-sm">
                                         {status}
                                     </div>
                                 )}
 
                                 {/* Form Inputs */}
-                                <form onSubmit={submit} className="space-y-4 mt-6">
+                                <form onSubmit={submit} className="space-y-4 mt-5">
+                                    {/* Email Field */}
                                     <div className="space-y-1.5">
                                         <Label htmlFor="email" className="text-xs font-medium text-slate-300">
                                             Alamat Email
                                         </Label>
                                         <div className="relative">
-                                            <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                                            <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
                                             <Input
                                                 id="email"
                                                 type="email"
@@ -116,20 +330,22 @@ export default function ForgotPassword({ status }) {
                                                 autoFocus
                                                 placeholder="nama@mitratel.co.id"
                                                 onChange={(e) => setData('email', e.target.value)}
-                                                className="pl-10 h-10 text-xs rounded-xl bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                                className="pl-10 h-10 text-xs rounded-xl bg-slate-900/90 border-slate-700/80 text-slate-100 placeholder:text-slate-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 shadow-sm"
                                             />
                                         </div>
                                         <InputError message={errors.email} />
                                     </div>
 
+                                    {/* Submit Button */}
                                     <Button 
                                         type="submit" 
                                         disabled={processing}
-                                        className="w-full h-10 bg-red-600 hover:bg-red-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-red-600/25 transition-all duration-200 mt-2"
+                                        className="w-full h-10 bg-red-600 hover:bg-red-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-red-600/30 transition-all duration-200 active:scale-[0.99] mt-2"
                                     >
                                         {processing ? 'Memproses...' : 'Kirim Tautan Reset'}
                                     </Button>
 
+                                    {/* Kembali ke Login */}
                                     <div className="pt-2 text-center">
                                         <Link
                                             href={route('login')}
@@ -140,121 +356,58 @@ export default function ForgotPassword({ status }) {
                                         </Link>
                                     </div>
                                 </form>
-                            </div>
 
-                            {/* Footer Notice */}
-                            <div className="pt-4 border-t border-slate-800/60 mt-auto">
-                                <p className="text-[11px] text-slate-500 text-center">
-                                    Ada masalah saat reset password? Hubungi <span className="font-semibold text-slate-300">Admin Mitratel</span>.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* ========================================================================= */}
-                        {/* KANAN: FUTURISTIC VISION GRAPHIC + TOWER */}
-                        {/* ========================================================================= */}
-                        <div className="lg:col-span-6 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden">
-                            
-                            {/* Radial Glow */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
-
-                            {/* Top HUD Header */}
-                            <div className="flex items-center justify-between text-[11px] text-slate-500 relative z-10 font-mono">
-                                <span className="flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Security System
-                                </span>
-                                <span>Reset Authentication</span>
-                            </div>
-
-                            {/* CENTER SVG GRAPHIC */}
-                            <div className="my-auto py-2 relative z-10 w-full flex items-center justify-center">
-                                <div className="relative w-full max-w-[320px] aspect-[4/3] flex items-center justify-center">
-                                    
-                                    <svg viewBox="0 0 320 240" className="w-full h-full overflow-visible drop-shadow-[0_0_15px_rgba(239,68,68,0.25)]">
-                                        <defs>
-                                            <linearGradient id="areaGlow" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#ef4444" stopOpacity="0.35" />
-                                                <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
-                                            </linearGradient>
-                                            <linearGradient id="towerGlow" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#f43f5e" />
-                                                <stop offset="100%" stopColor="#334155" />
-                                            </linearGradient>
-                                        </defs>
-
-                                        {/* HUD Target Concentric Grid Circles */}
-                                        <circle cx="160" cy="120" r="90" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" opacity="0.3" />
-                                        <circle cx="160" cy="120" r="60" fill="none" stroke="#ef4444" strokeWidth="1" strokeDasharray="6 6" opacity="0.2" className="animate-spin duration-[25s]" />
-
-                                        {/* Floating Equalizer / Bar Graph HUD Elements */}
-                                        <g opacity="0.6">
-                                            <rect x="30" y="150" width="5" height="30" rx="2" fill="#334155" />
-                                            <rect x="40" y="130" width="5" height="50" rx="2" fill="#ef4444" className="animate-pulse duration-[1500ms]" />
-                                            <rect x="50" y="140" width="5" height="40" rx="2" fill="#334155" />
-                                            <rect x="60" y="120" width="5" height="60" rx="2" fill="#f43f5e" className="animate-pulse duration-[2000ms]" />
-                                            
-                                            <rect x="250" y="135" width="5" height="45" rx="2" fill="#334155" />
-                                            <rect x="260" y="115" width="5" height="65" rx="2" fill="#ef4444" className="animate-pulse duration-[1800ms]" />
-                                            <rect x="270" y="145" width="5" height="35" rx="2" fill="#334155" />
-                                            <rect x="280" y="125" width="5" height="55" rx="2" fill="#f43f5e" className="animate-pulse duration-[2200ms]" />
-                                        </g>
-
-                                        {/* Telecom Wireframe Tower */}
-                                        <g stroke="url(#towerGlow)" strokeLinecap="round">
-                                            <line x1="160" y1="35" x2="130" y2="195" strokeWidth="2" />
-                                            <line x1="160" y1="35" x2="190" y2="195" strokeWidth="2" />
-                                            <line x1="160" y1="35" x2="160" y2="195" strokeWidth="1" strokeDasharray="3 3" opacity="0.4" />
-
-                                            <line x1="150" y1="80" x2="170" y2="80" strokeWidth="1.5" />
-                                            <line x1="142" y1="120" x2="178" y2="120" strokeWidth="1.5" />
-                                            <line x1="135" y1="160" x2="185" y2="160" strokeWidth="1.5" />
-
-                                            <line x1="150" y1="80" x2="178" y2="120" strokeWidth="1" opacity="0.6" />
-                                            <line x1="170" y1="80" x2="142" y2="120" strokeWidth="1" opacity="0.6" />
-                                            <line x1="142" y1="120" x2="185" y2="160" strokeWidth="1" opacity="0.6" />
-                                            <line x1="178" y1="120" x2="135" y2="160" strokeWidth="1" opacity="0.6" />
-
-                                            <circle cx="160" cy="35" r="3.5" fill="#ef4444" className="animate-pulse" />
-                                            <line x1="145" y1="48" x2="175" y2="48" strokeWidth="2" />
-                                        </g>
-
-                                        {/* Signal Pulse Waves */}
-                                        <path d="M 140 28 A 25 25 0 0 1 180 28" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" className="animate-pulse" />
-                                        <path d="M 125 18 A 45 45 0 0 1 195 18" fill="none" stroke="#ef4444" strokeWidth="1.2" strokeLinecap="round" opacity="0.4" />
-
-                                        {/* Futuristic Line Chart */}
-                                        <path 
-                                            d="M 10 170 Q 50 110 90 140 T 160 80 T 230 130 T 310 90 L 310 205 L 10 205 Z" 
-                                            fill="url(#areaGlow)" 
-                                        />
-                                        <path 
-                                            d="M 10 170 Q 50 110 90 140 T 160 80 T 230 130 T 310 90" 
-                                            fill="none" 
-                                            stroke="#ef4444" 
-                                            strokeWidth="2.5" 
-                                            strokeLinecap="round"
-                                            className="drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]"
-                                        />
-
-                                        {/* Glowing Node Points */}
-                                        <circle cx="90" cy="140" r="3.5" fill="#ef4444" />
-                                        <circle cx="90" cy="140" r="7" fill="none" stroke="#ef4444" strokeWidth="1" className="animate-ping" />
-
-                                        <circle cx="160" cy="80" r="4.5" fill="#ffffff" />
-                                        <circle cx="160" cy="80" r="9" fill="none" stroke="#ef4444" strokeWidth="1.5" className="animate-ping" />
-
-                                        <circle cx="230" cy="130" r="3.5" fill="#ef4444" />
-                                        <circle cx="310" cy="90" r="3.5" fill="#ef4444" />
-                                    </svg>
+                                {/* Footer Notice */}
+                                <div className="pt-4 border-t border-slate-800/80 mt-5">
+                                    <p className="text-[11px] text-slate-400">
+                                        Ada masalah saat reset password? Hubungi <span className="font-semibold text-slate-200">Admin Mitratel</span>.
+                                    </p>
                                 </div>
                             </div>
 
-                            {/* Bottom Footer Info */}
-                            <div className="flex items-center justify-between text-[10px] text-slate-500 relative z-10 font-mono">
-                                <span>PT Dayamitra Telekomunikasi</span>
-                                <span>v3.0</span>
+                        </div>
+
+                        {/* --------------------------------------------------------------------- */}
+                        {/* WINDOWS BOTTOM TASKBAR */}
+                        {/* --------------------------------------------------------------------- */}
+                        <div className="w-full h-10 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-4 flex items-center justify-between text-xs text-slate-300 select-none z-30">
+                            
+                            {/* Left Side: Start Button & Taskbar Apps */}
+                            <div className="flex items-center gap-2">
+                                <button className="flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg font-semibold text-xs transition-all shadow-md shadow-red-600/20 active:scale-95">
+                                    <Signal className="w-3.5 h-3.5" />
+                                    <span>Start</span>
+                                </button>
+
+                                <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 bg-slate-950/80 border border-slate-800 rounded-lg text-slate-400 text-[11px] w-36">
+                                    <Search className="w-3 h-3 text-slate-500" />
+                                    <span>Cari aplikasi...</span>
+                                </div>
+
+                                <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
+                                    <div className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer" title="System Dashboard">
+                                        <Server className="w-3.5 h-3.5 text-red-400" />
+                                    </div>
+                                    <div className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer" title="Network Explorer">
+                                        <Folder className="w-3.5 h-3.5 text-emerald-400" />
+                                    </div>
+                                </div>
                             </div>
 
+                            {/* Right Side: System Tray & Clock */}
+                            <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
+                                <span className="hidden sm:flex items-center gap-1 text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
+                                    <ShieldCheck className="w-3 h-3" /> Secure 5G
+                                </span>
+                                <Wifi className="w-3.5 h-3.5 text-slate-300" />
+                                <Volume2 className="w-3.5 h-3.5 text-slate-300" />
+                                <BatteryCharging className="w-3.5 h-3.5 text-emerald-400" />
+                                
+                                <div className="flex flex-col items-end text-[10px] leading-tight text-slate-200 border-l border-slate-800 pl-2.5">
+                                    <span className="font-semibold">{currentTime || '12:00'}</span>
+                                    <span className="text-slate-500 text-[9px]">{currentDate || '11/08/2026'}</span>
+                                </div>
+                            </div>
                         </div>
 
                     </div>
@@ -263,22 +416,18 @@ export default function ForgotPassword({ status }) {
                 {/* 2. LAPTOP HINGE */}
                 <div className="w-[96%] mx-auto h-2 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-x border-slate-700/60 relative z-20" />
 
-                {/* 3. LAPTOP BASE DECK & SOFT TRAPEZOID SHADOW */}
+                {/* 3. LAPTOP BASE DECK & SOFT SHADOW */}
                 <div className="relative z-10 -mt-0.5">
-                    
-                    {/* Base Lip */}
                     <div className="w-[108%] -ml-[4%] h-3.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 rounded-b-md border-t border-slate-500/60 shadow-md relative z-20 flex items-start justify-center">
                         <div className="w-24 h-1.5 bg-slate-950 rounded-b-md border-x border-b border-slate-700/70" />
                     </div>
 
-                    {/* SOFT TRAPEZOID SHADOW */}
                     <div 
                         className="w-[114%] -ml-[7%] h-20 bg-gradient-to-b from-black/40 via-black/15 to-transparent blur-md relative z-0 -mt-1 pointer-events-none opacity-40"
                         style={{
                             clipPath: 'polygon(4% 0%, 96% 0%, 100% 100%, 0% 100%)'
                         }}
                     />
-
                 </div>
 
             </div>
