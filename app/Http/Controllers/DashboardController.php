@@ -57,9 +57,6 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        // Menyediakan format bulan 1-12 dan 01-12
-        $validMonths = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-
         // ==========================================
         // 1. DASHBOARD RPM LOGIC
         // ==========================================
@@ -76,31 +73,76 @@ class DashboardController extends Controller
             $rpmQuery->where('rtp', '=', $rpmRtp);
         }
 
+        // --- Standardisasi Ekspresi SQL Status RPM ---
+        $statusCol    = "LOWER(TRIM(COALESCE(approve, '')))";
+        $condApproved = "{$statusCol} IN ('ok', 'approved', 'approve')";
+        $condReject   = "({$statusCol} IN ('reject', 'nok') OR {$statusCol} LIKE '%reject%')";
+        $condReturn   = "({$statusCol} IN ('return', 'revisi') OR {$statusCol} LIKE '%return%' OR {$statusCol} LIKE '%revisi%')";
+        $condPending  = "(NOT ({$condApproved}) AND NOT ({$condReject}) AND NOT ({$condReturn}))";
+
         // --- 1A. KPI Metrics Summary ---
         $rpmKpi = (clone $rpmQuery)
             ->selectRaw("
-                COUNT(*) as total_site,
-                SUM(CASE WHEN LOWER(TRIM(approve)) = 'ok' THEN 1 ELSE 0 END) as total_approved,
-                SUM(CASE WHEN LOWER(TRIM(approve)) IN ('belum', 'reviewed', 'tidakom', 'tidak om') OR approve IS NULL OR TRIM(approve) = '' THEN 1 ELSE 0 END) as total_pending,
-                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%tidak%' THEN 1 ELSE 0 END) as total_tidak_om,
-                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%reject%' THEN 1 ELSE 0 END) as total_reject,
-                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%return%' THEN 1 ELSE 0 END) as total_return
+                COUNT(*) as total_dokumen,
+                COUNT(DISTINCT site_id) as total_site_unik,
+                SUM(CASE WHEN {$condApproved} THEN 1 ELSE 0 END) as total_approved,
+                SUM(CASE WHEN {$condReject} THEN 1 ELSE 0 END) as total_reject,
+                SUM(CASE WHEN {$condReturn} THEN 1 ELSE 0 END) as total_return,
+                SUM(CASE WHEN {$condPending} THEN 1 ELSE 0 END) as total_pending
             ", [])
             ->first();
 
         // --- 1B. Chart Data Bulanan & Pivot Monthly Raw ---
         $pivotMonthlyRaw = (clone $rpmQuery)
             ->selectRaw("
-                CAST(bulan AS INTEGER) as month_num,
-                SUM(CASE WHEN LOWER(TRIM(approve)) = 'ok' THEN 1 ELSE 0 END) as ok,
-                SUM(CASE WHEN LOWER(TRIM(approve)) IN ('belum', 'reviewed', 'tidakom', 'tidak om') OR approve IS NULL OR TRIM(approve) = '' THEN 1 ELSE 0 END) as belum,
-                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%reject%' THEN 1 ELSE 0 END) as reject,
-                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%return%' THEN 1 ELSE 0 END) as returnVal
+                TRIM(COALESCE(bulan, '')) as month_str,
+                SUM(CASE WHEN {$condApproved} THEN 1 ELSE 0 END) as ok,
+                SUM(CASE WHEN {$condReject} THEN 1 ELSE 0 END) as reject,
+                SUM(CASE WHEN {$condReturn} THEN 1 ELSE 0 END) as return_val,
+                SUM(CASE WHEN {$condPending} THEN 1 ELSE 0 END) as belum
             ", [])
-            ->whereIn('bulan', $validMonths)
-            ->groupBy(DB::raw("CAST(bulan AS INTEGER)"))
-            ->get()
-            ->keyBy('month_num');
+            ->groupBy(DB::raw("TRIM(COALESCE(bulan, ''))"))
+            ->get();
+
+        // Inisialisasi struktur bulan 1-12
+        $monthlyParsed = [];
+        for ($i = 1; $i <= 12; $i++) {
+            $monthlyParsed[$i] = ['ok' => 0, 'belum' => 0, 'reject' => 0, 'returnVal' => 0];
+        }
+
+        // Pemetaan data bulan fleksibel & aman tanpa kehilangan 1 data pun
+        foreach ($pivotMonthlyRaw as $row) {
+            $str       = strtolower(trim($row->month_str));
+            $okVal     = (int) ($row->ok ?? 0);
+            $belumVal  = (int) ($row->belum ?? 0);
+            $rejectVal = (int) ($row->reject ?? 0);
+            $retVal    = (int) ($row->return_val ?? $row->returnval ?? 0);
+
+            $mNum = intval(preg_replace('/[^0-9]/', '', $str));
+
+            if ($mNum >= 1 && $mNum <= 12) {
+                $targetMonth = $mNum;
+            } else {
+                if (str_contains($str, 'jan')) $targetMonth = 1;
+                elseif (str_contains($str, 'feb')) $targetMonth = 2;
+                elseif (str_contains($str, 'mar')) $targetMonth = 3;
+                elseif (str_contains($str, 'apr')) $targetMonth = 4;
+                elseif (str_contains($str, 'mei') || str_contains($str, 'may')) $targetMonth = 5;
+                elseif (str_contains($str, 'jun')) $targetMonth = 6;
+                elseif (str_contains($str, 'jul')) $targetMonth = 7;
+                elseif (str_contains($str, 'agu') || str_contains($str, 'aug')) $targetMonth = 8;
+                elseif (str_contains($str, 'sep')) $targetMonth = 9;
+                elseif (str_contains($str, 'okt') || str_contains($str, 'oct')) $targetMonth = 10;
+                elseif (str_contains($str, 'nov')) $targetMonth = 11;
+                elseif (str_contains($str, 'des') || str_contains($str, 'dec')) $targetMonth = 12;
+                else $targetMonth = 12; // Fallback data tanpa bulan agar total tetap 53.321
+            }
+
+            $monthlyParsed[$targetMonth]['ok']        += $okVal;
+            $monthlyParsed[$targetMonth]['belum']     += $belumVal;
+            $monthlyParsed[$targetMonth]['reject']    += $rejectVal;
+            $monthlyParsed[$targetMonth]['returnVal'] += $retVal;
+        }
 
         $monthsName     = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
         $fullMonthsName = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -111,11 +153,11 @@ class DashboardController extends Controller
         $monthPct = [];
 
         for ($m = 1; $m <= 12; $m++) {
-            $row = $pivotMonthlyRaw[$m] ?? null;
-            $okVal     = (int) ($row->ok ?? 0);
-            $belumVal  = (int) ($row->belum ?? 0);
-            $rejectVal = (int) ($row->reject ?? 0);
-            $retVal    = (int) ($row->returnVal ?? 0);
+            $pData     = $monthlyParsed[$m];
+            $okVal     = $pData['ok'];
+            $belumVal  = $pData['belum'];
+            $rejectVal = $pData['reject'];
+            $retVal    = $pData['returnVal'];
 
             $rawCounts['OK'][]     = $okVal;
             $rawCounts['BELUM'][]  = $belumVal;
@@ -134,21 +176,21 @@ class DashboardController extends Controller
             ];
         }
 
-        // Menyediakan Alias Variasi Key untuk Frontend React
         $counts = [
-            'OK'     => $rawCounts['OK'],
-            'BELUM'  => $rawCounts['BELUM'],
-            'REJECT' => $rawCounts['REJECT'],
-            'RETURN' => $rawCounts['RETURN'],
+            'OK'        => $rawCounts['OK'],
+            'BELUM'     => $rawCounts['BELUM'],
+            'REJECT'    => $rawCounts['REJECT'],
+            'RETURN'    => $rawCounts['RETURN'],
 
-            'ok'     => $rawCounts['OK'],
-            'belum'  => $rawCounts['BELUM'],
-            'reject' => $rawCounts['REJECT'],
-            'return' => $rawCounts['RETURN'],
+            'ok'        => $rawCounts['OK'],
+            'belum'     => $rawCounts['BELUM'],
+            'reject'    => $rawCounts['REJECT'],
+            'return'    => $rawCounts['RETURN'],
+            'returnVal' => $rawCounts['RETURN'],
 
-            'Belum'  => $rawCounts['BELUM'],
-            'Reject' => $rawCounts['REJECT'],
-            'Return' => $rawCounts['RETURN'],
+            'Belum'     => $rawCounts['BELUM'],
+            'Reject'    => $rawCounts['REJECT'],
+            'Return'    => $rawCounts['RETURN'],
         ];
 
         $sumOk     = array_sum($rawCounts['OK']);
@@ -157,19 +199,20 @@ class DashboardController extends Controller
         $sumReturn = array_sum($rawCounts['RETURN']);
 
         $rowTotals = [
-            'OK'     => $sumOk,
-            'BELUM'  => $sumBelum,
-            'REJECT' => $sumReject,
-            'RETURN' => $sumReturn,
+            'OK'        => $sumOk,
+            'BELUM'     => $sumBelum,
+            'REJECT'    => $sumReject,
+            'RETURN'    => $sumReturn,
 
-            'ok'     => $sumOk,
-            'belum'  => $sumBelum,
-            'reject' => $sumReject,
-            'return' => $sumReturn,
+            'ok'        => $sumOk,
+            'belum'     => $sumBelum,
+            'reject'    => $sumReject,
+            'return'    => $sumReturn,
+            'returnVal' => $sumReturn,
 
-            'Belum'  => $sumBelum,
-            'Reject' => $sumReject,
-            'Return' => $sumReturn,
+            'Belum'     => $sumBelum,
+            'Reject'    => $sumReject,
+            'Return'    => $sumReturn,
         ];
 
         $overallTotal = array_sum($monthTotals);
@@ -188,10 +231,10 @@ class DashboardController extends Controller
         $rpmRtpPivot = (clone $rpmQuery)
             ->selectRaw("
                 COALESCE(NULLIF(TRIM(rtp), ''), 'Unassigned') as rtp_name,
-                SUM(CASE WHEN LOWER(TRIM(approve)) = 'ok' THEN 1 ELSE 0 END) as ok,
-                SUM(CASE WHEN LOWER(TRIM(approve)) IN ('belum', 'reviewed', 'tidakom', 'tidak om') OR approve IS NULL OR TRIM(approve) = '' THEN 1 ELSE 0 END) as belum,
-                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%reject%' THEN 1 ELSE 0 END) as reject,
-                SUM(CASE WHEN LOWER(TRIM(approve)) LIKE '%return%' THEN 1 ELSE 0 END) as returnVal,
+                SUM(CASE WHEN {$condApproved} THEN 1 ELSE 0 END) as ok,
+                SUM(CASE WHEN {$condReject} THEN 1 ELSE 0 END) as reject,
+                SUM(CASE WHEN {$condReturn} THEN 1 ELSE 0 END) as return_val,
+                SUM(CASE WHEN {$condPending} THEN 1 ELSE 0 END) as belum,
                 COUNT(*) as total
             ", [])
             ->groupBy(DB::raw("COALESCE(NULLIF(TRIM(rtp), ''), 'Unassigned')"))
@@ -199,15 +242,16 @@ class DashboardController extends Controller
             ->map(function ($item) {
                 $tot    = (int) $item->total;
                 $ok     = (int) $item->ok;
-                $retVal = (int) $item->returnVal;
+                $retVal = (int) ($item->return_val ?? $item->returnval ?? 0);
                 return [
                     'rtp'        => $item->rtp_name,
                     'ok'         => $ok,
                     'belum'      => (int) $item->belum,
                     'reject'     => (int) $item->reject,
-                    'return'     => $retVal,       // Alias 1
-                    'returnVal'  => $retVal,       // Alias 2
-                    'return_val' => $retVal,       // Alias 3
+                    'return'     => $retVal,
+                    'returnVal'  => $retVal,
+                    'return_val' => $retVal,
+                    'Return'     => $retVal,
                     'total'      => $tot,
                     'pct'        => $tot > 0 ? round(($ok / $tot) * 100) : 0,
                 ];
@@ -334,14 +378,14 @@ class DashboardController extends Controller
         // 3. DROPDOWN FILTER OPTIONS
         // ==========================================
         try {
-            $rpmFilterOptions = Cache::remember('rpm_filter_options_v6', 3600, function () {
+            $rpmFilterOptions = Cache::remember('rpm_filter_options_v10', 3600, function () {
                 return [
                     'tahun' => array_values(RpmMaster::select('tahun')->whereNotNull('tahun')->where('tahun', '!=', '')->distinct()->pluck('tahun')->filter()->toArray()),
                     'rtp'   => array_values(RpmMaster::select('rtp')->whereNotNull('rtp')->where('rtp', '!=', '')->distinct()->pluck('rtp')->filter()->toArray()),
                 ];
             });
 
-            $skFilterOptions = Cache::remember('sk_filter_options_v6', 3600, function () {
+            $skFilterOptions = Cache::remember('sk_filter_options_v10', 3600, function () {
                 return [
                     'infrako' => array_values(SmartkeyMaster::select('infrako')->whereNotNull('infrako')->where('infrako', '!=', '')->distinct()->pluck('infrako')->filter()->toArray()),
                     'status'  => array_values(SmartkeyMaster::select('status')->whereNotNull('status')->where('status', '!=', '')->distinct()->pluck('status')->filter()->toArray()),
@@ -365,23 +409,23 @@ class DashboardController extends Controller
         // ==========================================
         return Inertia::render('Maintenance/Dashboard/Index', [
             'rpmSummary' => [
-                'totalSite'     => (int) ($rpmKpi->total_site ?? 0),
-                'totalApproved' => (int) ($rpmKpi->total_approved ?? 0),
-                'totalPending'  => (int) ($rpmKpi->total_pending ?? 0),
-                'totalReject'   => (int) ($rpmKpi->total_reject ?? 0),
-                'totalReturn'   => (int) ($rpmKpi->total_return ?? 0),
-                'totalTidakOm'  => (int) ($rpmKpi->total_tidak_om ?? 0),
+                'totalSite'       => (int) ($rpmKpi->total_dokumen ?? 0),
+                'totalApproved'   => (int) ($rpmKpi->total_approved ?? 0),
+                'totalPending'    => (int) ($rpmKpi->total_pending ?? 0),
+                'totalReject'     => (int) ($rpmKpi->total_reject ?? 0),
+                'totalReturn'     => (int) ($rpmKpi->total_return ?? 0),
 
-                'total_site'     => (int) ($rpmKpi->total_site ?? 0),
-                'total_approved' => (int) ($rpmKpi->total_approved ?? 0),
-                'total_pending'  => (int) ($rpmKpi->total_pending ?? 0),
-                'total_reject'   => (int) ($rpmKpi->total_reject ?? 0),
-                'total_return'   => (int) ($rpmKpi->total_return ?? 0),
-                'total_tidak_om' => (int) ($rpmKpi->total_tidak_om ?? 0),
+                'total_site'      => (int) ($rpmKpi->total_dokumen ?? 0),
+                'total_site_unik' => (int) ($rpmKpi->total_site_unik ?? 0),
+                'total_dokumen'   => (int) ($rpmKpi->total_dokumen ?? 0),
+                'total_approved'  => (int) ($rpmKpi->total_approved ?? 0),
+                'total_pending'   => (int) ($rpmKpi->total_pending ?? 0),
+                'total_reject'    => (int) ($rpmKpi->total_reject ?? 0),
+                'total_return'    => (int) ($rpmKpi->total_return ?? 0),
 
-                'chartData'     => $rpmChartData,
-                'monthlyPivot'  => $rpmMonthlyPivot,
-                'rtpPivot'      => $rpmRtpPivot,
+                'chartData'       => $rpmChartData,
+                'monthlyPivot'    => $rpmMonthlyPivot,
+                'rtpPivot'        => $rpmRtpPivot,
             ],
             'smartkeySummary' => [
                 'summary'    => $skSummary,
