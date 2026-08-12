@@ -55,7 +55,20 @@ class DashboardController extends Controller
         return array_values(array_unique($flat));
     }
 
+    // ==========================================
+    // 🟢 1. HALAMAN BERANDA / HOME UTAMA (/home)
+    // ==========================================
     public function index(Request $request)
+    {
+        // Ubah nama 'Beranda' sesuai dengan nama file .jsx kamu di resources/js/Pages/ 
+        // Contoh: jika filenya resources/js/Pages/Beranda.jsx atau Pages/Dashboard.jsx
+        return Inertia::render('Beranda'); 
+    }
+
+    // ==========================================
+    // 🟠 2. HALAMAN MAINTENANCE DASHBOARD (/maintenance/dashboard)
+    // ==========================================
+    public function maintenance(Request $request)
     {
         // ==========================================
         // 1. DASHBOARD RPM LOGIC
@@ -110,7 +123,7 @@ class DashboardController extends Controller
             $monthlyParsed[$i] = ['ok' => 0, 'belum' => 0, 'reject' => 0, 'returnVal' => 0];
         }
 
-        // Pemetaan data bulan fleksibel & aman tanpa kehilangan 1 data pun
+        // Pemetaan data bulan fleksibel
         foreach ($pivotMonthlyRaw as $row) {
             $str       = strtolower(trim($row->month_str));
             $okVal     = (int) ($row->ok ?? 0);
@@ -135,7 +148,7 @@ class DashboardController extends Controller
                 elseif (str_contains($str, 'okt') || str_contains($str, 'oct')) $targetMonth = 10;
                 elseif (str_contains($str, 'nov')) $targetMonth = 11;
                 elseif (str_contains($str, 'des') || str_contains($str, 'dec')) $targetMonth = 12;
-                else $targetMonth = 12; // Fallback data tanpa bulan agar total tetap 53.321
+                else $targetMonth = 12;
             }
 
             $monthlyParsed[$targetMonth]['ok']        += $okVal;
@@ -181,13 +194,11 @@ class DashboardController extends Controller
             'BELUM'     => $rawCounts['BELUM'],
             'REJECT'    => $rawCounts['REJECT'],
             'RETURN'    => $rawCounts['RETURN'],
-
             'ok'        => $rawCounts['OK'],
             'belum'     => $rawCounts['BELUM'],
             'reject'    => $rawCounts['REJECT'],
             'return'    => $rawCounts['RETURN'],
             'returnVal' => $rawCounts['RETURN'],
-
             'Belum'     => $rawCounts['BELUM'],
             'Reject'    => $rawCounts['REJECT'],
             'Return'    => $rawCounts['RETURN'],
@@ -203,13 +214,11 @@ class DashboardController extends Controller
             'BELUM'     => $sumBelum,
             'REJECT'    => $sumReject,
             'RETURN'    => $sumReturn,
-
             'ok'        => $sumOk,
             'belum'     => $sumBelum,
             'reject'    => $sumReject,
             'return'    => $sumReturn,
             'returnVal' => $sumReturn,
-
             'Belum'     => $sumBelum,
             'Reject'    => $sumReject,
             'Return'    => $sumReturn,
@@ -405,7 +414,7 @@ class DashboardController extends Controller
         }
 
         // ==========================================
-        // 4. RENDER TO INERTIA
+        // 4. RENDER TO INERTIA (MAINTENANCE)
         // ==========================================
         return Inertia::render('Maintenance/Dashboard/Index', [
             'rpmSummary' => [
@@ -430,10 +439,8 @@ class DashboardController extends Controller
             'smartkeySummary' => [
                 'summary'    => $skSummary,
                 'chart'      => $skChart,
-
                 'map_data'   => $skMapData,
                 'mapData'    => $skMapData,
-
                 'tableData'  => $skTableData,
                 'table_data' => $skTableData,
             ],
@@ -453,10 +460,5 @@ class DashboardController extends Controller
                 ]
             ]
         ]);
-    }
-
-    public function maintenance(Request $request)
-    {
-        return $this->index($request);
     }
 }

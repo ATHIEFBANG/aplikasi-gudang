@@ -3,7 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DataManagementController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Admin\UserController; // 🟢 CONTROLLER ADMIN USER
+use App\Http\Controllers\Admin\UserController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
@@ -16,29 +16,26 @@ use Inertia\Inertia;
 */
 
 // ==========================================
-// 0. TES KONEKSI DATABASE (TEMPORARY)
+// 0. DIAGNOSTIK / CEK DATABASE
 // ==========================================
 Route::get('/cek-db', function () {
     try {
-        // Cek koneksi PDO ke PostgreSQL
         DB::connection('pgsql')->getPdo();
-        
         return response()->json([
             'status'   => 'SUCCESS 🎉',
-            'message'  => 'Laravel di Vercel BERHASIL terhubung ke Aiven PostgreSQL!',
+            'message'  => 'Terhubung ke Aiven PostgreSQL!',
             'database' => DB::connection('pgsql')->getDatabaseName(),
         ]);
     } catch (\Exception $e) {
         return response()->json([
-            'status'    => 'ERROR ❌',
-            'message'   => 'Gagal terhubung ke DB Aiven: ' . $e->getMessage(),
-            'host_read' => config('database.connections.pgsql.host'),
+            'status'  => 'ERROR ❌',
+            'message' => $e->getMessage(),
         ], 500);
     }
 });
 
 // ==========================================
-// 1. PUBLIC & LANDING PAGE
+// 1. PUBLIC LANDING PAGE (Guest Access)
 // ==========================================
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -47,29 +44,24 @@ Route::get('/', function () {
         'laravelVersion' => Application::VERSION,
         'phpVersion'     => PHP_VERSION,
     ]);
-});
+})->name('welcome');
 
 // ==========================================
-// 2. AUTHENTICATED ROUTES
+// 2. AUTHENTICATED ROUTES (Wajib Login)
 // ==========================================
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // ✅ Route utama (/home)
+    // 🟢 UTAMA: DASHBOARD MONITORING MITRATEL (Menggunakan /home & name('home'))
     Route::get('/home', [DashboardController::class, 'index'])->name('home');
 
-    // ✅ ALIAS: Mencegah crash jika ada komponen yang memanggil route('dashboard')
-    Route::get('/dashboard', function () {
-        return redirect()->route('home');
-    })->name('dashboard');
-
-    // --- PROFILE MANAGEMENT ---
+    // --- MANAJEMEN PROFIL ---
     Route::controller(ProfileController::class)->prefix('profile')->name('profile.')->group(function () {
         Route::get('/', 'edit')->name('edit');
         Route::patch('/', 'update')->name('update');
         Route::delete('/', 'destroy')->name('destroy');
     });
 
-    // 🟢 --- ADMIN USER MANAGEMENT (EKSPLISIT / TANPA RESOURCE) ---
+    // --- ADMIN USER MANAGEMENT ---
     Route::prefix('admin')
         ->name('admin.users.')
         ->controller(UserController::class)
@@ -81,20 +73,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/users/bulk-delete', 'bulkDelete')->name('bulk-delete');
         });
 
-    // --- MODUL MAINTENANCE ---
+    // --- MODUL MAINTENANCE & OPERATIONAL ---
     Route::prefix('maintenance')->name('maintenance.')->group(function () {
 
-        // URL: /maintenance/dashboard -> DashboardController@maintenance
+        // Dashboard khusus operasional perbaikan
         Route::get('/dashboard', [DashboardController::class, 'maintenance'])->name('dashboard');
 
-        // --- DATA MANAGEMENT SUB-ROUTES ---
+        // Data Management (RPM & SmartKey)
         Route::prefix('data-management')
             ->name('data-management.')
             ->controller(DataManagementController::class)
             ->group(function () {
                 Route::get('/', 'index')->name('index');
 
-                // --- MASTER RPM ---
+                // Master RPM
                 Route::post('/rpm', 'storeRpm')->name('store-rpm');
                 Route::put('/rpm/{id}', 'updateRpm')->name('update-rpm');
                 Route::delete('/rpm/{id?}', 'destroyRpm')->name('destroy-rpm');
@@ -104,7 +96,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::get('/rpm/export', 'exportRpm')->name('export-rpm');
                 Route::post('/rpm/process', 'processRpm')->name('process-rpm');
 
-                // --- MASTER SMART KEY ---
+                // Master Smart Key
                 Route::post('/smartkey', 'storeSmartkey')->name('store-smartkey');
                 Route::put('/smartkey/{id}', 'updateSmartkey')->name('update-smartkey');
                 Route::delete('/smartkey/{id?}', 'destroySmartkey')->name('destroy-smartkey');

@@ -1,8 +1,9 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage, router } from '@inertiajs/react'; // 1. Ditambahkan import 'router'
 import { useState, useEffect, createContext, useContext } from 'react';
 
-// --- IMPORT KOMPONEN NOTIFIKASI & CONFIRM MODAL ---
+// --- IMPORT KOMPONEN NOTIFIKASI, CONFIRM MODAL & LOADING ---
 import { Toast, ConfirmModal } from '@/components/ui/Notifikasi';
+import Loading from '@/components/ui/Loading'; // 2. Import Komponen Loading Baru
 
 import {
     DropdownMenu,
@@ -12,7 +13,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-    Home,
     Wrench,
     LayoutDashboard,
     Database,
@@ -35,7 +35,7 @@ const ROUTE_FALLBACKS = {
     'home': '/home',
     'maintenance.dashboard': '/maintenance/dashboard',
     'maintenance.data-management.index': '/maintenance/data-management',
-    'admin.users.index': '/admin/users', // Fallback route Admin Panel
+    'admin.users.index': '/admin/users',
     'profile.edit': '/profile',
     'logout': '/logout',
 };
@@ -59,6 +59,27 @@ export default function AuthenticatedLayout({ header, children }) {
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [isNavOpen, setIsNavOpen] = useState(true);
     const [isMaintenanceOpen, setIsMaintenanceOpen] = useState(false);
+
+    // --- STATE UNIVERSAL PAGE LOADING ---
+    const [isPageLoading, setIsPageLoading] = useState(false); // 3. State untuk indikator loading
+
+    // --- AUTOMATIC PAGE NAVIGATION LOADING LISTENER ---
+    useEffect(() => {
+        // 4. Deteksi otomatis saat navigasi atau submit form dimulai
+        const removeStartEventListener = router.on('start', () => {
+            setIsPageLoading(true);
+        });
+
+        // Deteksi otomatis saat navigasi/proses selesai
+        const removeFinishEventListener = router.on('finish', () => {
+            setIsPageLoading(false);
+        });
+
+        return () => {
+            removeStartEventListener();
+            removeFinishEventListener();
+        };
+    }, []);
 
     // --- STATE TOAST UNIVERSAL ---
     const [toastState, setToastState] = useState({
@@ -168,23 +189,35 @@ export default function AuthenticatedLayout({ header, children }) {
         <ConfirmContext.Provider value={confirm}>
             <div className="min-h-screen bg-slate-100 dark:bg-[#0B1437] text-slate-900 dark:text-slate-100 font-sans selection:bg-red-500 selection:text-white transition-colors duration-300">
                 
+                {/* 5. UNIVERSAL FULLSCREEN LOADING OVERLAY */}
+                {/* UNIVERSAL FLOATING PROGRESS BAR (POJOK KIRI BAWAH) */}
+                {isPageLoading && <Loading message="Memproses ..." />}
+
                 {/* HEADER UTAMA */}
                 <header className="sticky top-0 z-50 w-full flex flex-col shadow-sm transition-all duration-300 relative group">
                     
                     {/* TIER 1: Topbar */}
                     <div className="relative z-50 h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/10 px-4 sm:px-8 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-700 to-red-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-red-600/40">
-                                M
-                            </div>
-                            <div className="hidden sm:block">
-                                <span className="font-bold text-lg tracking-wider text-slate-800 dark:text-slate-100 block leading-none">
-                                    MITRATEL
-                                </span>
-                                <span className="text-[10px] text-red-600 dark:text-red-400 font-medium tracking-widest uppercase mt-1 block">
-                                    Command Center
-                                </span>
-                            </div>
+                            
+                            {/* LOGO BISA DI-KLIK UNTUK KE BERANDA / HOME */}
+                            <Link 
+                                href={getRoute('home')} 
+                                className="flex items-center gap-3 group/logo focus:outline-none transition-transform active:scale-95"
+                                title="Kembali ke Beranda"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-700 to-red-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-red-600/40 group-hover/logo:scale-105 transition-transform duration-200">
+                                    M
+                                </div>
+                                <div className="hidden sm:block">
+                                    <span className="font-bold text-lg tracking-wider text-slate-800 dark:text-slate-100 block leading-none group-hover/logo:text-red-600 dark:group-hover/logo:text-red-400 transition-colors duration-200">
+                                        MITRATEL
+                                    </span>
+                                    <span className="text-[10px] text-red-600 dark:text-red-400 font-medium tracking-widest uppercase mt-1 block">
+                                        Command Center
+                                    </span>
+                                </div>
+                            </Link>
 
                             {header && (
                                 <div className="hidden md:flex items-center gap-2 ml-4 pl-4 border-l border-slate-200 dark:border-white/10">
@@ -295,17 +328,8 @@ export default function AuthenticatedLayout({ header, children }) {
                         }`}
                     >
                         <nav className="flex h-14 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/80 dark:border-white/10 px-4 sm:px-8 items-center gap-2">
-                            <Link
-                                href={getRoute('home')}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-                                    checkActive('home')
-                                        ? 'bg-red-500/10 text-red-600 dark:bg-red-600/20 dark:text-red-400 font-semibold'
-                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
-                                }`}
-                            >
-                                <Home className="w-4 h-4" /> Home
-                            </Link>
-
+                            
+                            {/* DROPDOWN MAINTENANCE */}
                             <div 
                                 className="relative py-2"
                                 onMouseEnter={() => setIsMaintenanceOpen(true)}
@@ -365,18 +389,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     {/* Mobile Drawer Navigation */}
                     {showingNavigationDropdown && (
                         <div className="md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-b border-slate-200 dark:border-white/10 px-4 py-4 space-y-2 animate-in slide-in-from-top duration-200">
-                            <Link 
-                                href={getRoute('home')} 
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${
-                                    checkActive('home')
-                                        ? 'bg-red-500/10 text-red-600 dark:bg-red-600/20 dark:text-red-400 font-semibold'
-                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                }`}
-                            >
-                                <Home className="w-5 h-5" /> Home
-                            </Link>
-                            
-                            <div className="pt-2 border-t border-slate-100 dark:border-white/10">
+                            <div className="pt-2">
                                 <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Maintenance</p>
                                 <Link 
                                     href={getRoute('maintenance.dashboard')} 
