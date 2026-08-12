@@ -4,6 +4,11 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DataManagementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UserController;
+
+// 🟢 IMPORT CONTROLLER ASSETS YANG BARU
+use App\Http\Controllers\AssetDashboardController;
+use App\Http\Controllers\AssetDataManagementController;
+
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
@@ -15,9 +20,6 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
-// ==========================================
-// 0. DIAGNOSTIK / CEK DATABASE
-// ==========================================
 Route::get('/cek-db', function () {
     try {
         DB::connection('pgsql')->getPdo();
@@ -34,9 +36,6 @@ Route::get('/cek-db', function () {
     }
 });
 
-// ==========================================
-// 1. PUBLIC LANDING PAGE (Guest Access)
-// ==========================================
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin'       => Route::has('login'),
@@ -47,21 +46,21 @@ Route::get('/', function () {
 })->name('welcome');
 
 // ==========================================
-// 2. AUTHENTICATED ROUTES (Wajib Login)
+// AUTHENTICATED ROUTES
 // ==========================================
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // 🟢 UTAMA: DASHBOARD MONITORING MITRATEL (Menggunakan /home & name('home'))
+    // UTAMA: HOME
     Route::get('/home', [DashboardController::class, 'index'])->name('home');
 
-    // --- MANAJEMEN PROFIL ---
+    // PROFIL
     Route::controller(ProfileController::class)->prefix('profile')->name('profile.')->group(function () {
         Route::get('/', 'edit')->name('edit');
         Route::patch('/', 'update')->name('update');
         Route::delete('/', 'destroy')->name('destroy');
     });
 
-    // --- ADMIN USER MANAGEMENT ---
+    // ADMIN
     Route::prefix('admin')
         ->name('admin.users.')
         ->controller(UserController::class)
@@ -73,13 +72,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/users/bulk-delete', 'bulkDelete')->name('bulk-delete');
         });
 
-    // --- MODUL MAINTENANCE & OPERATIONAL ---
+    // MODUL MAINTENANCE
     Route::prefix('maintenance')->name('maintenance.')->group(function () {
-
-        // Dashboard khusus operasional perbaikan
         Route::get('/dashboard', [DashboardController::class, 'maintenance'])->name('dashboard');
 
-        // Data Management (RPM & SmartKey)
         Route::prefix('data-management')
             ->name('data-management.')
             ->controller(DataManagementController::class)
@@ -107,6 +103,40 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::post('/smartkey/process', 'processSmartkey')->name('process-smartkey');
             });
     });
+
+    // 🟢 MODUL ASSETS (DENGAN CONTROLLER TERSENDIRI)
+    Route::prefix('assets')->name('assets.')->group(function () {
+
+        // 1. Dashboard Asset
+        Route::get('/dashboard', [AssetDashboardController::class, 'index'])->name('dashboard');
+
+        // 2. Data Management Asset
+        Route::prefix('data-management')
+            ->name('data-management.')
+            ->controller(AssetDataManagementController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+
+                // Master COMBAT
+                Route::post('/combat', 'storeCombat')->name('store-combat');
+                Route::put('/combat/{id}', 'updateCombat')->name('update-combat');
+                Route::delete('/combat/{id?}', 'destroyCombat')->name('destroy-combat');
+                Route::post('/combat/bulk-delete', 'bulkDestroyCombat')->name('bulk-destroy-combat');
+                Route::post('/combat/reset', 'resetCombat')->name('reset-combat');
+                Route::post('/combat/bulk-paste', 'bulkPasteCombat')->name('bulk-paste-combat');
+                Route::get('/combat/export', 'exportCombat')->name('export-combat');
+
+                // Master Data 2 / Template
+                Route::post('/template', 'storeTemplate')->name('store-template');
+                Route::put('/template/{id}', 'updateTemplate')->name('update-template');
+                Route::delete('/template/{id?}', 'destroyTemplate')->name('destroy-template');
+                Route::post('/template/bulk-delete', 'bulkDestroyTemplate')->name('bulk-destroy-template');
+                Route::post('/template/reset', 'resetTemplate')->name('reset-template');
+                Route::post('/template/bulk-paste', 'bulkPasteTemplate')->name('bulk-paste-template');
+                Route::get('/template/export', 'exportTemplate')->name('export-template');
+            });
+    });
+
 });
 
 require __DIR__ . '/auth.php';

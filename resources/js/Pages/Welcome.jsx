@@ -101,7 +101,7 @@ export default function Welcome({ auth }) {
 
                             {auth?.user ? (
                                 <Link 
-                                    href="/dashboard"
+                                    href="/home"
                                     className="bg-gradient-to-r from-red-600 to-cyan-500 hover:from-red-500 hover:to-cyan-400 text-white font-extrabold tracking-wider text-xs uppercase px-5 py-2.5 flex items-center gap-2 rounded-none shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all"
                                 >
                                     <LayoutDashboard className="h-4 w-4" />
@@ -163,7 +163,7 @@ export default function Welcome({ auth }) {
                                 </p>
 
                                 <div className="pt-2">
-                                    <Link href={auth?.user ? "/dashboard" : "/login"} className="inline-block group">
+                                    <Link href={auth?.user ? "/home" : "/login"} className="inline-block group">
                                         <div className="relative border-2 border-red-500/80 p-1 transition-all duration-300 group-hover:border-red-500">
                                             <div className="bg-red-600 hover:bg-red-500 text-white font-black text-xs tracking-[0.2em] uppercase px-7 py-3.5 flex items-center gap-3 transition-transform group-hover:translate-x-1 shadow-[0_0_20px_rgba(239,68,68,0.5)]">
                                                 <span>{auth?.user ? "BUKA COMMAND CENTER" : "MASUK KE SISTEM"}</span>
@@ -409,7 +409,7 @@ export default function Welcome({ auth }) {
                             </p>
                             <div className="pt-4">
                                 <Link 
-                                    href={auth?.user ? "/dashboard" : "/login"}
+                                    href={auth?.user ? "/home" : "/login"}
                                     className="inline-block bg-cyan-400 hover:bg-red-500 text-black hover:text-white font-extrabold text-xs tracking-[0.2em] uppercase px-8 py-4 shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all duration-300"
                                 >
                                     START YOUR STORIES

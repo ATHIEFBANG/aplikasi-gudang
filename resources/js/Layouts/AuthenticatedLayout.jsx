@@ -1,9 +1,9 @@
-import { Link, usePage, router } from '@inertiajs/react'; // 1. Ditambahkan import 'router'
+import { Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect, createContext, useContext } from 'react';
 
 // --- IMPORT KOMPONEN NOTIFIKASI, CONFIRM MODAL & LOADING ---
 import { Toast, ConfirmModal } from '@/components/ui/Notifikasi';
-import Loading from '@/components/ui/Loading'; // 2. Import Komponen Loading Baru
+import Loading from '@/components/ui/Loading';
 
 import {
     DropdownMenu,
@@ -24,17 +24,24 @@ import {
     X,
     ChevronDown,
     ChevronUp,
-    Shield
+    Shield,
+    Boxes, // Ikon untuk Menu Utama Assets
 } from 'lucide-react';
 
 // Context Universal untuk Confirm Modal
 const ConfirmContext = createContext();
 export const useConfirm = () => useContext(ConfirmContext);
 
+// --- ROUTE FALLBACKS ---
 const ROUTE_FALLBACKS = {
     'home': '/home',
+    // Maintenance
     'maintenance.dashboard': '/maintenance/dashboard',
     'maintenance.data-management.index': '/maintenance/data-management',
+    // Assets (Disesuaikan jadi 2 route utama)
+    'assets.dashboard': '/assets/dashboard',
+    'assets.data-management.index': '/assets/data-management',
+    // System
     'admin.users.index': '/admin/users',
     'profile.edit': '/profile',
     'logout': '/logout',
@@ -58,19 +65,20 @@ export default function AuthenticatedLayout({ header, children }) {
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [isNavOpen, setIsNavOpen] = useState(true);
+    
+    // --- STATE DROPDOWN MENU ---
     const [isMaintenanceOpen, setIsMaintenanceOpen] = useState(false);
+    const [isAssetsOpen, setIsAssetsOpen] = useState(false);
 
     // --- STATE UNIVERSAL PAGE LOADING ---
-    const [isPageLoading, setIsPageLoading] = useState(false); // 3. State untuk indikator loading
+    const [isPageLoading, setIsPageLoading] = useState(false);
 
     // --- AUTOMATIC PAGE NAVIGATION LOADING LISTENER ---
     useEffect(() => {
-        // 4. Deteksi otomatis saat navigasi atau submit form dimulai
         const removeStartEventListener = router.on('start', () => {
             setIsPageLoading(true);
         });
 
-        // Deteksi otomatis saat navigasi/proses selesai
         const removeFinishEventListener = router.on('finish', () => {
             setIsPageLoading(false);
         });
@@ -101,7 +109,6 @@ export default function AuthenticatedLayout({ header, children }) {
         onConfirm: null,
     });
 
-    // Helper fungsi untuk memicu Confirm Modal dari halaman mana saja
     const confirm = ({ title, message, variant = 'danger', confirmText = 'Ya, Lanjutkan', cancelText = 'Batal', onConfirm }) => {
         setConfirmState({
             isOpen: true,
@@ -189,9 +196,8 @@ export default function AuthenticatedLayout({ header, children }) {
         <ConfirmContext.Provider value={confirm}>
             <div className="min-h-screen bg-slate-100 dark:bg-[#0B1437] text-slate-900 dark:text-slate-100 font-sans selection:bg-red-500 selection:text-white transition-colors duration-300">
                 
-                {/* 5. UNIVERSAL FULLSCREEN LOADING OVERLAY */}
-                {/* UNIVERSAL FLOATING PROGRESS BAR (POJOK KIRI BAWAH) */}
-                {isPageLoading && <Loading message="Memproses ..." />}
+                {/* UNIVERSAL FLOATING PROGRESS BAR */}
+                {isPageLoading && <Loading message="Memproses Halaman..." />}
 
                 {/* HEADER UTAMA */}
                 <header className="sticky top-0 z-50 w-full flex flex-col shadow-sm transition-all duration-300 relative group">
@@ -200,7 +206,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     <div className="relative z-50 h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/10 px-4 sm:px-8 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             
-                            {/* LOGO BISA DI-KLIK UNTUK KE BERANDA / HOME */}
+                            {/* LOGO BRAND */}
                             <Link 
                                 href={getRoute('home')} 
                                 className="flex items-center gap-3 group/logo focus:outline-none transition-transform active:scale-95"
@@ -234,10 +240,10 @@ export default function AuthenticatedLayout({ header, children }) {
                             )}
                         </div>
 
-                        {/* POJOK KANAN ATAS (Theme, Admin Panel, & Profile) */}
+                        {/* POJOK KANAN ATAS */}
                         <div className="flex items-center gap-1.5 sm:gap-2">
                             
-                            {/* 1. TOMBOL TEMA */}
+                            {/* TOMBOL TEMA */}
                             <button
                                 onClick={toggleTheme}
                                 className="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors focus:outline-none"
@@ -246,7 +252,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
                             </button>
 
-                            {/* 2. TOMBOL ADMIN PANEL */}
+                            {/* TOMBOL ADMIN PANEL */}
                             {user?.role === 'admin' && (
                                 <Link
                                     href={getRoute('admin.users.index')}
@@ -262,7 +268,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 </Link>
                             )}
 
-                            {/* 3. DROPDOWN MENU PROFIL */}
+                            {/* DROPDOWN MENU PROFIL */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button
@@ -329,7 +335,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     >
                         <nav className="flex h-14 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/80 dark:border-white/10 px-4 sm:px-8 items-center gap-2">
                             
-                            {/* DROPDOWN MAINTENANCE */}
+                            {/* 1. DROPDOWN MAINTENANCE */}
                             <div 
                                 className="relative py-2"
                                 onMouseEnter={() => setIsMaintenanceOpen(true)}
@@ -374,6 +380,56 @@ export default function AuthenticatedLayout({ header, children }) {
                                     </div>
                                 )}
                             </div>
+
+                            {/* 2. DROPDOWN ASSETS (2 MENU SAJA) */}
+                            <div 
+                                className="relative py-2"
+                                onMouseEnter={() => setIsAssetsOpen(true)}
+                                onMouseLeave={() => setIsAssetsOpen(false)}
+                            >
+                                <button
+                                    type="button"
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+                                        isAssetsOpen || checkActive('assets.dashboard') || checkActive('assets.data-management.index')
+                                            ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white font-semibold' 
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+                                    }`}
+                                >
+                                    <Boxes className="w-4 h-4" /> Assets
+                                    <ChevronDown className={`w-3.5 h-3.5 opacity-60 transition-transform duration-200 ${isAssetsOpen ? 'rotate-180 text-red-500' : ''}`} />
+                                </button>
+
+                                {isAssetsOpen && (
+                                    <div className="absolute left-0 top-full pt-1 z-[60] w-56 animate-in fade-in slide-in-from-top-2 duration-150">
+                                        <div className="py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl text-slate-800 dark:text-slate-200">
+                                            {/* Dashboard Assets */}
+                                            <Link 
+                                                href={getRoute('assets.dashboard')} 
+                                                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
+                                                    checkActive('assets.dashboard')
+                                                        ? 'bg-red-500/10 text-red-600 dark:bg-red-600/20 dark:text-red-400 font-semibold'
+                                                        : 'hover:bg-slate-100 dark:hover:bg-white/10 hover:text-red-600 dark:hover:text-red-400 text-slate-700 dark:text-slate-300'
+                                                }`}
+                                            >
+                                                <LayoutDashboard className="w-4 h-4" /> Dashboard Assets
+                                            </Link>
+
+                                            {/* Data Management Assets */}
+                                            <Link 
+                                                href={getRoute('assets.data-management.index')} 
+                                                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
+                                                    checkActive('assets.data-management.index')
+                                                        ? 'bg-red-500/10 text-red-600 dark:bg-red-600/20 dark:text-red-400 font-semibold'
+                                                        : 'hover:bg-slate-100 dark:hover:bg-white/10 hover:text-red-600 dark:hover:text-red-400 text-slate-700 dark:text-slate-300'
+                                                }`}
+                                            >
+                                                <Database className="w-4 h-4" /> Data Management
+                                            </Link>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                         </nav>
                     </div>
 
@@ -388,8 +444,10 @@ export default function AuthenticatedLayout({ header, children }) {
 
                     {/* Mobile Drawer Navigation */}
                     {showingNavigationDropdown && (
-                        <div className="md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-b border-slate-200 dark:border-white/10 px-4 py-4 space-y-2 animate-in slide-in-from-top duration-200">
-                            <div className="pt-2">
+                        <div className="md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-b border-slate-200 dark:border-white/10 px-4 py-4 space-y-4 animate-in slide-in-from-top duration-200">
+                            
+                            {/* Mobile Maintenance */}
+                            <div>
                                 <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Maintenance</p>
                                 <Link 
                                     href={getRoute('maintenance.dashboard')} 
@@ -412,6 +470,32 @@ export default function AuthenticatedLayout({ header, children }) {
                                     <Database className="w-4 h-4" /> Data Management
                                 </Link>
                             </div>
+
+                            {/* Mobile Assets */}
+                            <div className="pt-2 border-t border-slate-200 dark:border-white/10">
+                                <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Assets</p>
+                                <Link 
+                                    href={getRoute('assets.dashboard')} 
+                                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${
+                                        checkActive('assets.dashboard')
+                                            ? 'bg-red-500/10 text-red-600 dark:bg-red-600/20 dark:text-red-400 font-semibold'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <LayoutDashboard className="w-4 h-4" /> Dashboard Assets
+                                </Link>
+                                <Link 
+                                    href={getRoute('assets.data-management.index')} 
+                                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${
+                                        checkActive('assets.data-management.index')
+                                            ? 'bg-red-500/10 text-red-600 dark:bg-red-600/20 dark:text-red-400 font-semibold'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <Database className="w-4 h-4" /> Data Management
+                                </Link>
+                            </div>
+
                         </div>
                     )}
                 </header>
