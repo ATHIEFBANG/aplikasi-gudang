@@ -7,6 +7,7 @@ use App\Models\CombatMaster;
 use App\Models\CombatTrip;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CombatTripController extends Controller
 {
@@ -146,7 +147,7 @@ class CombatTripController extends Controller
     }
 
     /**
-     * 5. RIWAYAT: Mengambil Seluruh Histori Perjalanan (Query Cepat & Lengkap)
+     * 5. RIWAYAT: Mengambil Seluruh Histori Perjalanan
      */
     public function getAllTripsHistory(Request $request)
     {
@@ -204,7 +205,7 @@ class CombatTripController extends Controller
     }
 
     /**
-     * 7. ADMIN: Mengedit Data Penugasan / Perjalanan (MENYIMPAN SEMUA KOLOM TERMASUK ASAL & JENIS RUTE)
+     * 7. ADMIN: Mengedit Data Penugasan / Perjalanan
      */
     public function updateTrip(Request $request, $id)
     {
@@ -254,9 +255,15 @@ class CombatTripController extends Controller
     }
 
     /**
-     * 9. DRIVER: Memulai perjalanan
+     * =========================================================================
+     * FUNGSI KHUSUS TRACKING DRIVER DENGAN PROTEKSI DEVICE LOCK
+     * =========================================================================
      */
-    public function startTrip($token)
+
+    /**
+     * 9. DRIVER: Memulai perjalanan (MENGUNCI PERANGKAT DRIVER)
+     */
+    public function startTrip(Request $request, $token)
     {
         $trip = CombatTrip::where('tracking_token', $token)->firstOrFail();
 
@@ -264,18 +271,29 @@ class CombatTripController extends Controller
             return response()->json(['message' => 'Trip ini sudah dimulai atau selesai.'], 400);
         }
 
-        DB::transaction(function () use ($trip) {
-            $trip->update([
+        $deviceToken = $request->input('device_token');
+
+        DB::transaction(function () use ($trip, $deviceToken) {
+            $updateData = [
                 'status'     => 'IN_TRANSIT',
                 'started_at' => now(),
-            ]);
+            ];
+
+            if ($deviceToken && Schema::hasColumn('combat_trips', 'device_token')) {
+                $updateData['device_token'] = $deviceToken;
+            }
+
+            $trip->update($updateData);
 
             if ($trip->combat) {
                 $trip->combat->update(['status_combat' => 'IN TRANSIT']);
             }
         });
 
-        return response()->json(['message' => 'Perjalanan berhasil dimulai.']);
+        return response()->json([
+            'message'      => 'Perjalanan berhasil dimulai.',
+            'device_token' => $trip->fresh()->device_token ?? null
+        ]);
     }
 
     /**
@@ -284,15 +302,26 @@ class CombatTripController extends Controller
     public function ping(Request $request, $token)
     {
         $request->validate([
-            'latitude'  => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'speed'     => 'nullable|numeric',
-            'accuracy'  => 'nullable|numeric',
+            'latitude'     => 'required|numeric',
+            'longitude'    => 'required|numeric',
+            'speed'        => 'nullable|numeric',
+            'accuracy'     => 'nullable|numeric',
+            'device_token' => 'nullable|string',
         ]);
 
         $trip = CombatTrip::where('tracking_token', $token)
                           ->where('status', 'IN_TRANSIT')
                           ->firstOrFail();
+
+        // Tolak jika perangkat berbeda mencoba mengirim ping GPS
+        if (!empty($trip->device_token) && $request->filled('device_token')) {
+            if ($trip->device_token !== $request->input('device_token')) {
+                return response()->json([
+                    'status'  => 'locked',
+                    'message' => 'Perjalanan ini sedang aktif dikemudikan oleh HP driver lain.'
+                ], 403);
+            }
+        }
 
         DB::transaction(function () use ($request, $trip) {
             $trip->coordinates()->create([
@@ -320,6 +349,15 @@ class CombatTripController extends Controller
         $trip = CombatTrip::where('tracking_token', $token)
                           ->where('status', 'IN_TRANSIT')
                           ->firstOrFail();
+
+        if (!empty($trip->device_token) && $request->filled('device_token')) {
+            if ($trip->device_token !== $request->input('device_token')) {
+                return response()->json([
+                    'status'  => 'locked',
+                    'message' => 'Penyelesaian hanya dapat dilakukan oleh HP driver yang memulai perjalanan.'
+                ], 403);
+            }
+        }
 
         DB::transaction(function () use ($request, $trip) {
             $trip->update([
@@ -352,5 +390,46 @@ class CombatTripController extends Controller
         });
 
         return response()->json(['message' => 'Perjalanan selesai.']);
+    }
+
+    /**
+     * 👉 12. MODE PANTAU (OBSERVER): Mengambil posisi live supir dari database secara berkala
+     */
+    public function getDriverLiveStatus($token)
+    {
+        $trip = CombatTrip::with(['combat', 'latestCoordinate'])
+            ->where('tracking_token', $token)
+            ->firstOrFail();
+
+        $latestCoord = $trip->latestCoordinate;
+        $driverCoords = null;
+
+        if ($latestCoord) {
+            $driverCoords = [
+                'latitude'    => (float) $latestCoord->latitude,
+                'longitude'   => (float) $latestCoord->longitude,
+                'speed'       => (string) ($latestCoord->speed ? round($latestCoord->speed, 1) : '0.0'),
+                'accuracy'    => (int) ($latestCoord->accuracy ?? 0),
+                'recorded_at' => $latestCoord->created_at ? $latestCoord->created_at->format('H:i:s') : null,
+            ];
+        } elseif ($trip->combat && $trip->combat->long_lat && str_contains($trip->combat->long_lat, ';')) {
+            $parts = explode(';', $trip->combat->long_lat);
+            $driverCoords = [
+                'latitude'    => (float) trim($parts[0]),
+                'longitude'   => (float) trim($parts[1]),
+                'speed'       => '0.0',
+                'accuracy'    => 0,
+                'recorded_at' => null,
+            ];
+        }
+
+        return response()->json([
+            'status'           => $trip->status,
+            'device_token'     => $trip->device_token ?? null,
+            'driver_coords'    => $driverCoords,
+            'destination_lat'  => $trip->destination_lat ? (float) $trip->destination_lat : null,
+            'destination_lng'  => $trip->destination_lng ? (float) $trip->destination_lng : null,
+            'destination_name' => $trip->destination_name,
+        ]);
     }
 }

@@ -25,9 +25,9 @@ Route::get('/', function () {
     ]);
 })->name('welcome');
 
-// --- HALAMAN UI DRIVER (Akses via Link WhatsApp) ---
+// --- HALAMAN UI DRIVER (Load combat & latestCoordinate agar Mode Pantau langsung ada titiknya di awal) ---
 Route::get('/track/{token}', function ($token) {
-    $trip = CombatTrip::with('combat')->where('tracking_token', $token)->first();
+    $trip = CombatTrip::with(['combat', 'latestCoordinate'])->where('tracking_token', $token)->first();
 
     if (!$trip) {
         abort(404, 'Link tracking tidak valid atau sudah kadaluarsa.');
@@ -38,13 +38,16 @@ Route::get('/track/{token}', function ($token) {
     ]);
 })->name('track.driver');
 
-// --- API TRACKING DRIVER (Aman di Vercel: Menggunakan prefix track-api) ---
+// --- API TRACKING DRIVER (Aman di Vercel: Menggunakan prefix track-api & api/track) ---
 Route::prefix('track-api')->group(function () {
+    Route::get('/{token}/status', [CombatTripController::class, 'getDriverLiveStatus']); // 👉 Endpoint Polling Mode Pantau
     Route::post('/{token}/start', [CombatTripController::class, 'startTrip']);
     Route::post('/{token}/ping', [CombatTripController::class, 'ping']);
     Route::post('/{token}/complete', [CombatTripController::class, 'completeTrip']);
 });
+
 Route::prefix('api/track')->group(function () {
+    Route::get('/{token}/status', [CombatTripController::class, 'getDriverLiveStatus']);
     Route::post('/{token}/start', [CombatTripController::class, 'startTrip']);
     Route::post('/{token}/ping', [CombatTripController::class, 'ping']);
     Route::post('/{token}/complete', [CombatTripController::class, 'completeTrip']);

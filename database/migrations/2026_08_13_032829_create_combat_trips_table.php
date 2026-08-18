@@ -20,12 +20,13 @@ return new class extends Migration
             
             // 3. Info Driver & Titik Rute
             $table->string('pic_name');
-            $table->string('pic_phone');
-            $table->string('ip_gps')->nullable(); // ID Tracker / IP (opsional)
+            $table->string('pic_phone')->default('-');
+            $table->string('ip_gps')->nullable(); // Jenis Rute (DEPLOY, PENARIKAN, RELOKASI, MAINTENANCE)
+            $table->string('device_token')->nullable(); // 🛡️ Kunci ID Perangkat Driver (Anti Driver Ganda)
             $table->string('origin_name')->default('Gudang / Basecamp');
             $table->string('destination_name');
             
-            // ---> KOORDINAT TUJUAN (Baru Ditambahkan) <---
+            // ---> KOORDINAT TUJUAN <---
             $table->decimal('destination_lat', 11, 8)->nullable();
             $table->decimal('destination_lng', 11, 8)->nullable();
             
