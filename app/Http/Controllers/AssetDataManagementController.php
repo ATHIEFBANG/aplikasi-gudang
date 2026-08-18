@@ -42,7 +42,9 @@ class AssetDataManagementController extends Controller
                   ->orWhere('nama_site', 'like', "%{$search}%")
                   ->orWhere('pic_data', 'like', "%{$search}%")
                   ->orWhere('status_combat', 'like', "%{$search}%")
-                  ->orWhere('type_combat', 'like', "%{$search}%");
+                  ->orWhere('type_combat', 'like', "%{$search}%")
+                  ->orWhere('lokasi_saat_ini', 'like', "%{$search}%")
+                  ->orWhere('long_lat', 'like', "%{$search}%");
             });
         }
         $combatMasters = $combatQuery->orderBy('id', $order)
@@ -60,7 +62,7 @@ class AssetDataManagementController extends Controller
     }
 
     // ==========================================
-    // STORE MULTIPLE COMBAT MASTER
+    // STORE MULTIPLE COMBAT MASTER (SUPER TOLERAN)
     // ==========================================
 
     public function storeCombat(Request $request)
@@ -75,28 +77,38 @@ class AssetDataManagementController extends Controller
         $now = now();
 
         foreach ($items as $item) {
-            $assetName  = $this->nullableString($item['asset_name'] ?? $item['combat_id'] ?? null);
-            $sn         = $this->nullableString($item['sn'] ?? null);
-            $picData    = $this->nullableString($item['pic_data'] ?? $item['operator'] ?? null);
-            $namaSite   = $this->nullableString($item['nama_site'] ?? $item['site_name'] ?? null);
-            $lokasi     = $this->nullableString($item['lokasi_saat_ini'] ?? null);
-            $longitude  = $this->nullableString($item['longitude'] ?? null);
-            $latitude   = $this->nullableString($item['latitude'] ?? null);
+            $assetName  = $this->nullableString($item['asset_name'] ?? $item['combat_id'] ?? $item['nama_asset'] ?? null);
+            $sn         = $this->nullableString($item['sn'] ?? $item['serial_number'] ?? null);
+            $picData    = $this->nullableString($item['pic_data'] ?? $item['operator'] ?? $item['data'] ?? $item['pic'] ?? null);
+            $namaSite   = $this->nullableString($item['nama_site'] ?? $item['site_name'] ?? $item['siteid'] ?? null);
+            $lokasi     = $this->nullableString($item['lokasi_saat_ini'] ?? $item['lokasi'] ?? null);
+            $longLat    = $this->nullableString($item['long_lat'] ?? $item['longlat'] ?? $item['coordinate'] ?? $item['Long Lat'] ?? null);
             $status     = $this->nullableString($item['status_combat'] ?? $item['status'] ?? null);
-            $type       = $this->nullableString($item['type_combat'] ?? $item['tipe_combat'] ?? null);
-            $ketinggian = $this->nullableString($item['ketinggian_combat'] ?? $item['ketinggian_m'] ?? null);
-            $tglAmbil   = $this->nullableString($item['tanggal_ambil'] ?? null);
-            $tglKembali = $this->nullableString($item['tanggal_kembali'] ?? null);
-            $remark     = $this->nullableString($item['remark'] ?? null);
+            $type       = $this->nullableString($item['type_combat'] ?? $item['tipe_combat'] ?? $item['type'] ?? null);
+            $ketinggian = $this->nullableString($item['ketinggian_combat'] ?? $item['ketinggian_m'] ?? $item['ketinggian'] ?? null);
+            $tglAmbil   = $this->nullableString($item['tanggal_ambil'] ?? $item['tgl_ambil'] ?? null);
+            $tglKembali = $this->nullableString($item['tanggal_kembali'] ?? $item['tgl_kembali'] ?? null);
+            $remark     = $this->nullableString($item['remark'] ?? $item['keterangan'] ?? null);
 
-            // Lewati HANYA jika seluruh kolom dalam baris ini benar-benar kosong
+            // Cek apakah ada minimal 1 data apapun yang terisi di baris ini
             $hasData = !is_null($assetName) || !is_null($sn) || !is_null($picData) 
                     || !is_null($namaSite) || !is_null($lokasi) || !is_null($status) 
-                    || !is_null($type) || !is_null($longitude) || !is_null($latitude);
+                    || !is_null($type) || !is_null($longLat) || !is_null($ketinggian)
+                    || !is_null($tglAmbil) || !is_null($tglKembali) || !is_null($remark);
 
+            // Jika baris benar-benar kosong melompong, lewati
             if (!$hasData) {
                 continue;
             }
+
+            // AUTO-FALLBACK: Jika asset_name kosong di Excel, isi otomatis dengan SN / Nama Site / Default
+            if (is_null($assetName)) {
+                $assetName = $sn ?? $namaSite ?? 'Unit COMBAT';
+            }
+
+            // Default fallback untuk status & tipe jika belum terisi
+            $status = $status ?? 'READY TO USE';
+            $type   = $type ?? 'COMBAT';
 
             $insertData[] = [
                 'asset_name'        => $assetName,
@@ -104,8 +116,7 @@ class AssetDataManagementController extends Controller
                 'pic_data'          => $picData,
                 'nama_site'         => $namaSite,
                 'lokasi_saat_ini'   => $lokasi,
-                'longitude'         => $longitude,
-                'latitude'          => $latitude,
+                'long_lat'          => $longLat,
                 'status_combat'     => $status,
                 'type_combat'       => $type,
                 'ketinggian_combat' => $ketinggian,
@@ -143,8 +154,7 @@ class AssetDataManagementController extends Controller
             'pic_data'          => 'nullable|string|max:255',
             'nama_site'         => 'nullable|string|max:255',
             'lokasi_saat_ini'   => 'nullable|string',
-            'longitude'         => 'nullable|string|max:255',
-            'latitude'          => 'nullable|string|max:255',
+            'long_lat'          => 'nullable|string|max:255',
             'status_combat'     => 'nullable|string|max:255',
             'type_combat'       => 'nullable|string|max:255',
             'ketinggian_combat' => 'nullable|string|max:255',
@@ -157,6 +167,12 @@ class AssetDataManagementController extends Controller
 
         try {
             $combat = CombatMaster::findOrFail($id);
+
+            // Pastikan asset_name tidak bernilai null saat update
+            if (empty($data['asset_name'])) {
+                $data['asset_name'] = $data['sn'] ?? $combat->asset_name ?? 'Unit COMBAT';
+            }
+
             $combat->update($data);
             return back()->with('success', 'Data Master COMBAT berhasil diperbarui.');
         } catch (\Exception $e) {
@@ -206,7 +222,7 @@ class AssetDataManagementController extends Controller
     }
 
     // ==========================================
-    // STUB METODE TEMPLATE (AGAR TIDAK ERROR)
+    // STUB METODE TEMPLATE (STANDBY)
     // ==========================================
 
     public function storeTemplate(Request $request)
@@ -254,7 +270,7 @@ class AssetDataManagementController extends Controller
             fputs($file, "\xEF\xBB\xBF");
             fputcsv($file, [
                 'Asset Name', 'SN', 'Data/PIC', 'Nama Site', 'Lokasi Combat Saat Ini',
-                'Longitude', 'Latitude', 'Status Combat', 'Type Combat',
+                'Long Lat', 'Status Combat', 'Type Combat',
                 'Ketinggian Combat (M)', 'Tanggal Ambil', 'Tanggal Kembali', 'Remark'
             ], ';');
 
@@ -266,8 +282,7 @@ class AssetDataManagementController extends Controller
                         $item->pic_data,
                         $item->nama_site,
                         $item->lokasi_saat_ini,
-                        $item->longitude,
-                        $item->latitude,
+                        $item->long_lat,
                         $item->status_combat,
                         $item->type_combat,
                         $item->ketinggian_combat,

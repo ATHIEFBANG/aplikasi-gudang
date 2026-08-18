@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe } from 'lucide-react';
+import { Globe, Layers } from 'lucide-react';
 
 export const MAP_STYLES = {
     dark: {
@@ -75,12 +75,11 @@ export const DEFAULT_INDONESIA_CENTER = [117.8888, -2.4833];
 export const DEFAULT_INDONESIA_ZOOM = 4.5;
 
 // ==========================================
-// PARSER KOORDINAT UNIVERSAL (DENGAN SUPPORT "Long Lat" EXCEL & SEMICOLON)
+// PARSER KOORDINAT UNIVERSAL
 // ==========================================
 export function parseCoordinates(item) {
     if (!item) return null;
 
-    // A. Handled jika item adalah Array langsung [lng, lat]
     if (Array.isArray(item) && item.length >= 2) {
         const p1 = parseFloat(item[0]);
         const p2 = parseFloat(item[1]);
@@ -94,26 +93,29 @@ export function parseCoordinates(item) {
 
     if (typeof item !== 'object') return null;
 
-    // B. Cari key gabungan dari header Excel (seperti "Long Lat", "long_lat", dll)
+    const target = item.properties || item.combat || item;
+
     let combined = null;
     const possibleKeys = [
-        'Long Lat', 'Long Lat ', 'long lat', 'LONG LAT',
-        'Long_Lat', 'long_lat', 'LONG_LAT',
-        'Lat Long', 'Lat Long ', 'lat long', 'LAT LONG',
-        'lat_long', 'latlong', 'coordinat', 'coordinates', 'location'
+        'long_lat', 'Long Lat', 'Long Lat ', 'long lat', 'LONG LAT',
+        'Long_Lat', 'LONG_LAT', 'Lat Long', 'Lat Long ', 'lat long',
+        'LAT LONG', 'lat_long', 'latlong', 'coordinat', 'coordinates', 'location'
     ];
 
     for (const k of possibleKeys) {
+        if (target[k] !== undefined && target[k] !== null && target[k] !== '') {
+            combined = String(target[k]).trim();
+            break;
+        }
         if (item[k] !== undefined && item[k] !== null && item[k] !== '') {
             combined = String(item[k]).trim();
             break;
         }
     }
 
-    // C. Jika tidak ada string gabungan, coba properti lat / lng terpisah
     if (!combined) {
-        let lat = parseFloat(item.latitude ?? item.lat ?? item.Lat ?? item.LAT);
-        let lng = parseFloat(item.longitude ?? item.lng ?? item.Long ?? item.LONGITUDE);
+        let lat = parseFloat(target.latitude ?? target.lat ?? target.Lat ?? target.LAT ?? item.latitude ?? item.lat ?? item.Lat);
+        let lng = parseFloat(target.longitude ?? target.lng ?? target.Long ?? target.LONGITUDE ?? item.longitude ?? item.lng ?? item.Long);
 
         if (!isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
             return { lng, lat, text: `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
@@ -121,7 +123,6 @@ export function parseCoordinates(item) {
         return null;
     }
 
-    // D. Abaikan data rusak (#N/A atau Tanggal seperti 26-Jun, 04-Jul)
     if (combined.includes('#N/A') || combined.includes('N/A') || combined.toUpperCase() === 'NA') {
         return null;
     }
@@ -130,7 +131,6 @@ export function parseCoordinates(item) {
         return null;
     }
 
-    // E. Pecah string berdasarkan separator (; , spasi /)
     const parts = combined
         .split(/[\s,;/]+/)
         .map((p) => parseFloat(p.replace(',', '.').trim()))
@@ -143,7 +143,6 @@ export function parseCoordinates(item) {
         let latVal = p1;
         let lngVal = p2;
 
-        // Otomatis menukar jika p1 adalah Longitude Indonesia (~100 s/d 140)
         if (Math.abs(p1) > 50 && Math.abs(p2) <= 90) {
             lngVal = p1;
             latVal = p2;
@@ -178,18 +177,20 @@ export default function MapControls({
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            {/* CONTROL ATAS (MAP STYLE, RESET ZOOM, CLUSTER) */}
+            {/* 👉 KONTROL ATAS: DESAIN HITAM ELEGAN (MODE PETA, ZOOM GLOBE, CLUSTER ON/OFF) */}
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 max-w-[calc(100vw-80px)] flex-wrap">
-                <div className="bg-slate-900/80 backdrop-blur-xl p-1 rounded-full border border-white/10 shadow-2xl flex gap-1">
+                
+                {/* 1. Mode Gaya Peta (Dark Card Pill) */}
+                <div className="bg-slate-950/90 dark:bg-slate-950/95 backdrop-blur-md p-1 rounded-xl border border-slate-800/90 shadow-2xl flex items-center gap-1">
                     {Object.keys(MAP_STYLES).map((key) => (
                         <button
                             key={key}
                             type="button"
                             onClick={() => onChangeStyle && onChangeStyle(key)}
-                            className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 ${
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 cursor-pointer ${
                                 currentStyle === key
-                                    ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-[0_0_12px_rgba(14,165,233,0.3)]'
-                                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                                    ? 'bg-slate-800 text-white shadow-sm border border-slate-700/80'
+                                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
                             }`}
                         >
                             {MAP_STYLES[key].name}
@@ -197,30 +198,32 @@ export default function MapControls({
                     ))}
                 </div>
 
-                {/* 🌐 TOMBOL RESET ZOOM INDONESIA MENGGUNAKAN LUCIDE GLOBE */}
+                {/* 2. Tombol Reset View Indonesia (Dark Icon Button) */}
                 <button
                     type="button"
                     onClick={onResetView}
                     title="Zoom Out ke Peta Indonesia"
-                    className="p-2 rounded-full bg-slate-900/80 backdrop-blur-xl border border-white/10 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 hover:bg-sky-500/10 transition-all duration-200 shadow-2xl group flex items-center justify-center"
+                    className="p-2 rounded-xl bg-slate-950/90 dark:bg-slate-950/95 backdrop-blur-md border border-slate-800/90 text-slate-300 hover:text-white hover:bg-slate-800 hover:border-slate-700 transition-all duration-200 shadow-2xl flex items-center justify-center cursor-pointer active:scale-95"
                 >
-                    <Globe className="w-4 h-4 transition-transform group-hover:scale-110" />
+                    <Globe className="w-4 h-4" />
                 </button>
 
+                {/* 3. Tombol Cluster ON/OFF (Desain Hitam Elegan dengan Indikator Putih Bersih) */}
                 <button
                     type="button"
                     onClick={onToggleCluster}
                     title={isClustered ? "Matikan Clustering" : "Aktifkan Clustering"}
-                    className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all duration-200 flex items-center gap-1.5 shadow-2xl ${
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl border backdrop-blur-md transition-all duration-200 flex items-center gap-2 shadow-2xl cursor-pointer active:scale-95 ${
                         isClustered
-                            ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40 shadow-[0_0_12px_rgba(99,102,241,0.3)]'
-                            : 'bg-slate-900/80 text-slate-400 border-white/10 hover:text-slate-200 hover:bg-white/5'
+                            ? 'bg-slate-950/95 border-slate-700/90 text-white hover:bg-slate-900 shadow-[0_4px_16px_rgba(0,0,0,0.6)]'
+                            : 'bg-slate-950/70 border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
                     }`}
                 >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <span>{isClustered ? 'Cluster ON' : 'Cluster OFF'}</span>
+                    <Layers className={`w-3.5 h-3.5 ${isClustered ? 'text-white' : 'text-slate-400'}`} />
+                    <span className="tracking-wide">{isClustered ? 'Cluster ON' : 'Cluster OFF'}</span>
+                    {isClustered && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+                    )}
                 </button>
             </div>
 
@@ -228,7 +231,6 @@ export default function MapControls({
             {Object.keys(statusConfig).length > 0 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 max-w-[90vw] overflow-x-auto no-scrollbar py-1 px-2">
                     {Object.entries(statusConfig)
-                        // 💡 FILTER INI UNTUK MENYEMBUNYIKAN BADGE #N/A
                         .filter(([key]) => key !== '#N/A' && key !== 'N/A' && key !== 'NA') 
                         .map(([key, cfg]) => {
                             const count = statusCounts[key] || 0;
@@ -241,15 +243,15 @@ export default function MapControls({
                                     type="button"
                                     onClick={() => onSelectStatus && onSelectStatus(isSelected ? 'ALL' : key)}
                                     style={{
-                                        backgroundColor: isSelected ? cfg.bg || 'rgba(59,130,246,0.3)' : 'rgba(15, 23, 42, 0.85)',
-                                        borderColor: isSelected ? color : 'rgba(255, 255, 255, 0.1)',
+                                        backgroundColor: isSelected ? cfg.bg || 'rgba(59,130,246,0.3)' : 'rgba(15, 23, 42, 0.88)',
+                                        borderColor: isSelected ? color : 'rgba(255, 255, 255, 0.12)',
                                         color: isSelected ? '#ffffff' : '#94a3b8',
                                     }}
-                                    className="px-3 py-1.5 rounded-full text-xs font-semibold border backdrop-blur-xl transition-all shadow-lg flex items-center gap-2 whitespace-nowrap"
+                                    className="px-3 py-1.5 rounded-full text-xs font-semibold border backdrop-blur-xl transition-all shadow-lg flex items-center gap-2 whitespace-nowrap cursor-pointer"
                                 >
                                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                                     <span>{cfg.label || key}</span>
-                                    <span className="px-1.5 py-0.5 rounded-full bg-black/40 text-[10px] text-white/90">
+                                    <span className="px-1.5 py-0.5 rounded-full bg-black/50 text-[10px] text-white font-mono">
                                         {count}
                                     </span>
                                 </button>

@@ -12,7 +12,7 @@ import Modal from '@/components/Modal';
 
 const MAX_ROWS_LIMIT = 500;
 
-// DEFINISI KOLOM MASING-MASING MASTER DATA ASSETS
+// DEFINISI 12 KOLOM MASTER DATA COMBAT (Presisi sesuai Excel)
 const TABLE_COLUMNS = {
     combat: [
         { key: 'asset_name', altKeys: ['asset_name', 'combat_id', 'nama_asset'], label: 'Asset Name' }, 
@@ -20,8 +20,7 @@ const TABLE_COLUMNS = {
         { key: 'pic_data', altKeys: ['pic_data', 'data', 'pic', 'operator'], label: 'Data / PIC' },
         { key: 'nama_site', altKeys: ['nama_site', 'site_name', 'siteid'], label: 'Nama Site' },
         { key: 'lokasi_saat_ini', altKeys: ['lokasi_saat_ini', 'lokasi'], label: 'Lokasi Saat Ini' },
-        { key: 'longitude', altKeys: ['longitude', 'long'], label: 'Longitude' },
-        { key: 'latitude', altKeys: ['latitude', 'lat'], label: 'Latitude' },
+        { key: 'long_lat', altKeys: ['long_lat', 'longlat', 'coordinate', 'Long Lat', 'Long Lat '], label: 'Long Lat' },
         { key: 'status_combat', altKeys: ['status_combat', 'status'], label: 'Status COMBAT' },
         { key: 'type_combat', altKeys: ['type_combat', 'tipe_combat', 'type'], label: 'Type COMBAT' },
         { key: 'ketinggian_combat', altKeys: ['ketinggian_combat', 'ketinggian'], label: 'Ketinggian (M)' },
@@ -41,20 +40,23 @@ const TABLE_COLUMNS = {
 };
 
 /**
- * Helper Parser TSV / Excel Pintar:
- * Menangani sel Excel yang berisi Enter / Line Break di dalam tanda kutip ("...")
+ * STATE-MACHINE PARSER:
+ * Menjaga sel yang berisi Alt+Enter di dalam tanda kutip ("...") agar TIDAK memecah baris.
  */
 const parseTSV = (text) => {
-    if (!text) return [];
+    if (!text || typeof text !== 'string') return [];
+
+    const cleanText = text.trim();
+    if (!cleanText) return [];
 
     const rows = [];
     let currentRow = [];
     let currentCell = '';
     let insideQuotes = false;
 
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        const nextChar = text[i + 1];
+    for (let i = 0; i < cleanText.length; i++) {
+        const char = cleanText[i];
+        const nextChar = cleanText[i + 1];
 
         if (char === '"') {
             if (insideQuotes && nextChar === '"') {
@@ -67,8 +69,9 @@ const parseTSV = (text) => {
             currentRow.push(currentCell.trim());
             currentCell = '';
         } else if ((char === '\r' || char === '\n') && !insideQuotes) {
-            if (char === '\r' && nextChar === '\n') i++;
-            
+            if (char === '\r' && nextChar === '\n') {
+                i++;
+            }
             currentRow.push(currentCell.trim());
             if (currentRow.some(cell => cell.length > 0)) {
                 rows.push(currentRow);
@@ -102,6 +105,13 @@ export default function CrudTable({
     const userRole = auth?.user?.role || 'view';
     const canWrite = userRole === 'admin' || userRole === 'staff';
 
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const [editData, setEditData] = useState({});
+    const [addItems, setAddItems] = useState([]);
+
     const getFieldValue = useCallback((item, colDef) => {
         if (!item || !colDef) return '';
         if (colDef.altKeys && Array.isArray(colDef.altKeys)) {
@@ -115,7 +125,8 @@ export default function CrudTable({
     }, []);
 
     const getItemId = useCallback((item) => {
-        return item?.id || item?.combat_id || item?.asset_name || item?.asset_code;
+        if (!item) return '';
+        return item.id || item.combat_id || item.asset_name || item.asset_code || '';
     }, []);
 
     const formattedColumns = useMemo(() => {
@@ -131,6 +142,8 @@ export default function CrudTable({
                         return <span className="font-mono font-bold text-red-600 dark:text-red-400">{value || '-'}</span>;
                     case 'sn':
                         return <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{value || '-'}</span>;
+                    case 'long_lat':
+                        return <span className="font-mono text-xs text-slate-600 dark:text-slate-300">{value || '-'}</span>;
                     case 'status_combat':
                     case 'status':
                         const statusVal = String(value || '').toLowerCase();
@@ -151,13 +164,6 @@ export default function CrudTable({
         }));
     }, [subTab, getFieldValue]);
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
-
-    const [editData, setEditData] = useState({});
-    const [addItems, setAddItems] = useState([]);
-
     const createEmptyRow = useCallback(() => {
         const emptyObj = {};
         const rawCols = TABLE_COLUMNS[subTab] || TABLE_COLUMNS.combat;
@@ -165,16 +171,15 @@ export default function CrudTable({
         return emptyObj;
     }, [subTab]);
 
+    // =========================================================================
+    // PARSER LANGSUNG (TANPA PEMOTONGAN BARIS PERTAMA)
+    // =========================================================================
     const parseAndApplyExcelData = useCallback((pastedText) => {
-        if (!pastedText) return false;
+        if (!pastedText || typeof pastedText !== 'string' || !pastedText.trim()) return false;
 
-        // Gunakan Parser TSV Pintar
-        const parsedRows = parseTSV(pastedText);
+        let rawRows = parseTSV(pastedText);
+        if (!rawRows || rawRows.length === 0) return false;
 
-        if (parsedRows.length === 0) return false;
-        if (parsedRows.length === 1 && parsedRows[0].length <= 1) return false;
-
-        let rawRows = parsedRows;
         if (rawRows.length > MAX_ROWS_LIMIT) {
             alert(`⚠️ Data paste berisi ${rawRows.length} baris. Dibatasi maksimal ${MAX_ROWS_LIMIT} baris.`);
             rawRows = rawRows.slice(0, MAX_ROWS_LIMIT);
@@ -186,7 +191,6 @@ export default function CrudTable({
             rawCols.forEach((col, idx) => {
                 let cellVal = cells[idx] ?? '';
                 if (typeof cellVal === 'string') {
-                    // Bersihkan tanda kutip luar & ubah Enter internal menjadi spasi tunggal
                     cellVal = cellVal.replace(/^"(.*)"$/, '$1').replace(/[\r\n]+/g, ' ').trim();
                 }
                 rowObj[col.key] = cellVal;
@@ -204,18 +208,21 @@ export default function CrudTable({
     const handleContainerPaste = useCallback((e) => {
         if (isEditMode || !canWrite) return;
         const pastedText = e.clipboardData.getData('text');
-        if (parseAndApplyExcelData(pastedText)) e.preventDefault();
+        if (parseAndApplyExcelData(pastedText)) {
+            e.preventDefault();
+        }
     }, [isEditMode, canWrite, parseAndApplyExcelData]);
 
     const handlePasteFromClipboardButton = useCallback(async () => {
         try {
             const text = await navigator.clipboard.readText();
-            if (text && !parseAndApplyExcelData(text)) {
-                alert("Format teks clipboard bukan urutan tabel Excel yang valid.");
+            if (text && parseAndApplyExcelData(text)) {
+                return;
             }
         } catch (err) {
-            alert("Gagal membaca clipboard. Gunakan Ctrl+V pada modal.");
+            console.warn("Clipboard API diblokir browser.");
         }
+        alert("Tekan Ctrl + V pada area form modal untuk menempelkan data dari Excel.");
     }, [parseAndApplyExcelData]);
 
     const handleOpenAddModal = useCallback(() => {
@@ -226,7 +233,7 @@ export default function CrudTable({
     }, [canWrite, createEmptyRow]);
 
     const handleOpenEditModal = useCallback((item) => {
-        if (!canWrite) return;
+        if (!canWrite || !item) return;
         setIsEditMode(true);
         const rawCols = TABLE_COLUMNS[subTab] || TABLE_COLUMNS.combat;
         const formattedItem = { ...item };
@@ -267,6 +274,22 @@ export default function CrudTable({
     const handleSubmitForm = (e) => {
         e?.preventDefault();
         if (!canWrite) return;
+
+        let payloadData;
+        if (isEditMode) {
+            payloadData = editData;
+        } else {
+            const cleanItems = addItems.filter(item => 
+                item && Object.values(item).some(val => val !== null && val !== undefined && String(val).trim().length > 0)
+            );
+
+            if (cleanItems.length === 0) {
+                alert('Tidak ada baris data yang valid untuk disimpan.');
+                return;
+            }
+            payloadData = { items: cleanItems };
+        }
+
         setIsProcessing(true);
 
         const routeName = subTab === 'combat' 
@@ -277,20 +300,25 @@ export default function CrudTable({
         
         const getUrl = () => {
             if (typeof window.route === 'function') {
-                return isEditMode ? window.route(routeName, getItemId(editData)) : window.route(routeName);
+                try {
+                    return isEditMode ? window.route(routeName, getItemId(editData)) : window.route(routeName);
+                } catch (err) {
+                    // Fallback
+                }
             }
             return isEditMode ? `/assets/data-management/${subTab}/${getItemId(editData)}` : `/assets/data-management/${subTab}`;
         };
 
-        const payload = isEditMode ? editData : { items: addItems };
-
-        router[method](getUrl(), payload, {
+        router[method](getUrl(), payloadData, {
             preserveScroll: true,
             onSuccess: () => {
                 handleCloseModal();
                 setIsProcessing(false);
             },
-            onError: () => setIsProcessing(false),
+            onError: (err) => {
+                console.error('Submit error:', err);
+                setIsProcessing(false);
+            },
             onFinish: () => setIsProcessing(false)
         });
     };
@@ -308,7 +336,7 @@ export default function CrudTable({
                         type="button" 
                         size="sm" 
                         onClick={handleOpenAddModal}
-                        className="h-8 text-xs gap-1.5 bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm"
+                        className="h-8 text-xs gap-1.5 bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm cursor-pointer"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Tambah Data Baru</span>
@@ -316,7 +344,7 @@ export default function CrudTable({
                 )}
             </div>
 
-            {/* TABEL */}
+            {/* TABEL DATA */}
             <Tabel
                 data={dataList}
                 columns={formattedColumns}
@@ -347,12 +375,12 @@ export default function CrudTable({
                                     variant="outline"
                                     size="sm"
                                     onClick={handlePasteFromClipboardButton}
-                                    className="h-7 text-xs gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400"
+                                    className="h-7 text-xs gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer"
                                 >
                                     <ClipboardPaste className="w-3.5 h-3.5" />
                                     <span>Paste dari Excel</span>
                                 </Button>
-                                <Badge variant="secondary" className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                <Badge variant="secondary" className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 font-mono">
                                     {addItems.length} Baris
                                 </Badge>
                             </div>
@@ -363,7 +391,7 @@ export default function CrudTable({
                         <Alert className="shrink-0 mb-3 bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 p-2.5 flex items-start gap-2">
                             <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                             <AlertDescription className="text-[11px] leading-relaxed">
-                                <strong>Smart Paste Excel:</strong> Tekan <strong>Ctrl + V</strong> untuk menempelkan sel langsung dari spreadsheet Excel sesuai urutan kolom.
+                                <strong>Smart Paste Excel:</strong> Tekan <strong>Ctrl + V</strong> atau klik tombol <strong>Paste dari Excel</strong> untuk menempelkan data.
                             </AlertDescription>
                         </Alert>
                     )}
@@ -397,7 +425,7 @@ export default function CrudTable({
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => handleRemoveAddRow(itemIdx)}
-                                                    className="h-7 px-2 text-rose-500 hover:text-rose-700 text-xs gap-1"
+                                                    className="h-7 px-2 text-rose-500 hover:text-rose-700 text-xs gap-1 cursor-pointer"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" /> Hapus Baris
                                                 </Button>
@@ -410,7 +438,7 @@ export default function CrudTable({
                                                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{col.label}</Label>
                                                     <Input 
                                                         disabled={isProcessing}
-                                                        value={item[col.key] || ''} 
+                                                        value={item ? (item[col.key] || '') : ''} 
                                                         onChange={(e) => handleAddItemChange(itemIdx, col.key, e.target.value)} 
                                                         placeholder={col.label}
                                                         className="h-8 text-xs bg-white dark:bg-slate-900"
@@ -427,8 +455,8 @@ export default function CrudTable({
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleAddMoreRows(1)}
-                                        disabled={isProcessing}
-                                        className="h-8 text-xs gap-1.5"
+                                        disabled={isProcessing || addItems.length >= MAX_ROWS_LIMIT}
+                                        className="h-8 text-xs gap-1.5 cursor-pointer"
                                     >
                                         <PlusCircle className="w-3.5 h-3.5" />
                                         <span>Tambah 1 Baris</span>
@@ -438,8 +466,8 @@ export default function CrudTable({
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleAddMoreRows(5)}
-                                        disabled={isProcessing}
-                                        className="h-8 text-xs gap-1.5"
+                                        disabled={isProcessing || addItems.length >= MAX_ROWS_LIMIT}
+                                        className="h-8 text-xs gap-1.5 cursor-pointer"
                                     >
                                         <PlusCircle className="w-3.5 h-3.5" />
                                         <span>Tambah 5 Baris</span>

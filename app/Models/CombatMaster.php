@@ -11,6 +11,17 @@ class CombatMaster extends Model
 
     protected $table = 'combat_masters';
 
-    // Mengizinkan semua kolom diisi secara massal
-    protected $guarded = [];
+    protected $guarded = ['id'];
+
+    public function trips()
+    {
+        return $this->hasMany(CombatTrip::class, 'combat_master_id')->latest();
+    }
+
+    public function activeTrip()
+    {
+        return $this->hasOne(CombatTrip::class, 'combat_master_id')
+            ->whereIn('status', ['ASSIGNED', 'IN_TRANSIT'])
+            ->latestOfMany();
+    }
 }

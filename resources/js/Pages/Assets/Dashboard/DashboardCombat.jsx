@@ -1,5 +1,6 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { router } from '@inertiajs/react';
+import axios from 'axios';
 import {
     DropdownMenu,
     DropdownMenuTrigger,
@@ -7,20 +8,15 @@ import {
     DropdownMenuCheckboxItem,
     DropdownMenuSearchInput
 } from '@/components/ui/dropdown-menu';
-import { Filter, ChevronDown, Image as ImageIcon, Loader2, RotateCcw } from 'lucide-react';
+import { 
+    Filter, ChevronDown, Image as ImageIcon, Loader2, RotateCcw 
+} from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 import StatistikCombat from './StatistikCombat';
 import TabelCombat from './TabelCombat';
 
-// SUB-KOMPONEN MULTI-SELECT FILTER
-function FilterMultiSelect({ 
-    options = [], 
-    selectedValues = [], 
-    onChange, 
-    placeholder = "Pilih...", 
-    searchPlaceholder = "Cari..." 
-}) {
+function FilterMultiSelect({ options = [], selectedValues = [], onChange, placeholder = "Pilih...", searchPlaceholder = "Cari..." }) {
     const [search, setSearch] = useState('');
     const showSearch = options.length > 5;
 
@@ -58,8 +54,7 @@ function FilterMultiSelect({
                 <span className="truncate font-normal">{getTriggerLabel()}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-2" />
             </DropdownMenuTrigger>
-
-            <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 z-50 shadow-md p-1">
+            <DropdownMenuContent className="w-[var(--anchor-width)] max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 z-50 shadow-md p-1">
                 {showSearch && (
                     <DropdownMenuSearchInput
                         value={search}
@@ -69,7 +64,6 @@ function FilterMultiSelect({
                         className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 mb-1"
                     />
                 )}
-
                 <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-slate-100 dark:border-slate-800 text-[11px]">
                     <button
                         type="button"
@@ -88,7 +82,6 @@ function FilterMultiSelect({
                         </button>
                     )}
                 </div>
-
                 {filteredOptions.length === 0 ? (
                     <div className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500 text-center">Tidak ditemukan</div>
                 ) : (
@@ -112,7 +105,6 @@ function FilterMultiSelect({
     );
 }
 
-// MAIN DASHBOARD CONTAINER COMBAT
 export default function DashboardCombat({ 
     summary = {}, 
     tableData = [], 
@@ -121,25 +113,88 @@ export default function DashboardCombat({
 }) {
     const [isExporting, setIsExporting] = useState(false);
     const dashboardRef = useRef(null);
+    const [activeTrip, setActiveTrip] = useState(summary?.active_trip || null);
 
-    // Opsi dropdown diselaraskan dengan schema combat_masters
+    const initialList = useMemo(() => {
+        if (Array.isArray(tableData) && tableData.length > 0) return tableData;
+        if (summary?.table_data) return summary.table_data;
+        if (summary?.map_data) return summary.map_data;
+        return [];
+    }, [tableData, summary]);
+
+    const [liveCombats, setLiveCombats] = useState(initialList);
+
     const listStatus = options.status_combat || options.status || [];
     const listType = options.type_combat || options.tipe || [];
     const listKetinggian = options.ketinggian_combat || options.ketinggian || [];
 
-    // State filter dari URL
     const selectedStatus = filters.status_combat || filters.status || [];
     const selectedType = filters.type_combat || filters.tipe || [];
     const selectedKetinggian = filters.ketinggian_combat || filters.ketinggian || [];
-
     const isFiltered = selectedStatus.length > 0 || selectedType.length > 0 || selectedKetinggian.length > 0;
 
-    const resolvedTableData = useMemo(() => {
-        if (Array.isArray(tableData) && tableData.length > 0) return tableData;
-        if (summary?.table_data) return summary.table_data;
-        if (summary?.map_data) return summary.map_data;
-        return tableData;
-    }, [tableData, summary]);
+    const fetchLivePositions = useCallback(async () => {
+        try {
+            const res = await axios.get('/api/combat/live-positions');
+            if (res.data?.combats && Array.isArray(res.data.combats)) {
+                setLiveCombats(res.data.combats);
+            }
+            if (res.data?.active_trip !== undefined) {
+                setActiveTrip(res.data.active_trip);
+            }
+        } catch (err) {
+            console.error("Gagal polling live position COMBAT:", err);
+        }
+    }, []);
+
+    // 👉 SISTEM POLLING PINTAR ANTI-BOTTLENECK
+    useEffect(() => {
+        let isMounted = true;
+        let timeoutId = null;
+
+        const poll = async () => {
+            if (!isMounted) return;
+            await fetchLivePositions(); // Tunggu request selesai dulu
+            
+            // Baru hitung mundur 10 detik setelah request berhasil (agar tidak menumpuk!)
+            if (isMounted) {
+                timeoutId = setTimeout(poll, 10000); 
+            }
+        };
+
+        poll(); // Panggil pertama kali
+
+        return () => {
+            isMounted = false;
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [fetchLivePositions]);
+
+    const normalizeStatus = (statusStr) => {
+        if (!statusStr) return 'UNASSIGNED';
+        const clean = String(statusStr).toUpperCase().trim();
+        if (clean.includes('TRANSIT')) return 'IN TRANSIT';
+        if (clean.includes('ONSITE') || clean.startsWith('2.')) return 'ONSITE';
+        if (clean.includes('READY') || clean.startsWith('5.')) return 'READY TO USE';
+        if (clean.includes('BROKEN') || clean.startsWith('6.')) return 'BROKEN';
+        return 'UNASSIGNED';
+    };
+
+    const dynamicSummary = useMemo(() => {
+        return {
+            ...summary,
+            map_data: liveCombats,
+            table_data: liveCombats,
+            summary: {
+                ...summary?.summary,
+                totalCombat: liveCombats.length,
+                count_onsite: liveCombats.filter(i => normalizeStatus(i.status_combat || i.status_raw) === 'ONSITE').length,
+                count_in_transit: liveCombats.filter(i => normalizeStatus(i.status_combat || i.status_raw) === 'IN TRANSIT').length,
+                count_ready: liveCombats.filter(i => normalizeStatus(i.status_combat || i.status_raw) === 'READY TO USE').length,
+                count_broken: liveCombats.filter(i => normalizeStatus(i.status_combat || i.status_raw) === 'BROKEN').length,
+            }
+        };
+    }, [summary, liveCombats]);
 
     const handleFilterChange = (key, values) => {
         router.get(
@@ -160,13 +215,10 @@ export default function DashboardCombat({
     const handleDownloadDashboardImage = async () => {
         if (!dashboardRef.current) return;
         setIsExporting(true);
-
         const isDarkMode = document.documentElement.classList.contains('dark');
-
         try {
             dashboardRef.current.classList.add('exporting-mode');
             await new Promise((resolve) => setTimeout(resolve, 300));
-
             const dataUrl = await toPng(dashboardRef.current, { 
                 cacheBust: true,
                 quality: 1.0,
@@ -174,7 +226,6 @@ export default function DashboardCombat({
                 backgroundColor: isDarkMode ? '#020617' : '#f8fafc',
                 fetchRequestInit: { mode: 'cors' },
             });
-
             const link = document.createElement('a');
             const statusName = selectedStatus.length === 0 ? 'SemuaStatus' : selectedStatus.join('-');
             const fileName = `Dashboard_COMBAT_${statusName}_${new Date().toISOString().slice(0,10)}.png`;
@@ -183,7 +234,6 @@ export default function DashboardCombat({
             link.href = dataUrl;
             link.click();
         } catch (err) {
-            console.error("Gagal mendownload gambar dashboard:", err);
             alert("Terjadi kesalahan saat memproses gambar.");
         } finally {
             if (dashboardRef.current) {
@@ -212,7 +262,6 @@ export default function DashboardCombat({
                 }
             `}</style>
 
-            {/* BAR KONTROL FILTER & DOWNLOAD */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900/40 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl shadow-sm">
                 <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider pr-1">
@@ -221,7 +270,6 @@ export default function DashboardCombat({
                     </div>
                     <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block" />
                     
-                    {/* Filter Status COMBAT */}
                     <div className="w-full sm:w-48">
                         <FilterMultiSelect
                             options={listStatus} 
@@ -232,7 +280,6 @@ export default function DashboardCombat({
                         />
                     </div>
 
-                    {/* Filter Type COMBAT */}
                     <div className="w-full sm:w-44">
                         <FilterMultiSelect
                             options={listType} 
@@ -243,7 +290,6 @@ export default function DashboardCombat({
                         />
                     </div>
 
-                    {/* Filter Ketinggian COMBAT */}
                     <div className="w-full sm:w-44">
                         <FilterMultiSelect
                             options={listKetinggian}
@@ -257,7 +303,7 @@ export default function DashboardCombat({
                     {isFiltered && (
                         <button
                             onClick={handleResetAllFilters}
-                            className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:underline font-medium px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                            className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:underline font-medium px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
                         >
                             <RotateCcw className="w-3 h-3" />
                             <span>Reset Filter</span>
@@ -286,7 +332,6 @@ export default function DashboardCombat({
                 </div>
             </div>
 
-            {/* AREA CAPTURE DASHBOARD */}
             <div ref={dashboardRef} className="capture-area space-y-5 p-5 bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-900 rounded-xl overflow-hidden transition-colors duration-200">
                 <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800/80 pb-3">
                     <div>
@@ -300,11 +345,12 @@ export default function DashboardCombat({
                     </span>
                 </div>
 
-                {/* 1. STATISTIK & MAP */}
-                <StatistikCombat summary={summary} />
+                <StatistikCombat 
+                    summary={dynamicSummary} 
+                    activeTrip={activeTrip}
+                />
 
-                {/* 2. TABEL COMBAT */}
-                <TabelCombat tableData={resolvedTableData} />
+                <TabelCombat tableData={liveCombats} />
             </div>
         </div>
     );
