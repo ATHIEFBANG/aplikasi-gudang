@@ -6,16 +6,14 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AssetDashboardController;
 use App\Http\Controllers\AssetDataManagementController;
-use App\Http\Controllers\Api\CombatTripController;
-use App\Models\CombatTrip; 
+use App\Models\CombatTrip;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 // =========================================================================
-// 1. PUBLIC ROUTES (Tanpa Login)
+// 1. PUBLIC ROUTES
 // =========================================================================
-
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin'       => Route::has('login'),
@@ -25,19 +23,16 @@ Route::get('/', function () {
     ]);
 })->name('welcome');
 
-// --- HALAMAN UI DRIVER ---
+// TAMPILAN HALAMAN DRIVER (UI/Frontend)
 Route::get('/track/{token}', function ($token) {
     $trip = CombatTrip::with('combat')->where('tracking_token', $token)->first();
-
     if (!$trip) {
         abort(404, 'Link tracking tidak valid atau sudah kadaluarsa.');
     }
-
     return Inertia::render('Track/DrivePage', [
         'trip' => $trip
     ]);
 })->name('track.driver');
-
 
 // =========================================================================
 // 2. AUTHENTICATED ROUTES (Wajib Login)
@@ -91,20 +86,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/combat/reset', 'resetCombat')->name('reset-combat');
             Route::get('/combat/export', 'exportCombat')->name('export-combat');
         });
-    });
-
-    // 👉 API COMBAT DASHBOARD (SEKARANG SUDAH ADA RUTE UPDATE & DELETE)
-    Route::prefix('api/combat')->group(function () {
-        Route::get('/active', [CombatTripController::class, 'getActiveTrip']);
-        Route::post('/dispatch', [CombatTripController::class, 'createTrip']);
-        Route::post('/trips/{id}/cancel', [CombatTripController::class, 'cancelTrip']);
-        Route::get('/live-positions', [CombatTripController::class, 'getLivePositions']);
-        Route::get('/history', [CombatTripController::class, 'getAllTripsHistory']);
-        Route::get('/trips/{id}/route', [CombatTripController::class, 'getTripRoute']);
-        
-        // DUA RUTE INI YANG SEBELUMNYA HILANG:
-        Route::put('/trips/{id}', [CombatTripController::class, 'updateTrip']);
-        Route::delete('/trips/{id}', [CombatTripController::class, 'destroyTrip']);
     });
 });
 

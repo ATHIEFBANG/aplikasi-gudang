@@ -15,7 +15,6 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Percayai Reverse Proxy dari Vercel
         $middleware->trustProxies(at: '*');
 
         $middleware->web(append: [
@@ -23,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        // 👉 KODE WAJIB UNTUK VERCEL: KECUALIKAN CSRF UNTUK SEMUA API
+        // 👉 INI KUNCI UTAMANYA: BEBASKAN API DARI CSRF AGAR AXIOS LANCAR DI VERCEL
         $middleware->validateCsrfTokens(except: [
             'api/*',
             'track/*'
