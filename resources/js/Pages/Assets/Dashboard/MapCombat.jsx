@@ -42,9 +42,10 @@ export default function MapCombat({
     const [draftSelectedCombat, setDraftSelectedCombat] = useState(null);
     const [showDetailCard, setShowDetailCard] = useState(true);
 
+    // 👉 Menggunakan prefix /combat-api untuk Vercel
     const fetchTripsList = useCallback(async () => {
         try {
-            const res = await axios.get('/api/combat/history?per_page=50');
+            const res = await axios.get('/combat-api/history?per_page=50');
             const data = res.data?.data || res.data || [];
             if (Array.isArray(data) && data.length > 0) {
                 setAllTrips(data);
@@ -64,14 +65,14 @@ export default function MapCombat({
         fetchTripsList();
     }, [viewMode, fetchTripsList]);
 
-    // Ambil jejak koordinat riil supir
+    // 👉 Menggunakan prefix /combat-api untuk Vercel
     const fetchGpsTrail = useCallback(async (trip) => {
         if (!trip?.id) {
             setLiveGpsCoords([]);
             return;
         }
         try {
-            const res = await axios.get(`/api/combat/trips/${trip.id}/route`);
+            const res = await axios.get(`/combat-api/trips/${trip.id}/route`);
             const coords = res.data?.data?.coordinates || [];
             setLiveGpsCoords(coords);
         } catch (err) {
@@ -79,7 +80,7 @@ export default function MapCombat({
         }
     }, []);
 
-    // 👉 POLLING REAL-TIME: HANYA JIKA RUTE SEDANG 'IN_TRANSIT'
+    // Polling rute live saat IN_TRANSIT
     useEffect(() => {
         if (viewMode === 'rute' && selectedTrip && !isCreatingRoute) {
             fetchGpsTrail(selectedTrip);
@@ -87,7 +88,7 @@ export default function MapCombat({
             if (selectedTrip.status === 'IN_TRANSIT') {
                 const interval = setInterval(() => {
                     fetchGpsTrail(selectedTrip);
-                }, 5000); // Tarik posisi supir setiap 5 detik
+                }, 5000);
                 return () => clearInterval(interval);
             }
         }
@@ -135,10 +136,11 @@ export default function MapCombat({
         fetchTripsList();
     };
 
+    // 👉 Menggunakan prefix /combat-api untuk Vercel
     const handleDeleteTrip = async (tripId) => {
         if (!confirm('Tindakan ini tidak dapat dibatalkan!\nApakah Anda yakin ingin menghapus data penugasan rute ini?')) return;
         try {
-            await axios.delete(`/api/combat/trips/${tripId}`);
+            await axios.delete(`/combat-api/trips/${tripId}`);
             alert('Penugasan rute berhasil dihapus!');
             
             setAllTrips(prev => prev.filter(t => t.id !== tripId));
@@ -157,9 +159,7 @@ export default function MapCombat({
         }
     };
 
-    // =========================================================================
-    // 👉 PEMETAAN TITIK PIN: ASAL, TUJUAN, DAN PIN DRIVER (HANYA IN_TRANSIT)
-    // =========================================================================
+    // Pemetaan Titik Pin
     const finalMapData = useMemo(() => {
         if (viewMode === 'dashboard') {
             return [...activeMapRaw];
@@ -168,7 +168,6 @@ export default function MapCombat({
         if (viewMode === 'rute') {
             let data = [];
             
-            // Mode Buat Rute Baru
             if (isCreatingRoute) {
                 if (draftSelectedCombat) {
                     const originCoord = parseCoordinates(draftSelectedCombat);
@@ -200,9 +199,8 @@ export default function MapCombat({
                     });
                 }
             } 
-            // Mode Rute Terpilih
             else if (selectedTrip) {
-                // 1. PIN ASAL (Lokasi Unit COMBAT)
+                // 1. Pin Titik Asal
                 const originCoord = parseCoordinates(selectedTrip.combat || selectedTrip);
                 if (originCoord) {
                     data.push({ 
@@ -219,7 +217,7 @@ export default function MapCombat({
                     });
                 }
 
-                // 2. PIN TUJUAN
+                // 2. Pin Titik Tujuan
                 const destLat = (isEditingRoute && draftLocation) ? draftLocation.lat : parseFloat(selectedTrip.destination_lat);
                 const destLng = (isEditingRoute && draftLocation) ? draftLocation.lng : parseFloat(selectedTrip.destination_lng);
 
@@ -236,13 +234,13 @@ export default function MapCombat({
                     });
                 }
 
-                // 👉 3. PIN POSISI DRIVER (HANYA DITAMPILKAN JIKA STATUS SUDAH "IN_TRANSIT")
+                // 3. Pin Posisi Driver (Hanya muncul saat status IN_TRANSIT)
                 if (selectedTrip.status === 'IN_TRANSIT') {
                     let driverLat = null;
                     let driverLng = null;
 
                     if (liveGpsCoords.length > 0) {
-                        const lastCoord = liveGpsCoords[liveGpsCoords.length - 1]; // Titik ping terakhir [lng, lat]
+                        const lastCoord = liveGpsCoords[liveGpsCoords.length - 1];
                         driverLng = lastCoord[0];
                         driverLat = lastCoord[1];
                     } else if (selectedTrip.latest_coordinate || selectedTrip.latestCoordinate) {
@@ -271,7 +269,6 @@ export default function MapCombat({
         return [];
     }, [activeMapRaw, viewMode, isCreatingRoute, draftLocation, draftSelectedCombat, selectedTrip, isEditingRoute, liveGpsCoords]);
 
-    // Jalur Polyline
     const activePolylineCoords = useMemo(() => {
         if (selectedTripInfo) return routeHistory;
         
@@ -282,7 +279,6 @@ export default function MapCombat({
             }
         }
 
-        // Jika driver sedang berjalan, gambar lintasan riil GPS
         if (liveGpsCoords.length >= 2 && !isEditingRoute) {
             return liveGpsCoords;
         }

@@ -18,16 +18,12 @@ import {
     TrendingUp 
 } from 'lucide-react';
 
-// Komponen Map Universal Proyek
 import Map from '@/components/Map';
-
-// Komponen UI Shadcn
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-// Recharts untuk Grafik Kecepatan
 import {
     AreaChart,
     Area,
@@ -38,24 +34,22 @@ import {
     CartesianGrid
 } from 'recharts';
 
-// Konfigurasi Warna Pin Marker Driver & Tujuan
 const DRIVER_MAP_CONFIG = {
     'DRIVER': {
         label: 'Posisi Anda',
-        color: '#f59e0b', // Amber
+        color: '#f59e0b',
         bg: 'rgba(245,158,11,0.35)',
     },
     'DESTINATION': {
         label: 'Tujuan Site',
-        color: '#ef4444', // Merah
+        color: '#ef4444',
         bg: 'rgba(239,68,68,0.35)',
     }
 };
 
-// 👉 Helper Rumus Haversine: Hitung sisa jarak lurus ke tujuan (dalam KM)
 const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-    const R = 6371; // Radius bumi dalam KM
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
@@ -65,7 +59,6 @@ const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
     return (R * c).toFixed(1);
 };
 
-// 👉 Helper Pendeteksi Jenis Pergerakan
 const getJenisPergerakanInfo = (trip) => {
     if (!trip) {
         return { label: 'Mobilisasi Unit', badgeClass: 'bg-slate-500/10 text-slate-400 border-slate-500/20' };
@@ -87,12 +80,12 @@ const getJenisPergerakanInfo = (trip) => {
 
     const dest = (trip.destination_name || '').toLowerCase();
     if (dest.includes('workshop') || dest.includes('repair') || dest.includes('perbaikan')) {
-        return { label: 'Maintenance (Ke Workshop)', badgeClass: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };
+        return { label: 'Maintenance (Ke Workshop)', badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' };
     }
     if (dest.includes('gudang') || dest.includes('basecamp') || dest.includes('wh')) {
-        return { label: 'Penarikan (Site ke Gudang)', badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
+        return { label: 'Penarikan (Site ke Gudang)', badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
     }
-    return { label: 'Deploy (Gudang ke Site)', badgeClass: 'bg-sky-500/10 text-sky-400 border-sky-500/20' };
+    return { label: 'Deploy (Gudang ke Site)', badgeClass: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20' };
 };
 
 export default function DriverPage({ trip }) {
@@ -103,7 +96,6 @@ export default function DriverPage({ trip }) {
     const [lastPingTime, setLastPingTime] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // State Riwayat Kecepatan untuk Grafik
     const [speedHistory, setSpeedHistory] = useState([
         { time: 'Mulai', speed: 0 }
     ]);
@@ -114,9 +106,6 @@ export default function DriverPage({ trip }) {
     const lastPingTimestampRef = useRef(0);
     const lastValidCoordRef = useRef(null);
 
-    // =========================================================================
-    // 1. WAKE LOCK API (Menjaga layar HP supir tidak mati otomatis)
-    // =========================================================================
     const requestWakeLock = async () => {
         if ('wakeLock' in navigator) {
             try {
@@ -135,16 +124,14 @@ export default function DriverPage({ trip }) {
         }
     };
 
-    // =========================================================================
-    // 2. PING TRANSMISI GPS & REKAM GRAFIK KECEPATAN
-    // =========================================================================
+    // 👉 Menggunakan prefix /track-api untuk Vercel
     const sendGpsPing = useCallback(async (lat, lng, speed, accuracy) => {
         const now = Date.now();
         if (now - lastPingTimestampRef.current < 4000) return;
         lastPingTimestampRef.current = now;
 
         try {
-            await axios.post(`/api/track/${token}/ping`, {
+            await axios.post(`/track-api/${token}/ping`, {
                 latitude: lat,
                 longitude: lng,
                 speed: speed ? Number(speed) : 0,
@@ -164,9 +151,6 @@ export default function DriverPage({ trip }) {
         }
     }, [token]);
 
-    // =========================================================================
-    // 3. SMART GPS WATCHER
-    // =========================================================================
     const startGpsWatcher = useCallback(() => {
         if (!navigator.geolocation) {
             setGpsError('Browser HP kamu tidak mendukung fitur GPS.');
@@ -228,13 +212,11 @@ export default function DriverPage({ trip }) {
         return () => stopGpsWatcher();
     }, [status, startGpsWatcher, stopGpsWatcher]);
 
-    // =========================================================================
-    // 4. ACTION HANDLERS (MULAI & SELESAI)
-    // =========================================================================
+    // 👉 Menggunakan prefix /track-api untuk Vercel
     const handleStartTrip = async () => {
         setIsSubmitting(true);
         try {
-            await axios.post(`/api/track/${token}/start`);
+            await axios.post(`/track-api/${token}/start`);
             setStatus('IN_TRANSIT');
             startGpsWatcher();
         } catch (err) {
@@ -244,6 +226,7 @@ export default function DriverPage({ trip }) {
         }
     };
 
+    // 👉 Menggunakan prefix /track-api untuk Vercel
     const handleCompleteTrip = () => {
         if (!confirm('Apakah unit COMBAT sudah tiba di lokasi tujuan dengan aman?')) return;
 
@@ -253,7 +236,7 @@ export default function DriverPage({ trip }) {
             setIsSubmitting(false);
 
             try {
-                await axios.post(`/api/track/${token}/complete`, {
+                await axios.post(`/track-api/${token}/complete`, {
                     final_latitude: lat,
                     final_longitude: lng,
                 });
@@ -284,7 +267,6 @@ export default function DriverPage({ trip }) {
     const combat = trip?.combat || {};
     const jenisInfo = useMemo(() => getJenisPergerakanInfo(trip), [trip]);
 
-    // Marker Peta Universal (Driver & Tujuan)
     const mapMarkers = useMemo(() => {
         const list = [];
         if (trip?.destination_lat && trip?.destination_lng) {
@@ -310,7 +292,6 @@ export default function DriverPage({ trip }) {
         return list;
     }, [trip?.destination_lat, trip?.destination_lng, trip?.destination_name, currentCoords]);
 
-    // 👉 Garis Rute Panduan Supir (Dari Posisi Live ke Titik Tujuan)
     const activeRouteHistory = useMemo(() => {
         if (currentCoords?.latitude && currentCoords?.longitude && trip?.destination_lat && trip?.destination_lng) {
             return [
@@ -321,7 +302,6 @@ export default function DriverPage({ trip }) {
         return [];
     }, [currentCoords, trip?.destination_lat, trip?.destination_lng]);
 
-    // Titik Tengah Awal Peta Universal
     const mapInitialCenter = useMemo(() => {
         if (currentCoords) {
             return [currentCoords.longitude, currentCoords.latitude];
@@ -332,7 +312,6 @@ export default function DriverPage({ trip }) {
         return [106.8456, -6.2088];
     }, [currentCoords, trip?.destination_lng, trip?.destination_lat]);
 
-    // 👉 Sisa Jarak Real-Time (Sudah akurat dalam KM tanpa bug pembagian 1000)
     const remainingDistanceKm = useMemo(() => {
         if (!currentCoords || !trip?.destination_lat || !trip?.destination_lng) return '-';
         const distKm = calculateDistanceKm(
@@ -344,7 +323,6 @@ export default function DriverPage({ trip }) {
         return distKm || '-';
     }, [currentCoords, trip?.destination_lat, trip?.destination_lng]);
 
-    // Google Maps Navigation URL
     const googleMapsNavUrl = useMemo(() => {
         if (trip?.destination_lat && trip?.destination_lng) {
             return `https://www.google.com/maps/dir/?api=1&origin=${currentCoords ? `${currentCoords.latitude},${currentCoords.longitude}` : ''}&destination=${trip.destination_lat},${trip.destination_lng}&travelmode=driving`;
@@ -359,7 +337,6 @@ export default function DriverPage({ trip }) {
         <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-between max-w-lg mx-auto border-x border-slate-800/80 shadow-2xl relative">
             <Head title={`Tracking Driver - ${combat.asset_name || 'COMBAT'}`} />
 
-            {/* 1. HEADER ATAS: INFO UNIT & TOMBOL AKSI UTAMA */}
             <header className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3 sticky top-0 z-30 shadow-md shrink-0">
                 <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center font-black text-sm text-white shrink-0 shadow-md shadow-red-600/20">
@@ -380,7 +357,6 @@ export default function DriverPage({ trip }) {
                     </div>
                 </div>
 
-                {/* TOMBOL AKSI UTAMA */}
                 <div className="shrink-0">
                     {status === 'ASSIGNED' && (
                         <Button
@@ -423,7 +399,6 @@ export default function DriverPage({ trip }) {
                 </div>
             </header>
 
-            {/* 2. TENGAH: PETA UNIVERSAL BERSIH */}
             <main className="w-full relative bg-slate-900 border-b border-slate-800 shrink-0">
                 {gpsError && (
                     <div className="p-3 bg-slate-950">
@@ -465,10 +440,7 @@ export default function DriverPage({ trip }) {
                 </div>
             </main>
 
-            {/* 3. DI BAWAH PETA: TELEMETRI GRID, GRAFIK KM & KARTU INFORMASI RUTE */}
             <div className="flex-1 p-4 bg-slate-950 space-y-3.5 overflow-y-auto">
-                
-                {/* A. SPEEDOMETER & TELEMETRI GRID */}
                 <div className="grid grid-cols-3 gap-2">
                     <Card className="bg-slate-900 border-slate-800 rounded-xl p-3 shadow-sm">
                         <CardContent className="p-0 flex flex-col justify-between h-full">
@@ -516,7 +488,6 @@ export default function DriverPage({ trip }) {
                     </Card>
                 </div>
 
-                {/* B. GRAFIK KECEPATAN (KM/H) */}
                 <Card className="bg-slate-900 border-slate-800 rounded-2xl shadow-sm overflow-hidden">
                     <CardHeader className="p-3.5 pb-2 border-b border-slate-800/80 flex flex-row items-center justify-between space-y-0">
                         <div className="flex items-center gap-1.5">
@@ -554,7 +525,6 @@ export default function DriverPage({ trip }) {
                     </CardContent>
                 </Card>
 
-                {/* C. CARD GABUNGAN: STATUS GPS + RUTE + JENIS PERGERAKAN + GOOGLE MAPS */}
                 <Card className="bg-slate-900 border-slate-800 rounded-2xl shadow-sm overflow-hidden">
                     <CardContent className="p-3.5 space-y-3">
                         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">

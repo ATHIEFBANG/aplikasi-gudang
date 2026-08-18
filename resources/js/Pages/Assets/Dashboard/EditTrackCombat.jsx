@@ -47,7 +47,7 @@ export default function EditTrackCombat({
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // 👉 SINKRONISASI DATA KETIKA MODAL DIBUKA
+    // Sinkronisasi data ketika modal dibuka
     useEffect(() => {
         if (trip) {
             setFormData({
@@ -98,7 +98,8 @@ export default function EditTrackCombat({
                 target_status: selectedPergerakan.target_status
             };
 
-            const res = await axios.put(`/api/combat/trips/${trip.id}`, payload);
+            // 👉 Menggunakan prefix aman /combat-api untuk Vercel
+            const res = await axios.put(`/combat-api/trips/${trip.id}`, payload);
             
             const updatedData = {
                 ...trip,

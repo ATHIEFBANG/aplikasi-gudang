@@ -69,12 +69,13 @@ export default function RiwayatCombat({ initialTrips = [], onBack }) {
     const [itemsPerPage, setItemsPerPage] = useState(10);
     
     const [historyData, setHistoryData] = useState(initialTrips);
-    const [isLoadingData, setIsLoadingData] = useState(false); // 👉 Hapus auto-loading karena data dari backend sudah instan!
+    const [isLoadingData, setIsLoadingData] = useState(false);
 
+    // 👉 Menggunakan prefix /combat-api untuk Vercel
     const fetchHistory = useCallback(async () => {
         setIsLoadingData(true);
         try {
-            const response = await axios.get('/api/combat/history?per_page=100');
+            const response = await axios.get('/combat-api/history?per_page=100');
             const data = response.data?.data || response.data || [];
             if (Array.isArray(data)) {
                 setHistoryData(data);

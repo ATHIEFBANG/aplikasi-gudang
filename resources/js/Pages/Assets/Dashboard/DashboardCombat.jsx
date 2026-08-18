@@ -133,9 +133,10 @@ export default function DashboardCombat({
     const selectedKetinggian = filters.ketinggian_combat || filters.ketinggian || [];
     const isFiltered = selectedStatus.length > 0 || selectedType.length > 0 || selectedKetinggian.length > 0;
 
+    // 👉 Menggunakan prefix aman /combat-api untuk Vercel
     const fetchLivePositions = useCallback(async () => {
         try {
-            const res = await axios.get('/api/combat/live-positions');
+            const res = await axios.get('/combat-api/live-positions');
             if (res.data?.combats && Array.isArray(res.data.combats)) {
                 setLiveCombats(res.data.combats);
             }
@@ -147,22 +148,20 @@ export default function DashboardCombat({
         }
     }, []);
 
-    // 👉 SISTEM POLLING PINTAR ANTI-BOTTLENECK
+    // Polling pintar anti-bottleneck
     useEffect(() => {
         let isMounted = true;
         let timeoutId = null;
 
         const poll = async () => {
             if (!isMounted) return;
-            await fetchLivePositions(); // Tunggu request selesai dulu
-            
-            // Baru hitung mundur 10 detik setelah request berhasil (agar tidak menumpuk!)
+            await fetchLivePositions();
             if (isMounted) {
                 timeoutId = setTimeout(poll, 10000); 
             }
         };
 
-        poll(); // Panggil pertama kali
+        poll();
 
         return () => {
             isMounted = false;

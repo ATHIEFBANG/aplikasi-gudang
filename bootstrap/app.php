@@ -15,7 +15,6 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Percayai Reverse Proxy dari Vercel
         $middleware->trustProxies(at: '*');
 
         $middleware->web(append: [
@@ -23,15 +22,16 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        // 👉 INI KUNCI UTAMANYA: BEBASKAN API DARI CSRF AGAR AXIOS LANCAR DI VERCEL
-        // Karena semua API kita di web.php sudah pakai prefix /api/, cukup 1 baris ini.
+        // 👉 KECUALIKAN CSRF UNTUK SEMUA ENDPOINT AJAX
         $middleware->validateCsrfTokens(except: [
+            'combat-api/*',
+            'track-api/*',
             'api/*'
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('combat-api/*') || $request->is('track-api/*') || $request->is('api/*'),
         );
 
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {

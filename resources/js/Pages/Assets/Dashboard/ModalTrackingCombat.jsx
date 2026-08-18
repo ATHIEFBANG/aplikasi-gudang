@@ -22,7 +22,7 @@ const JENIS_PERGERAKAN_OPTIONS = [
     { id: 'MAINTENANCE', label: 'Maintenance (Ke Workshop/Perbaikan)', target_status: 'BROKEN / INOP' },
 ];
 
-// 👉 PENDETEKSI RESMI JENIS PERGERAKAN DARI DATA DATABASE TRIP
+// PENDETEKSI RESMI JENIS PERGERAKAN DARI DATA DATABASE TRIP
 const getJenisPergerakanInfo = (trip) => {
     if (!trip) {
         return { label: 'Mobilisasi Unit', badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' };
@@ -151,7 +151,8 @@ export default function ModalTrackingCombat({
                 target_status: selectedPergerakan.target_status 
             };
 
-            const res = await axios.post('/api/combat/dispatch', payload);
+            // 👉 Menggunakan prefix aman /combat-api untuk Vercel
+            const res = await axios.post('/combat-api/dispatch', payload);
             alert('Penugasan rute baru berhasil dibuat!');
             if (onSuccess) onSuccess(res.data?.data || res.data);
         } catch (err) {
@@ -197,7 +198,7 @@ export default function ModalTrackingCombat({
             return `https://www.google.com/maps/dir/?api=1&origin=${originCoord.lat},${originCoord.lng}&destination=${destLat},${destLng}&travelmode=driving`;
         }
         if (t.destination_name) {
-            return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(t.destination_name)}`;
+            return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(t.destination_name)}`;
         }
         return '#';
     };
@@ -427,7 +428,7 @@ export default function ModalTrackingCombat({
                     {/* Box Info Rute & Status */}
                     <div className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 rounded-xl space-y-2 text-xs">
                         
-                        {/* Status Misi & Jenis Pergerakan (Otomatis membaca data ip_gps / jenis_rute hasil update) */}
+                        {/* Status Misi & Jenis Pergerakan */}
                         <div className="flex justify-between items-center pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
                             <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md border ${detailPergerakan.badgeClass}`}>
                                 {detailPergerakan.label}
