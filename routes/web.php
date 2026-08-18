@@ -6,14 +6,16 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AssetDashboardController;
 use App\Http\Controllers\AssetDataManagementController;
+use App\Http\Controllers\Api\CombatTripController;
 use App\Models\CombatTrip;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 // =========================================================================
-// 1. PUBLIC ROUTES
+// 1. PUBLIC ROUTES (Tanpa Login)
 // =========================================================================
+
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin'       => Route::has('login'),
@@ -23,69 +25,119 @@ Route::get('/', function () {
     ]);
 })->name('welcome');
 
-// TAMPILAN HALAMAN DRIVER (UI/Frontend)
+// --- HALAMAN UI DRIVER (Akses via Link WhatsApp) ---
 Route::get('/track/{token}', function ($token) {
     $trip = CombatTrip::with('combat')->where('tracking_token', $token)->first();
+
     if (!$trip) {
         abort(404, 'Link tracking tidak valid atau sudah kadaluarsa.');
     }
+
     return Inertia::render('Track/DrivePage', [
         'trip' => $trip
     ]);
 })->name('track.driver');
 
+// --- API TRACKING DRIVER (Dipanggil oleh DrivePage.jsx di HP Driver) ---
+Route::prefix('api/track')->group(function () {
+    Route::post('/{token}/start', [CombatTripController::class, 'startTrip']);
+    Route::post('/{token}/ping', [CombatTripController::class, 'ping']);
+    Route::post('/{token}/complete', [CombatTripController::class, 'completeTrip']);
+});
+
+
 // =========================================================================
 // 2. AUTHENTICATED ROUTES (Wajib Login)
 // =========================================================================
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     
+    // HOME
     Route::get('/home', [DashboardController::class, 'index'])->name('home');
 
+    // PROFIL
     Route::controller(ProfileController::class)->prefix('profile')->name('profile.')->group(function () {
         Route::get('/', 'edit')->name('edit');
         Route::patch('/', 'update')->name('update');
         Route::delete('/', 'destroy')->name('destroy');
     });
 
-    Route::prefix('admin')->name('admin.users.')->controller(UserController::class)->group(function () {
-        Route::get('/users', 'index')->name('index');
-        Route::post('/users', 'store')->name('store');
-        Route::put('/users/{user}', 'update')->name('update');
-        Route::delete('/users/{user}', 'destroy')->name('destroy');
-        Route::post('/users/bulk-delete', 'bulkDelete')->name('bulk-delete');
-    });
+    // ADMIN USERS
+    Route::prefix('admin')
+        ->name('admin.users.')
+        ->controller(UserController::class)
+        ->group(function () {
+            Route::get('/users', 'index')->name('index');
+            Route::post('/users', 'store')->name('store');
+            Route::put('/users/{user}', 'update')->name('update');
+            Route::delete('/users/{user}', 'destroy')->name('destroy');
+            Route::post('/users/bulk-delete', 'bulkDelete')->name('bulk-delete');
+        });
 
+    // MODUL MAINTENANCE
     Route::prefix('maintenance')->name('maintenance.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'maintenance'])->name('dashboard');
-        Route::prefix('data-management')->name('data-management.')->controller(DataManagementController::class)->group(function () {
-            Route::get('/', 'index')->name('index');
-            Route::post('/rpm', 'storeRpm')->name('store-rpm');
-            Route::put('/rpm/{id}', 'updateRpm')->name('update-rpm');
-            Route::delete('/rpm/{id?}', 'destroyRpm')->name('destroy-rpm');
-            Route::post('/rpm/bulk-delete', 'bulkDestroyRpm')->name('bulk-destroy-rpm');
-            Route::post('/rpm/reset', 'resetRpm')->name('reset-rpm');
-            Route::get('/rpm/export', 'exportRpm')->name('export-rpm');
-            
-            Route::post('/smartkey', 'storeSmartkey')->name('store-smartkey');
-            Route::put('/smartkey/{id}', 'updateSmartkey')->name('update-smartkey');
-            Route::delete('/smartkey/{id?}', 'destroySmartkey')->name('destroy-smartkey');
-            Route::post('/smartkey/bulk-delete', 'bulkDestroySmartkey')->name('bulk-destroy-smartkey');
-            Route::post('/smartkey/reset', 'resetSmartkey')->name('reset-smartkey');
-            Route::get('/smartkey/export', 'exportSmartkey')->name('export-smartkey');
-        });
+        Route::prefix('data-management')
+            ->name('data-management.')
+            ->controller(DataManagementController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::post('/rpm', 'storeRpm')->name('store-rpm');
+                Route::put('/rpm/{id}', 'updateRpm')->name('update-rpm');
+                Route::delete('/rpm/{id?}', 'destroyRpm')->name('destroy-rpm');
+                Route::post('/rpm/bulk-delete', 'bulkDestroyRpm')->name('bulk-destroy-rpm');
+                Route::post('/rpm/reset', 'resetRpm')->name('reset-rpm');
+                Route::get('/rpm/export', 'exportRpm')->name('export-rpm');
+                
+                Route::post('/smartkey', 'storeSmartkey')->name('store-smartkey');
+                Route::put('/smartkey/{id}', 'updateSmartkey')->name('update-smartkey');
+                Route::delete('/smartkey/{id?}', 'destroySmartkey')->name('destroy-smartkey');
+                Route::post('/smartkey/bulk-delete', 'bulkDestroySmartkey')->name('bulk-destroy-smartkey');
+                Route::post('/smartkey/reset', 'resetSmartkey')->name('reset-smartkey');
+                Route::get('/smartkey/export', 'exportSmartkey')->name('export-smartkey');
+            });
     });
 
+    // MODUL ASSETS
     Route::prefix('assets')->name('assets.')->group(function () {
         Route::get('/dashboard', [AssetDashboardController::class, 'index'])->name('dashboard');
-        Route::prefix('data-management')->name('data-management.')->controller(AssetDataManagementController::class)->group(function () {
-            Route::get('/', 'index')->name('index');
-            Route::post('/combat', 'storeCombat')->name('store-combat');
-            Route::put('/combat/{id}', 'updateCombat')->name('update-combat');
-            Route::delete('/combat/{id?}', 'destroyCombat')->name('destroy-combat');
-            Route::post('/combat/bulk-delete', 'bulkDestroyCombat')->name('bulk-destroy-combat');
-            Route::post('/combat/reset', 'resetCombat')->name('reset-combat');
-            Route::get('/combat/export', 'exportCombat')->name('export-combat');
-        });
+        Route::prefix('data-management')
+            ->name('data-management.')
+            ->controller(AssetDataManagementController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::post('/combat', 'storeCombat')->name('store-combat');
+                Route::put('/combat/{id}', 'updateCombat')->name('update-combat');
+                Route::delete('/combat/{id?}', 'destroyCombat')->name('destroy-combat');
+                Route::post('/combat/bulk-delete', 'bulkDestroyCombat')->name('bulk-destroy-combat');
+                Route::post('/combat/reset', 'resetCombat')->name('reset-combat');
+                Route::get('/combat/export', 'exportCombat')->name('export-combat');
+            });
+    });
+
+    // =========================================================================
+    // 3. API COMBAT DASHBOARD & MANAGEMENT (LENGKAP SEMUA METHOD CRUD)
+    // =========================================================================
+    Route::prefix('api/combat')->group(function () {
+        // Read / Polling
+        Route::get('/active', [CombatTripController::class, 'getActiveTrip']);
+        Route::get('/trips/active', [CombatTripController::class, 'getActiveTrip']);
+        Route::get('/live-positions', [CombatTripController::class, 'getLivePositions']);
+        
+        // Riwayat & Lintasan
+        Route::get('/history', [CombatTripController::class, 'getAllTripsHistory']);
+        Route::get('/trips/history', [CombatTripController::class, 'getAllTripsHistory']);
+        Route::get('/trips/{id}/route', [CombatTripController::class, 'getTripRoute']);
+
+        // Create / Dispatch
+        Route::post('/dispatch', [CombatTripController::class, 'createTrip']);
+        Route::post('/trips', [CombatTripController::class, 'createTrip']);
+
+        // Update / Edit Rute (PUT)
+        Route::put('/trips/{id}', [CombatTripController::class, 'updateTrip']);
+        
+        // Cancel & Delete
+        Route::post('/trips/{id}/cancel', [CombatTripController::class, 'cancelTrip']);
+        Route::delete('/trips/{id}', [CombatTripController::class, 'destroyTrip']);
     });
 });
 
