@@ -4,17 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\RpmMaster;
 use App\Models\SmartkeyMaster;
+use App\Models\CombatMaster;
+use App\Models\CombatTrip;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    /**
-     * Helper untuk mengekstrak nilai string tunggal dari input filter RPM
-     */
-    private function parseFilterValue($input, string $default = 'ALL'): string
+    private function parseFilterValue(mixed $input, string $default = 'ALL'): string
     {
         if (is_null($input)) {
             return $default;
@@ -28,18 +29,15 @@ class DashboardController extends Controller
         return (string) $input;
     }
 
-    /**
-     * Helper untuk menyaring & meratakan input filter bertipe Array (Smartkey)
-     */
-    private function parseArrayFilter($input): array
+    private function parseArrayFilter(mixed $input): array
     {
         if (empty($input)) {
             return [];
         }
 
         $array = is_array($input) ? $input : [$input];
-
         $flat = [];
+
         foreach ($array as $item) {
             if (is_array($item)) {
                 $val = $item['value'] ?? $item['id'] ?? reset($item);
@@ -58,21 +56,107 @@ class DashboardController extends Controller
     // ==========================================
     // 🟢 1. HALAMAN BERANDA / HOME UTAMA (/home)
     // ==========================================
-    public function index(Request $request)
+    public function index(Request $request): Response
     {
-        // Ubah nama 'Beranda' sesuai dengan nama file .jsx kamu di resources/js/Pages/ 
-        // Contoh: jika filenya resources/js/Pages/Beranda.jsx atau Pages/Dashboard.jsx
-        return Inertia::render('Beranda'); 
+        // 1A. COMBAT: MODE DASHBOARD (Menggunakan kolom status_combat)
+        $totalCombat  = CombatMaster::query()->count('*');
+        $rusakCombat  = CombatMaster::query()->whereRaw("(LOWER(TRIM(status_combat)) LIKE '%broken%' OR LOWER(TRIM(status_combat)) LIKE '%rusak%' OR status_combat LIKE '6.%')", [], 'and')->count('*');
+        $onsiteCombat = CombatMaster::query()->whereRaw("(LOWER(TRIM(status_combat)) LIKE '%onsite%' OR status_combat LIKE '2.%')", [], 'and')->count('*');
+        $readyCombat  = CombatMaster::query()->whereRaw("(LOWER(TRIM(status_combat)) LIKE '%ready%' OR status_combat LIKE '5.%')", [], 'and')->count('*');
+
+        // Fallback jika nilai status_combat di database kosong/belum terisi
+        if ($readyCombat === 0 && $onsiteCombat === 0 && $rusakCombat === 0 && $totalCombat > 0) {
+            $inTransitCount = CombatTrip::query()->where('status', '=', 'IN_TRANSIT')->count('*');
+            $readyCombat    = max(0, $totalCombat - $inTransitCount);
+            $onsiteCombat   = $inTransitCount;
+        }
+
+        // 1B. COMBAT: MODE RUTE (Status Operasional Perjalanan dari tabel combat_trips)
+        $tripInTransit = CombatTrip::query()->where('status', '=', 'IN_TRANSIT')->count('*');
+        $tripAssigned  = CombatTrip::query()->where('status', '=', 'ASSIGNED')->count('*');
+        $tripCompleted = CombatTrip::query()->where('status', '=', 'COMPLETED')->count('*');
+        $tripTotal     = CombatTrip::query()->count('*');
+
+        $combatSummary = [
+            'unit' => [
+                'total'  => $totalCombat,
+                'ready'  => $readyCombat,
+                'rusak'  => $rusakCombat,
+                'onsite' => $onsiteCombat,
+            ],
+            'rute' => [
+                'total_trips' => $tripTotal,
+                'in_transit'  => $tripInTransit,
+                'assigned'    => $tripAssigned,
+                'completed'   => $tripCompleted,
+            ],
+        ];
+
+        // 2. MAINTENANCE (RPM & SMARTKEY)
+        $statusCol    = "LOWER(TRIM(COALESCE(approve, '')))";
+        $condApproved = "{$statusCol} IN ('ok', 'approved', 'approve')";
+        $condReject   = "({$statusCol} IN ('reject', 'nok') OR {$statusCol} LIKE '%reject%')";
+        $condReturn   = "({$statusCol} IN ('return', 'revisi') OR {$statusCol} LIKE '%return%' OR {$statusCol} LIKE '%revisi%')";
+        $condPending  = "(NOT ({$condApproved}) AND NOT ({$condReject}) AND NOT ({$condReturn}))";
+
+        $rpmSummary = RpmMaster::query()->selectRaw("
+            COUNT(*) as total_site,
+            SUM(CASE WHEN {$condApproved} THEN 1 ELSE 0 END) as total_approved,
+            SUM(CASE WHEN {$condPending} THEN 1 ELSE 0 END) as total_pending,
+            SUM(CASE WHEN {$condReject} THEN 1 ELSE 0 END) as total_reject,
+            SUM(CASE WHEN {$condReturn} THEN 1 ELSE 0 END) as total_return
+        ", [])->first(['*']);
+
+        $rpmTotal    = (int) ($rpmSummary->total_site ?? 0);
+        $rpmApproved = (int) ($rpmSummary->total_approved ?? 0);
+        $rpmPending  = (int) ($rpmSummary->total_pending ?? 0);
+        $rpmReject   = (int) ($rpmSummary->total_reject ?? 0);
+        $rpmReturn   = (int) ($rpmSummary->total_return ?? 0);
+        $rpmPctOk    = $rpmTotal > 0 ? round(($rpmApproved / $rpmTotal) * 100, 1) : 0;
+
+        $skSummary = SmartkeyMaster::query()->selectRaw("
+            COUNT(*) as total_unit,
+            SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'locked' THEN 1 ELSE 0 END) as count_locked,
+            SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'unlocked' THEN 1 ELSE 0 END) as count_unlocked,
+            SUM(CASE WHEN status_aktifitas IS NULL OR TRIM(status_aktifitas) = '' OR status_aktifitas = '#N/A' THEN 1 ELSE 0 END) as count_na
+        ", [])->first(['*']);
+
+        $maintenanceSummary = [
+            'rpm' => [
+                'total'    => $rpmTotal,
+                'approved' => $rpmApproved,
+                'pending'  => $rpmPending,
+                'reject'   => $rpmReject,
+                'return'   => $rpmReturn,
+                'pctOk'    => $rpmPctOk,
+            ],
+            'smartkey' => [
+                'total'    => (int) ($skSummary->total_unit ?? 0),
+                'locked'   => (int) ($skSummary->count_locked ?? 0),
+                'unlocked' => (int) ($skSummary->count_unlocked ?? 0),
+                'na'       => (int) ($skSummary->count_na ?? 0),
+            ],
+        ];
+
+        // 3. DAFTAR TIM & USER
+        $teamMembers = User::query()
+            ->select(['id', 'name', 'email', 'role', 'created_at'])
+            ->orderBy('name', 'asc')
+            ->get();
+
+        return Inertia::render('Beranda', [
+            'combatSummary'      => $combatSummary,
+            'maintenanceSummary' => $maintenanceSummary,
+            'teamMembers'        => $teamMembers,
+            'teamCount'          => $teamMembers->count(),
+        ]);
     }
 
     // ==========================================
     // 🟠 2. HALAMAN MAINTENANCE DASHBOARD (/maintenance/dashboard)
     // ==========================================
-    public function maintenance(Request $request)
+    public function maintenance(Request $request): Response
     {
-        // ==========================================
-        // 1. DASHBOARD RPM LOGIC
-        // ==========================================
         $rpmTahun = $this->parseFilterValue($request->input('tahun'), 'ALL');
         $rpmRtp   = $this->parseFilterValue($request->input('rtp'), 'ALL');
 
@@ -86,14 +170,12 @@ class DashboardController extends Controller
             $rpmQuery->where('rtp', '=', $rpmRtp);
         }
 
-        // --- Standardisasi Ekspresi SQL Status RPM ---
         $statusCol    = "LOWER(TRIM(COALESCE(approve, '')))";
         $condApproved = "{$statusCol} IN ('ok', 'approved', 'approve')";
         $condReject   = "({$statusCol} IN ('reject', 'nok') OR {$statusCol} LIKE '%reject%')";
         $condReturn   = "({$statusCol} IN ('return', 'revisi') OR {$statusCol} LIKE '%return%' OR {$statusCol} LIKE '%revisi%')";
         $condPending  = "(NOT ({$condApproved}) AND NOT ({$condReject}) AND NOT ({$condReturn}))";
 
-        // --- 1A. KPI Metrics Summary ---
         $rpmKpi = (clone $rpmQuery)
             ->selectRaw("
                 COUNT(*) as total_dokumen,
@@ -103,9 +185,8 @@ class DashboardController extends Controller
                 SUM(CASE WHEN {$condReturn} THEN 1 ELSE 0 END) as total_return,
                 SUM(CASE WHEN {$condPending} THEN 1 ELSE 0 END) as total_pending
             ", [])
-            ->first();
+            ->first(['*']);
 
-        // --- 1B. Chart Data Bulanan & Pivot Monthly Raw ---
         $pivotMonthlyRaw = (clone $rpmQuery)
             ->selectRaw("
                 TRIM(COALESCE(bulan, '')) as month_str,
@@ -117,19 +198,17 @@ class DashboardController extends Controller
             ->groupBy(DB::raw("TRIM(COALESCE(bulan, ''))"))
             ->get();
 
-        // Inisialisasi struktur bulan 1-12
         $monthlyParsed = [];
         for ($i = 1; $i <= 12; $i++) {
             $monthlyParsed[$i] = ['ok' => 0, 'belum' => 0, 'reject' => 0, 'returnVal' => 0];
         }
 
-        // Pemetaan data bulan fleksibel
         foreach ($pivotMonthlyRaw as $row) {
             $str       = strtolower(trim($row->month_str));
             $okVal     = (int) ($row->ok ?? 0);
             $belumVal  = (int) ($row->belum ?? 0);
             $rejectVal = (int) ($row->reject ?? 0);
-            $retVal    = (int) ($row->return_val ?? $row->returnval ?? 0);
+            $retVal    = (int) ($row->return_val ?? 0);
 
             $mNum = intval(preg_replace('/[^0-9]/', '', $str));
 
@@ -236,7 +315,6 @@ class DashboardController extends Controller
             'overallPct'   => $overallPct,
         ];
 
-        // --- 1C. RTP Pivot Table Data ---
         $rpmRtpPivot = (clone $rpmQuery)
             ->selectRaw("
                 COALESCE(NULLIF(TRIM(rtp), ''), 'Unassigned') as rtp_name,
@@ -251,7 +329,7 @@ class DashboardController extends Controller
             ->map(function ($item) {
                 $tot    = (int) $item->total;
                 $ok     = (int) $item->ok;
-                $retVal = (int) ($item->return_val ?? $item->returnval ?? 0);
+                $retVal = (int) ($item->return_val ?? 0);
                 return [
                     'rtp'        => $item->rtp_name,
                     'ok'         => $ok,
@@ -266,9 +344,7 @@ class DashboardController extends Controller
                 ];
             });
 
-        // ==========================================
-        // 2. DASHBOARD SMARTKEY LOGIC
-        // ==========================================
+        // SMARTKEY LOGIC
         $skInfrako = $this->parseArrayFilter($request->input('infrako'));
         $skStatus  = $this->parseArrayFilter($request->input('status'));
         $skSn      = $this->parseArrayFilter($request->input('sn'));
@@ -278,7 +354,6 @@ class DashboardController extends Controller
             ->when(!empty($skStatus),  fn ($q) => $q->whereIn('status', $skStatus))
             ->when(!empty($skSn),      fn ($q) => $q->whereIn('serial_number', $skSn));
 
-        // --- 2A. Smartkey Summary Cards ---
         $skSummary = (clone $skQuery)->selectRaw("
             COUNT(*) as total_unit,
             SUM(CASE WHEN LOWER(TRIM(status)) = 'aktif' THEN 1 ELSE 0 END) as count_aktif,
@@ -286,9 +361,8 @@ class DashboardController extends Controller
             SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'locked' THEN 1 ELSE 0 END) as count_locked,
             SUM(CASE WHEN LOWER(TRIM(status_aktifitas)) = 'unlocked' THEN 1 ELSE 0 END) as count_unlocked,
             SUM(CASE WHEN status_aktifitas IS NULL OR TRIM(status_aktifitas) = '' OR status_aktifitas = '#N/A' THEN 1 ELSE 0 END) as count_na
-        ", [])->first();
+        ", [])->first(['*']);
 
-        // --- 2B. Smartkey Chart ---
         $skChart = (clone $skQuery)
             ->selectRaw("
                 COALESCE(NULLIF(TRIM(infrako), ''), 'Unassigned') as infrako,
@@ -300,53 +374,33 @@ class DashboardController extends Controller
             ->groupBy(DB::raw("COALESCE(NULLIF(TRIM(infrako), ''), 'Unassigned')"))
             ->get();
 
-        // --- 2C. Smartkey Map Data ---
         $skMapData = (clone $skQuery)
-            ->select('long_lat', 'site_name', 'tower_id', 'serial_number', 'new_sn', 'infrako', 'status_aktifitas', 'kota_kab', 'posisi_unit', 'ksm')
+            ->select(['long_lat', 'site_name', 'tower_id', 'serial_number', 'new_sn', 'infrako', 'status_aktifitas', 'kota_kab', 'posisi_unit', 'ksm'])
             ->whereNotNull('long_lat')
             ->where('long_lat', '!=', '')
             ->where('long_lat', 'NOT LIKE', '%#N/A%')
             ->get()
             ->map(function ($item) {
                 $raw = trim($item->long_lat);
-                
                 $parts = preg_split('/[\s,;\/]+/', $raw);
                 if (count($parts) < 2) return null;
 
                 $v1 = (float) str_replace(',', '.', $parts[0]);
                 $v2 = (float) str_replace(',', '.', $parts[1]);
-
                 if ($v1 == 0 && $v2 == 0) return null;
 
-                if (abs($v1) > 50) {
-                    $lng = $v1;
-                    $lat = $v2;
-                } elseif (abs($v2) > 50) {
-                    $lat = $v1;
-                    $lng = $v2;
-                } else {
-                    $lng = $v1;
-                    $lat = $v2;
-                }
-
+                $lng = abs($v1) > 50 ? $v1 : $v2;
+                $lat = abs($v1) > 50 ? $v2 : $v1;
                 if ($lat < -90 || $lat > 90) return null;
 
                 $rawStatus = strtoupper(trim($item->status_aktifitas ?? ''));
-                if ($rawStatus === 'LOCKED') {
-                    $cleanStatus = 'LOCKED';
-                } elseif ($rawStatus === 'UNLOCKED') {
-                    $cleanStatus = 'UNLOCKED';
-                } else {
-                    $cleanStatus = '#N/A';
-                }
+                $cleanStatus = in_array($rawStatus, ['LOCKED', 'UNLOCKED']) ? $rawStatus : '#N/A';
 
                 return [
                     'latitude'         => $lat,
                     'longitude'        => $lng,
                     'lat'              => $lat,
                     'lng'              => $lng,
-                    'position'         => [$lat, $lng],
-                    'coordinates'      => [$lng, $lat],
                     'site_name'        => $item->site_name ?? '-',
                     'tower_id'         => $item->tower_id ?? '-',
                     'serial_number'    => $item->serial_number ?? $item->new_sn ?? '-',
@@ -361,7 +415,6 @@ class DashboardController extends Controller
             ->filter()
             ->values();
 
-        // --- 2D. Smartkey Table Pivot Data ---
         $skTableData = (clone $skQuery)
             ->selectRaw("
                 COALESCE(NULLIF(TRIM(ksm), ''), 'Unassigned') as ksm_name,
@@ -371,51 +424,28 @@ class DashboardController extends Controller
                 COUNT(*) as total
             ", [])
             ->groupBy(DB::raw("COALESCE(NULLIF(TRIM(ksm), ''), 'Unassigned')"))
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'ksm'      => $item->ksm_name,
-                    'ksm_name' => $item->ksm_name,
-                    'locked'   => (int) $item->locked,
-                    'unlocked' => (int) $item->unlocked,
-                    'na'       => (int) $item->na,
-                    'total'    => (int) $item->total,
-                ];
-            });
+            ->get();
 
-        // ==========================================
-        // 3. DROPDOWN FILTER OPTIONS
-        // ==========================================
         try {
-            $rpmFilterOptions = Cache::remember('rpm_filter_options_v10', 3600, function () {
+            $rpmFilterOptions = Cache::remember('rpm_filter_options_v11', 3600, function () {
                 return [
-                    'tahun' => array_values(RpmMaster::select('tahun')->whereNotNull('tahun')->where('tahun', '!=', '')->distinct()->pluck('tahun')->filter()->toArray()),
-                    'rtp'   => array_values(RpmMaster::select('rtp')->whereNotNull('rtp')->where('rtp', '!=', '')->distinct()->pluck('rtp')->filter()->toArray()),
+                    'tahun' => array_values(RpmMaster::query()->select(['tahun'])->whereNotNull('tahun')->where('tahun', '!=', '')->distinct()->pluck('tahun')->filter()->toArray()),
+                    'rtp'   => array_values(RpmMaster::query()->select(['rtp'])->whereNotNull('rtp')->where('rtp', '!=', '')->distinct()->pluck('rtp')->filter()->toArray()),
                 ];
             });
 
-            $skFilterOptions = Cache::remember('sk_filter_options_v10', 3600, function () {
+            $skFilterOptions = Cache::remember('sk_filter_options_v11', 3600, function () {
                 return [
-                    'infrako' => array_values(SmartkeyMaster::select('infrako')->whereNotNull('infrako')->where('infrako', '!=', '')->distinct()->pluck('infrako')->filter()->toArray()),
-                    'status'  => array_values(SmartkeyMaster::select('status')->whereNotNull('status')->where('status', '!=', '')->distinct()->pluck('status')->filter()->toArray()),
-                    'sn'      => array_values(SmartkeyMaster::select('serial_number')->whereNotNull('serial_number')->where('serial_number', '!=', '')->distinct()->pluck('serial_number')->filter()->toArray()),
+                    'infrako' => array_values(SmartkeyMaster::query()->select(['infrako'])->whereNotNull('infrako')->where('infrako', '!=', '')->distinct()->pluck('infrako')->filter()->toArray()),
+                    'status'  => array_values(SmartkeyMaster::query()->select(['status'])->whereNotNull('status')->where('status', '!=', '')->distinct()->pluck('status')->filter()->toArray()),
+                    'sn'      => array_values(SmartkeyMaster::query()->select(['serial_number'])->whereNotNull('serial_number')->where('serial_number', '!=', '')->distinct()->pluck('serial_number')->filter()->toArray()),
                 ];
             });
         } catch (\Throwable $e) {
-            $rpmFilterOptions = [
-                'tahun' => array_values(RpmMaster::select('tahun')->whereNotNull('tahun')->where('tahun', '!=', '')->distinct()->pluck('tahun')->filter()->toArray()),
-                'rtp'   => array_values(RpmMaster::select('rtp')->whereNotNull('rtp')->where('rtp', '!=', '')->distinct()->pluck('rtp')->filter()->toArray()),
-            ];
-            $skFilterOptions = [
-                'infrako' => array_values(SmartkeyMaster::select('infrako')->whereNotNull('infrako')->where('infrako', '!=', '')->distinct()->pluck('infrako')->filter()->toArray()),
-                'status'  => array_values(SmartkeyMaster::select('status')->whereNotNull('status')->where('status', '!=', '')->distinct()->pluck('status')->filter()->toArray()),
-                'sn'      => array_values(SmartkeyMaster::select('serial_number')->whereNotNull('serial_number')->where('serial_number', '!=', '')->distinct()->pluck('serial_number')->filter()->toArray()),
-            ];
+            $rpmFilterOptions = ['tahun' => [], 'rtp' => []];
+            $skFilterOptions  = ['infrako' => [], 'status' => [], 'sn' => []];
         }
 
-        // ==========================================
-        // 4. RENDER TO INERTIA (MAINTENANCE)
-        // ==========================================
         return Inertia::render('Maintenance/Dashboard/Index', [
             'rpmSummary' => [
                 'totalSite'       => (int) ($rpmKpi->total_dokumen ?? 0),
@@ -423,15 +453,6 @@ class DashboardController extends Controller
                 'totalPending'    => (int) ($rpmKpi->total_pending ?? 0),
                 'totalReject'     => (int) ($rpmKpi->total_reject ?? 0),
                 'totalReturn'     => (int) ($rpmKpi->total_return ?? 0),
-
-                'total_site'      => (int) ($rpmKpi->total_dokumen ?? 0),
-                'total_site_unik' => (int) ($rpmKpi->total_site_unik ?? 0),
-                'total_dokumen'   => (int) ($rpmKpi->total_dokumen ?? 0),
-                'total_approved'  => (int) ($rpmKpi->total_approved ?? 0),
-                'total_pending'   => (int) ($rpmKpi->total_pending ?? 0),
-                'total_reject'    => (int) ($rpmKpi->total_reject ?? 0),
-                'total_return'    => (int) ($rpmKpi->total_return ?? 0),
-
                 'chartData'       => $rpmChartData,
                 'monthlyPivot'    => $rpmMonthlyPivot,
                 'rtpPivot'        => $rpmRtpPivot,
@@ -439,10 +460,8 @@ class DashboardController extends Controller
             'smartkeySummary' => [
                 'summary'    => $skSummary,
                 'chart'      => $skChart,
-                'map_data'   => $skMapData,
                 'mapData'    => $skMapData,
                 'tableData'  => $skTableData,
-                'table_data' => $skTableData,
             ],
             'filterOptions' => [
                 'rpm'      => $rpmFilterOptions,

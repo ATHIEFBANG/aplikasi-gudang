@@ -72,7 +72,7 @@ class DataManagementController extends Controller
     }
 
     // ==========================================
-    // STORE MULTIPLE RPM MASTER
+    // STORE MULTIPLE RPM MASTER (SUPER TOLERAN)
     // ==========================================
 
     /**
@@ -80,7 +80,6 @@ class DataManagementController extends Controller
      */
     public function storeRpm(Request $request)
     {
-        // Mendukung request dalam bentuk 'items' => [[...], [...]] atau payload objek tunggal
         $items = $request->has('items') ? $request->input('items') : [$request->all()];
 
         if (empty($items) || !is_array($items)) {
@@ -90,31 +89,49 @@ class DataManagementController extends Controller
         $insertData = [];
         $now = now();
 
-        foreach ($items as $index => $item) {
-            $siteId = $this->nullableString($item['site_id'] ?? null);
+        foreach ($items as $item) {
+            $rpmId          = $this->nullableString($item['rpm_id'] ?? $item['id_rpm'] ?? null);
+            $siteId         = $this->nullableString($item['site_id'] ?? $item['siteid'] ?? null);
+            $rtp            = $this->nullableString($item['rtp'] ?? null);
+            $mitra          = $this->nullableString($item['mitra'] ?? null);
+            $bulan          = $this->nullableString($item['bulan'] ?? null);
+            $tahun          = $this->nullableString($item['tahun'] ?? null);
+            $approve        = $this->nullableString($item['approve'] ?? $item['status_approve'] ?? null);
+            $tanggalSubmit  = $this->nullableString($item['tanggal_submit'] ?? $item['tanggalsubn'] ?? $item['tanggalsubmit'] ?? null);
+            $tanggalApprove = $this->nullableString($item['tanggal_approve'] ?? $item['tanggalappr'] ?? $item['tanggalapprove'] ?? null);
 
-            // Jika baris kosong tanpa Site ID, lewati
-            if (is_null($siteId)) {
+            // 👉 Cek apakah ada MINIMAL 1 data apapun yang terisi di baris ini
+            $hasData = !is_null($rpmId) || !is_null($siteId) || !is_null($rtp) 
+                    || !is_null($mitra) || !is_null($bulan) || !is_null($tahun) 
+                    || !is_null($approve) || !is_null($tanggalSubmit) || !is_null($tanggalApprove);
+
+            // Jika baris benar-benar kosong melompong, lewati
+            if (!$hasData) {
                 continue;
             }
 
+            // AUTO-FALLBACK: Jika site_id kosong, isi otomatis dari rpm_id / default
+            if (is_null($siteId)) {
+                $siteId = $rpmId ?? 'SITE-UNKNOWN';
+            }
+
             $insertData[] = [
-                'rpm_id'          => $this->nullableString($item['rpm_id'] ?? null),
+                'rpm_id'          => $rpmId,
                 'site_id'         => $siteId,
-                'rtp'             => $this->nullableString($item['rtp'] ?? null),
-                'mitra'           => $this->nullableString($item['mitra'] ?? null),
-                'bulan'           => $this->nullableString($item['bulan'] ?? null),
-                'tahun'           => $this->nullableString($item['tahun'] ?? null),
-                'approve'         => $this->nullableString($item['approve'] ?? null),
-                'tanggal_submit'  => $this->nullableString($item['tanggal_submit'] ?? null),
-                'tanggal_approve' => $this->nullableString($item['tanggal_approve'] ?? null),
+                'rtp'             => $rtp,
+                'mitra'           => $mitra,
+                'bulan'           => $bulan,
+                'tahun'           => $tahun,
+                'approve'         => $approve ?? 'BELUM APPROVED',
+                'tanggal_submit'  => $tanggalSubmit,
+                'tanggal_approve' => $tanggalApprove,
                 'created_at'      => $now,
                 'updated_at'      => $now,
             ];
         }
 
         if (empty($insertData)) {
-            return back()->with('error', 'Gagal menyimpan. Pastikan minimal kolom Site ID terisi!');
+            return back()->with('error', 'Gagal menyimpan. Tidak ada baris data yang valid untuk disimpan.');
         }
 
         try {
@@ -135,7 +152,7 @@ class DataManagementController extends Controller
     {
         $validated = $request->validate([
             'rpm_id'          => 'nullable|string|max:255',
-            'site_id'         => 'required|string|max:255',
+            'site_id'         => 'nullable|string|max:255',
             'rtp'             => 'nullable|string|max:255',
             'mitra'           => 'nullable|string|max:255',
             'bulan'           => 'nullable|string|max:255',
@@ -149,6 +166,12 @@ class DataManagementController extends Controller
 
         try {
             $rpm = RpmMaster::findOrFail($id);
+
+            // Pastikan site_id tidak kosong
+            if (empty($data['site_id'])) {
+                $data['site_id'] = $data['rpm_id'] ?? $rpm->site_id ?? 'SITE-UNKNOWN';
+            }
+
             $rpm->update($data);
             return back()->with('success', 'Data Master RPM berhasil diperbarui.');
         } catch (\Exception $e) {
@@ -192,8 +215,13 @@ class DataManagementController extends Controller
         }
     }
 
+    public function bulkPasteRpm(Request $request)
+    {
+        return $this->storeRpm($request);
+    }
+
     // ==========================================
-    // STORE MULTIPLE SMARTKEY MASTER
+    // STORE MULTIPLE SMARTKEY MASTER (SUPER TOLERAN)
     // ==========================================
 
     /**
@@ -201,7 +229,6 @@ class DataManagementController extends Controller
      */
     public function storeSmartkey(Request $request)
     {
-        // Mendukung request dalam bentuk 'items' => [[...], [...]] atau payload objek tunggal
         $items = $request->has('items') ? $request->input('items') : [$request->all()];
 
         if (empty($items) || !is_array($items)) {
@@ -211,34 +238,56 @@ class DataManagementController extends Controller
         $insertData = [];
         $now = now();
 
-        foreach ($items as $index => $item) {
-            $sn = $this->nullableString($item['serial_number'] ?? null);
+        foreach ($items as $item) {
+            $sn              = $this->nullableString($item['serial_number'] ?? $item['sn'] ?? $item['lock_id'] ?? null);
+            $newSn           = $this->nullableString($item['new_sn'] ?? null);
+            $towerId         = $this->nullableString($item['tower_id'] ?? null);
+            $siteName        = $this->nullableString($item['site_name'] ?? null);
+            $kotaKab         = $this->nullableString($item['kota_kab'] ?? $item['kota'] ?? $item['kabupaten'] ?? null);
+            $longLat         = $this->nullableString($item['long_lat'] ?? $item['longlat'] ?? $item['coordinate'] ?? null);
+            $infrako         = $this->nullableString($item['infrako'] ?? null);
+            $status          = $this->nullableString($item['status'] ?? null);
+            $statusAktifitas = $this->nullableString($item['status_aktifitas'] ?? $item['status_aktivitas'] ?? null);
+            $ksm             = $this->nullableString($item['ksm'] ?? null);
+            $posisiUnit      = $this->nullableString($item['posisi_unit'] ?? null);
+            $batch           = $this->nullableString($item['batch'] ?? null);
 
-            // Jika baris kosong tanpa Serial Number, lewati
-            if (is_null($sn)) {
+            // 👉 Cek apakah ada MINIMAL 1 data apapun yang terisi di baris ini
+            $hasData = !is_null($sn) || !is_null($newSn) || !is_null($towerId) 
+                    || !is_null($siteName) || !is_null($kotaKab) || !is_null($longLat) 
+                    || !is_null($infrako) || !is_null($status) || !is_null($statusAktifitas)
+                    || !is_null($ksm) || !is_null($posisiUnit) || !is_null($batch);
+
+            // Jika baris benar-benar kosong melompong, lewati
+            if (!$hasData) {
                 continue;
+            }
+
+            // AUTO-FALLBACK: Jika serial_number kosong, isi otomatis dari new_sn / tower_id / default
+            if (is_null($sn)) {
+                $sn = $newSn ?? $towerId ?? 'SK-UNKNOWN';
             }
 
             $insertData[] = [
                 'serial_number'    => $sn,
-                'new_sn'           => $this->nullableString($item['new_sn'] ?? null),
-                'tower_id'         => $this->nullableString($item['tower_id'] ?? null),
-                'site_name'        => $this->nullableString($item['site_name'] ?? null),
-                'kota_kab'         => $this->nullableString($item['kota_kab'] ?? null),
-                'long_lat'         => $this->nullableString($item['long_lat'] ?? null),
-                'infrako'          => $this->nullableString($item['infrako'] ?? null),
-                'status'           => $this->nullableString($item['status'] ?? null),
-                'status_aktifitas' => $this->nullableString($item['status_aktifitas'] ?? null),
-                'ksm'              => $this->nullableString($item['ksm'] ?? null),
-                'posisi_unit'      => $this->nullableString($item['posisi_unit'] ?? null),
-                'batch'            => $this->nullableString($item['batch'] ?? null),
+                'new_sn'           => $newSn,
+                'tower_id'         => $towerId,
+                'site_name'        => $siteName,
+                'kota_kab'         => $kotaKab,
+                'long_lat'         => $longLat,
+                'infrako'          => $infrako,
+                'status'           => $status ?? 'AKTIF',
+                'status_aktifitas' => $statusAktifitas ?? 'LOCKED',
+                'ksm'              => $ksm,
+                'posisi_unit'      => $posisiUnit,
+                'batch'            => $batch,
                 'created_at'       => $now,
                 'updated_at'       => $now,
             ];
         }
 
         if (empty($insertData)) {
-            return back()->with('error', 'Gagal menyimpan. Pastikan minimal kolom Serial Number terisi!');
+            return back()->with('error', 'Gagal menyimpan. Tidak ada baris data yang valid untuk disimpan.');
         }
 
         try {
@@ -258,7 +307,7 @@ class DataManagementController extends Controller
     public function updateSmartkey(Request $request, int|string $id)
     {
         $validated = $request->validate([
-            'serial_number'    => 'required|string|max:255',
+            'serial_number'    => 'nullable|string|max:255',
             'new_sn'           => 'nullable|string|max:255',
             'tower_id'         => 'nullable|string|max:255',
             'site_name'        => 'nullable|string|max:255',
@@ -276,6 +325,12 @@ class DataManagementController extends Controller
 
         try {
             $smartkey = SmartkeyMaster::findOrFail($id);
+
+            // Pastikan serial_number tidak kosong
+            if (empty($data['serial_number'])) {
+                $data['serial_number'] = $data['new_sn'] ?? $smartkey->serial_number ?? 'SK-UNKNOWN';
+            }
+
             $smartkey->update($data);
             return back()->with('success', 'Data Master Smart Key berhasil diperbarui.');
         } catch (\Exception $e) {
@@ -317,6 +372,11 @@ class DataManagementController extends Controller
             Log::error("Bulk Delete Smart Key Error: " . $e->getMessage());
             return back()->with('error', 'Gagal menghapus data terpilih: ' . $e->getMessage());
         }
+    }
+
+    public function bulkPasteSmartkey(Request $request)
+    {
+        return $this->storeSmartkey($request);
     }
 
     // ==========================================
