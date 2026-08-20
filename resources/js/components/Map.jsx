@@ -318,7 +318,7 @@ export default function Map({
         const validCoords = routeCoordinates.length >= 2 ? routeCoordinates : [];
 
         const routeGeoJSON = { 
-            type: 'Feature', 
+            type: 'Feature',
             properties: {},
             geometry: { 
                 type: 'LineString', 
@@ -367,7 +367,6 @@ export default function Map({
             style: MAP_STYLES[currentStyle].style,
             center: center,
             zoom: zoom,
-            preserveDrawingBuffer: true, // 👉 KUNCI UTAMA: Agar kanvas peta tidak menjadi hitam saat di-export / capture
             attributionControl: false,
             renderWorldCopies: false,
             transformRequest: (url) => ({ url })

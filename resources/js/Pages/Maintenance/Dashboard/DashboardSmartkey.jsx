@@ -55,7 +55,7 @@ function FilterMultiSelect({
 
     return (
         <DropdownMenu onOpenChange={(open) => { if (!open) setSearch(''); }}>
-            <DropdownMenuTrigger className="w-full bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 h-9 px-3 rounded-lg flex items-center justify-between text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-700 shadow-sm cursor-pointer">
+            <DropdownMenuTrigger className="w-full bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 h-9 px-3 rounded-lg flex items-center justify-between text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-700 shadow-sm">
                 <span className="truncate font-normal">{getTriggerLabel()}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-2" />
             </DropdownMenuTrigger>
@@ -167,7 +167,6 @@ export default function DashboardSmartkey({
         );
     };
 
-    // 👉 EXPORT PNG SNAPSHOT DENGAN JEDA AGAR MAP KANVAS STABIL & TIDAK HITAM
     const handleDownloadDashboardImage = async () => {
         if (!dashboardRef.current) return;
         setIsExporting(true);
@@ -176,9 +175,7 @@ export default function DashboardSmartkey({
 
         try {
             dashboardRef.current.classList.add('exporting-mode');
-            
-            // Jeda 200ms agar kanvas WebGL stabil sebelum ditangkap
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await new Promise((resolve) => setTimeout(resolve, 300));
 
             const dataUrl = await toPng(dashboardRef.current, { 
                 cacheBust: true,
@@ -257,10 +254,10 @@ export default function DashboardSmartkey({
 
                     <div className="w-full sm:w-52">
                         <FilterMultiSelect
-                            options={listSN} 
-                            selectedValues={selectedSN} 
+                            options={listSN}
+                            selectedValues={selectedSN}
                             onChange={(val) => handleFilterChange('sn', val)}
-                            placeholder="Semua Serial Number" 
+                            placeholder="Semua Serial Number"
                             searchPlaceholder="Cari Serial Number..."
                         />
                     </div>
@@ -268,7 +265,7 @@ export default function DashboardSmartkey({
                     {isFiltered && (
                         <button
                             onClick={handleResetAllFilters}
-                            className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:underline font-medium px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 hover:underline font-medium px-2 py-1 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
                         >
                             <RotateCcw className="w-3 h-3" />
                             <span>Reset Filter</span>
@@ -314,7 +311,7 @@ export default function DashboardSmartkey({
                 {/* 1. SEKSI STATISTIK & MAP */}
                 <StatistikSmartkey summary={summary} />
 
-                {/* 2. SEKSI TABEL PIVOT KSM */}
+                {/* 2. SEKSI TABEL PIVOT KSM (Hanya dipanggil sekali di sini) */}
                 <TabelSmartkey tableData={resolvedTableData} />
             </div>
         </div>
