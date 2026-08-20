@@ -51,7 +51,11 @@ export default function useDriverTracker(trip) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [lastPingTime, setLastPingTime] = useState(null);
 
-    // Titik awal supir (langsung terisi agar mode pantau tidak kosong)
+    // 👉 STATE DETEKSI GOOGLE MAPS & BACKGROUND
+    const [isAppInBackground, setIsAppInBackground] = useState(false);
+    const [isNavigatingMaps, setIsNavigatingMaps] = useState(false);
+
+    // Titik awal supir
     const [currentCoords, setCurrentCoords] = useState(() => {
         const latest = trip?.latest_coordinate || trip?.latestCoordinate;
         if (latest?.latitude && latest?.longitude) {
@@ -91,6 +95,23 @@ export default function useDriverTracker(trip) {
         return true;
     }, [status, lockedDeviceToken, myDeviceToken]);
 
+    // 🔍 DETEKSI OTOMATIS SAAT DRIVER BERPINDAH KE GOOGLE MAPS / MINIMIZE BROWSER
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                setIsAppInBackground(true);
+            } else {
+                setIsAppInBackground(false);
+                setIsNavigatingMaps(false); // Reset saat driver kembali melihat halaman web
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
     const requestWakeLock = async () => {
         if ('wakeLock' in navigator) {
             try {
@@ -107,7 +128,7 @@ export default function useDriverTracker(trip) {
         }
     };
 
-    // 1. PING GPS (Hanya jika Driver Utama)
+    // 1. PING GPS
     const sendGpsPing = useCallback(async (lat, lng, speed, accuracy) => {
         if (!isAuthorizedDriver) return;
         const now = Date.now();
@@ -120,7 +141,8 @@ export default function useDriverTracker(trip) {
                 longitude: lng,
                 speed: speed ? Number(speed) : 0,
                 accuracy: accuracy ? Number(accuracy) : null,
-                device_token: myDeviceToken
+                device_token: myDeviceToken,
+                is_background: document.hidden // Kirim info ke backend apakah supir sedang minimize/buka maps
             });
 
             const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -226,7 +248,7 @@ export default function useDriverTracker(trip) {
         return () => stopGpsWatcher();
     }, [status, isAuthorizedDriver, startGpsWatcher, stopGpsWatcher, fetchObserverLiveStatus]);
 
-    // 4. ACTION HANDLERS: MULAI & SELESAI
+    // 4. ACTION HANDLERS: MULAI, SELESAI, DAN BUKA GOOGLE MAPS
     const handleStartTrip = async () => {
         setIsSubmitting(true);
         try {
@@ -277,6 +299,12 @@ export default function useDriverTracker(trip) {
         }
     };
 
+    // 👉 Handler saat tombol Google Maps diklik
+    const handleOpenGoogleMapsClick = (url) => {
+        setIsNavigatingMaps(true);
+        window.open(url, '_blank', 'noreferrer');
+    };
+
     return {
         status,
         isGpsActive,
@@ -285,8 +313,11 @@ export default function useDriverTracker(trip) {
         currentCoords,
         speedHistory,
         isAuthorizedDriver,
+        isAppInBackground,   // 👉 Status apakah aplikasi sedang di latar belakang
+        isNavigatingMaps,    // 👉 Status apakah driver sedang membuka Google Maps
         startGpsWatcher,
         handleStartTrip,
-        handleCompleteTrip
+        handleCompleteTrip,
+        handleOpenGoogleMapsClick // 👉 Fungsi pembuka Maps
     };
 }

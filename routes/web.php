@@ -25,7 +25,7 @@ Route::get('/', function () {
     ]);
 })->name('welcome');
 
-// --- HALAMAN UI DRIVER (Load combat & latestCoordinate agar Mode Pantau langsung ada titiknya di awal) ---
+// --- HALAMAN UI DRIVER ---
 Route::get('/track/{token}', function ($token) {
     $trip = CombatTrip::with(['combat', 'latestCoordinate'])->where('tracking_token', $token)->first();
 
@@ -38,9 +38,9 @@ Route::get('/track/{token}', function ($token) {
     ]);
 })->name('track.driver');
 
-// --- API TRACKING DRIVER (Aman di Vercel: Menggunakan prefix track-api & api/track) ---
+// --- API TRACKING DRIVER ---
 Route::prefix('track-api')->group(function () {
-    Route::get('/{token}/status', [CombatTripController::class, 'getDriverLiveStatus']); // 👉 Endpoint Polling Mode Pantau
+    Route::get('/{token}/status', [CombatTripController::class, 'getDriverLiveStatus']);
     Route::post('/{token}/start', [CombatTripController::class, 'startTrip']);
     Route::post('/{token}/ping', [CombatTripController::class, 'ping']);
     Route::post('/{token}/complete', [CombatTripController::class, 'completeTrip']);
@@ -52,6 +52,10 @@ Route::prefix('api/track')->group(function () {
     Route::post('/{token}/ping', [CombatTripController::class, 'ping']);
     Route::post('/{token}/complete', [CombatTripController::class, 'completeTrip']);
 });
+
+// 👉 ENDPOINT CRON VERCEL (RESET BULANAN OTOMATIS TANPA LOGIN)
+Route::match(['get', 'delete'], '/combat-api/history/reset-monthly', [CombatTripController::class, 'resetMonthlyTripsHistory']);
+Route::match(['get', 'delete'], '/api/combat-api/history/reset-monthly', [CombatTripController::class, 'resetMonthlyTripsHistory']);
 
 
 // =========================================================================
@@ -124,6 +128,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/trips/history', [CombatTripController::class, 'getAllTripsHistory']);
         Route::get('/trips/{id}/route', [CombatTripController::class, 'getTripRoute']);
 
+        // 👉 EXPORT EXCEL RIWAYAT
+        Route::get('/history/export', [CombatTripController::class, 'exportTripsHistory']);
+
         Route::post('/dispatch', [CombatTripController::class, 'createTrip']);
         Route::post('/trips', [CombatTripController::class, 'createTrip']);
         Route::put('/trips/{id}', [CombatTripController::class, 'updateTrip']);
@@ -139,6 +146,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/history', [CombatTripController::class, 'getAllTripsHistory']);
         Route::get('/trips/history', [CombatTripController::class, 'getAllTripsHistory']);
         Route::get('/trips/{id}/route', [CombatTripController::class, 'getTripRoute']);
+        Route::get('/history/export', [CombatTripController::class, 'exportTripsHistory']);
         Route::post('/dispatch', [CombatTripController::class, 'createTrip']);
         Route::post('/trips', [CombatTripController::class, 'createTrip']);
         Route::put('/trips/{id}', [CombatTripController::class, 'updateTrip']);

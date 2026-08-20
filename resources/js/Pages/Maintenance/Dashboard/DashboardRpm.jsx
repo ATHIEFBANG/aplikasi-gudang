@@ -10,8 +10,9 @@ import {
 import { Filter, ChevronDown, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
-// Import Komponent Terpisah
+// 👉 Import Komponen Terpisah
 import StatistikRpm from './StatistikRpm';
+import GrafikRpm from './GrafikRpm'; // <-- Import file baru
 import TabelRpm from './TabelRpm';
 
 // --- SUB-KOMPONEN FILTER SELECT ---
@@ -74,14 +75,12 @@ export default function DashboardRpm({ summary = {}, options = {}, filters = {} 
     const [isExporting, setIsExporting] = useState(false);
     const dashboardRef = useRef(null);
 
-    // Membaca opsi dropdown dari server (Laravel)
     const listTahun = ['ALL', ...(options.tahun || [])];
     const listRtp = ['ALL', ...(options.rtp || [])];
 
     const selectedTahun = filters.tahun || 'ALL';
     const selectedRtp = filters.rtp || 'ALL';
 
-    // Handler untuk mengirim filter baru ke Laravel via Inertia request
     const handleFilterChange = (key, value) => {
         router.get(
             window.location.pathname,
@@ -205,10 +204,13 @@ export default function DashboardRpm({ summary = {}, options = {}, filters = {} 
                     </span>
                 </div>
 
-                {/* 1. SEKSI STATISTIK & GRAFIK */}
+                {/* 1. SEKSI KARTU STATISTIK KPI */}
                 <StatistikRpm summary={summary} />
 
-                {/* 2. SEKSI TABEL PIVOT */}
+                {/* 2. SEKSI GRAFIK RPM */}
+                <GrafikRpm summary={summary} />
+
+                {/* 3. SEKSI TABEL PIVOT */}
                 <TabelRpm monthlyPivot={summary.monthlyPivot || {}} rtpPivot={summary.rtpPivot || []} />
             </div>
         </div>

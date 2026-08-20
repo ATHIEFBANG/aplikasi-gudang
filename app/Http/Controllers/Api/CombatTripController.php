@@ -185,16 +185,26 @@ class CombatTripController extends Controller
     }
 
     /**
-     * 6. PETA: Mengambil Seluruh Titik Koordinat Rute
+     * 6. PETA & RIWAYAT: Mengambil Seluruh Titik Koordinat Rute (Breadcrumb Trail)
+     * Dilengkapi Filter Titik Liar / Anti-Jitter GPS
      */
     public function getTripRoute($id)
     {
-        $trip = CombatTrip::with(['combat', 'coordinates'])->findOrFail($id);
+        $trip = CombatTrip::with(['combat', 'coordinates' => function ($q) {
+            $q->orderBy('recorded_at', 'asc')->orderBy('id', 'asc');
+        }])->findOrFail($id);
 
-        $geoJsonCoords = $trip->coordinates->map(fn ($c) => [
-            (float) $c->longitude, 
-            (float) $c->latitude,  
-        ])->values();
+        // Filter Koordinat: Ambil yang akurasinya baik (<= 50 meter) atau jika null tetap disertakan
+        $geoJsonCoords = $trip->coordinates
+            ->filter(function ($c) {
+                return $c->accuracy === null || (float) $c->accuracy <= 50;
+            })
+            ->map(function ($c) {
+                return [
+                    (float) $c->longitude, 
+                    (float) $c->latitude,  
+                ];
+            })->values();
 
         return response()->json([
             'data' => [
@@ -393,7 +403,7 @@ class CombatTripController extends Controller
     }
 
     /**
-     * 👉 12. MODE PANTAU (OBSERVER): Mengambil posisi live supir dari database secara berkala
+     * 12. MODE PANTAU (OBSERVER): Mengambil posisi live supir dari database secara berkala
      */
     public function getDriverLiveStatus($token)
     {
@@ -430,6 +440,87 @@ class CombatTripController extends Controller
             'destination_lat'  => $trip->destination_lat ? (float) $trip->destination_lat : null,
             'destination_lng'  => $trip->destination_lng ? (float) $trip->destination_lng : null,
             'destination_name' => $trip->destination_name,
+        ]);
+    }
+
+    /**
+     * 👉 13. EXPORT EXCEL: Mengunduh Riwayat Perjalanan ke File CSV/Excel (Tanpa Kolom No Telp PIC)
+     */
+    public function exportTripsHistory(Request $request)
+    {
+        $trips = CombatTrip::with(['combat', 'picUser'])
+            ->latest('id')
+            ->get();
+
+        $filename = "Riwayat_Mobilisasi_COMBAT_" . date('Y-m-d_His') . ".csv";
+
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename={$filename}",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        // 👉 Kolom 'No. Telp PIC' sudah dihapus sesuai permintaan
+        $columns = [
+            'ID Trip', 'Nama Asset COMBAT', 'Serial Number (SN)', 'Tipe COMBAT', 
+            'Jenis Pergerakan', 'Titik Asal', 'Site Tujuan', 'PIC Driver', 
+            'Status', 'Waktu Mulai', 'Waktu Selesai'
+        ];
+
+        $callback = function () use ($trips, $columns) {
+            $file = fopen('php://output', 'w');
+            fputs($file, "\xEF\xBB\xBF"); // UTF-8 BOM agar rapi saat dibuka di Microsoft Excel
+            fputcsv($file, $columns);
+
+            foreach ($trips as $t) {
+                fputcsv($file, [
+                    $t->id,
+                    $t->combat->asset_name ?? 'Unit COMBAT',
+                    $t->combat->sn ?? '-',
+                    $t->combat->type_combat ?? '-',
+                    $t->ip_gps ?? 'DEPLOY',
+                    $t->origin_name ?? 'Gudang / Basecamp',
+                    $t->destination_name ?? '-',
+                    $t->pic_name ?? '-',
+                    $t->status ?? 'COMPLETED',
+                    $t->started_at ? $t->started_at->format('Y-m-d H:i:s') : '-',
+                    $t->ended_at ? $t->ended_at->format('Y-m-d H:i:s') : '-',
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * 👉 14. RESET BULANAN OTOMATIS: Membersihkan seluruh riwayat COMBAT yang sudah selesai
+     * Dipanggil otomatis oleh Vercel Cron Job setiap akhir/awal bulan
+     */
+    public function resetMonthlyTripsHistory(Request $request)
+    {
+        $finishedTrips = CombatTrip::whereIn('status', ['COMPLETED', 'CANCELLED', 'ONSITE'])->get();
+        $count = $finishedTrips->count();
+
+        if ($count === 0) {
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Tidak ada riwayat selesai yang perlu dibersihkan.'
+            ]);
+        }
+
+        DB::transaction(function () use ($finishedTrips) {
+            foreach ($finishedTrips as $trip) {
+                $trip->coordinates()->delete();
+                $trip->delete();
+            }
+        });
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => "Reset bulanan berhasil! {$count} data riwayat COMBAT yang selesai telah dibersihkan dari database Aiven."
         ]);
     }
 }

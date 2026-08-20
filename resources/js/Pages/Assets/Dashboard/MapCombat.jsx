@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { 
-    History, Plus, ChevronDown, Route as RouteIcon
+    History, Plus, ChevronDown, Route as RouteIcon, RotateCcw
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -35,6 +35,7 @@ export default function MapCombat({
     
     const [selectedTrip, setSelectedTrip] = useState(() => activeTrip || activeTripsRaw[0] || null);
     const [liveGpsCoords, setLiveGpsCoords] = useState([]);
+    const [isRefreshing, setIsRefreshing] = useState(false); // Loading state tombol refresh manual
 
     const [isCreatingRoute, setIsCreatingRoute] = useState(false);
     const [isEditingRoute, setIsEditingRoute] = useState(false);
@@ -42,7 +43,7 @@ export default function MapCombat({
     const [draftSelectedCombat, setDraftSelectedCombat] = useState(null);
     const [showDetailCard, setShowDetailCard] = useState(true);
 
-    // 👉 Menggunakan prefix /combat-api untuk Vercel
+    // 1. Tarik daftar riwayat / penugasan rute dari backend
     const fetchTripsList = useCallback(async () => {
         try {
             const res = await axios.get('/combat-api/history?per_page=50');
@@ -57,7 +58,7 @@ export default function MapCombat({
                 });
             }
         } catch (err) {
-            console.error("Gagal load history trips:", err);
+            console.error("Gagal memuat riwayat perjalanan:", err);
         }
     }, []);
 
@@ -65,7 +66,7 @@ export default function MapCombat({
         fetchTripsList();
     }, [viewMode, fetchTripsList]);
 
-    // 👉 Menggunakan prefix /combat-api untuk Vercel
+    // 2. Tarik jejak koordinat riil GPS supir dari database (Breadcrumb Trail)
     const fetchGpsTrail = useCallback(async (trip) => {
         if (!trip?.id) {
             setLiveGpsCoords([]);
@@ -80,7 +81,22 @@ export default function MapCombat({
         }
     }, []);
 
-    // Polling rute live saat IN_TRANSIT
+    // 3. Handler Refresh Manual (Anti-lag / Anti-stuck)
+    const handleManualRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await Promise.all([
+                fetchTripsList(),
+                selectedTrip ? fetchGpsTrail(selectedTrip) : Promise.resolve()
+            ]);
+        } catch (err) {
+            console.error("Gagal merefresh rute:", err);
+        } finally {
+            setTimeout(() => setIsRefreshing(false), 500);
+        }
+    };
+
+    // 4. Polling otomatis koordinat GPS tiap 5 detik jika trip sedang berjalan (IN_TRANSIT)
     useEffect(() => {
         if (viewMode === 'rute' && selectedTrip && !isCreatingRoute) {
             fetchGpsTrail(selectedTrip);
@@ -136,7 +152,6 @@ export default function MapCombat({
         fetchTripsList();
     };
 
-    // 👉 Menggunakan prefix /combat-api untuk Vercel
     const handleDeleteTrip = async (tripId) => {
         if (!confirm('Tindakan ini tidak dapat dibatalkan!\nApakah Anda yakin ingin menghapus data penugasan rute ini?')) return;
         try {
@@ -159,7 +174,7 @@ export default function MapCombat({
         }
     };
 
-    // Pemetaan Titik Pin
+    // 5. Marker Pin Lokasi di Peta
     const finalMapData = useMemo(() => {
         if (viewMode === 'dashboard') {
             return [...activeMapRaw];
@@ -168,6 +183,7 @@ export default function MapCombat({
         if (viewMode === 'rute') {
             let data = [];
             
+            // Mode Buat Rute Baru (Draft)
             if (isCreatingRoute) {
                 if (draftSelectedCombat) {
                     const originCoord = parseCoordinates(draftSelectedCombat);
@@ -199,8 +215,9 @@ export default function MapCombat({
                     });
                 }
             } 
+            // Mode Rute Terpilih
             else if (selectedTrip) {
-                // 1. Pin Titik Asal
+                // Pin 1: Titik Asal Unit COMBAT
                 const originCoord = parseCoordinates(selectedTrip.combat || selectedTrip);
                 if (originCoord) {
                     data.push({ 
@@ -217,7 +234,7 @@ export default function MapCombat({
                     });
                 }
 
-                // 2. Pin Titik Tujuan
+                // Pin 2: Titik Tujuan Site
                 const destLat = (isEditingRoute && draftLocation) ? draftLocation.lat : parseFloat(selectedTrip.destination_lat);
                 const destLng = (isEditingRoute && draftLocation) ? draftLocation.lng : parseFloat(selectedTrip.destination_lng);
 
@@ -234,7 +251,7 @@ export default function MapCombat({
                     });
                 }
 
-                // 3. Pin Posisi Driver (Hanya muncul saat status IN_TRANSIT)
+                // Pin 3: Posisi Live Driver (Saat sedang berjalan)
                 if (selectedTrip.status === 'IN_TRANSIT') {
                     let driverLat = null;
                     let driverLng = null;
@@ -269,31 +286,21 @@ export default function MapCombat({
         return [];
     }, [activeMapRaw, viewMode, isCreatingRoute, draftLocation, draftSelectedCombat, selectedTrip, isEditingRoute, liveGpsCoords]);
 
+    // 6. GARIS JEJAK RIIL GPS SUPIR (BREADCRUMB TRAIL MURNI)
     const activePolylineCoords = useMemo(() => {
-        if (selectedTripInfo) return routeHistory;
-        
-        if (isCreatingRoute && draftSelectedCombat && draftLocation) {
-            const originCoord = parseCoordinates(draftSelectedCombat);
-            if (originCoord) {
-                return [[originCoord.lng, originCoord.lat], [draftLocation.lng, draftLocation.lat]];
-            }
+        // Jika ada prop histori khusus dari modal riwayat
+        if (selectedTripInfo && Array.isArray(routeHistory) && routeHistory.length >= 2) {
+            return routeHistory;
         }
 
-        if (liveGpsCoords.length >= 2 && !isEditingRoute) {
+        // Tampilkan garis jika jejak GPS supir dari database sudah memiliki minimal 2 titik
+        if (Array.isArray(liveGpsCoords) && liveGpsCoords.length >= 2) {
             return liveGpsCoords;
         }
 
-        if (selectedTrip) {
-            const originCoord = parseCoordinates(selectedTrip.combat || selectedTrip);
-            const destLat = (isEditingRoute && draftLocation) ? draftLocation.lat : parseFloat(selectedTrip.destination_lat);
-            const destLng = (isEditingRoute && draftLocation) ? draftLocation.lng : parseFloat(selectedTrip.destination_lng);
-            if (originCoord && !isNaN(destLat) && !isNaN(destLng)) {
-                return [[originCoord.lng, originCoord.lat], [destLng, destLat]];
-            }
-        }
-
+        // Jika belum ada rekaman titik supir, kosongkan polyline
         return [];
-    }, [selectedTripInfo, routeHistory, isCreatingRoute, draftSelectedCombat, draftLocation, liveGpsCoords, selectedTrip, isEditingRoute]);
+    }, [selectedTripInfo, routeHistory, liveGpsCoords]);
 
     const filteredDropdownTrips = useMemo(() => {
         if (!searchTrip.trim()) return allTrips;
@@ -309,6 +316,7 @@ export default function MapCombat({
     return (
         <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-xs relative">
             <div className="px-4 py-2.5 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between flex-wrap gap-2.5 relative z-10">
+                {/* SWITCH MODE: DASHBOARD VS RUTE */}
                 <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-800/60 p-1 rounded-lg">
                     <button 
                         onClick={() => { 
@@ -346,86 +354,104 @@ export default function MapCombat({
                     </button>
                 </div>
                 
+                {/* TOOLBAR KANAN */}
                 <div className="flex items-center gap-2 flex-wrap">
+                    {/* KHUSUS MODE RUTE: TOMBOL BUAT RUTE, REFRESH, RIWAYAT, & DROPDOWN */}
                     {viewMode === 'rute' && (
-                        <button 
-                            onClick={() => {
-                                setIsCreatingRoute(true);
-                                setIsEditingRoute(false);
-                                setSelectedTrip(null);
-                                setDraftLocation(null);
-                                setDraftSelectedCombat(null);
-                                setShowDetailCard(true);
-                            }}
-                            className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer shadow-xs active:scale-95 ${
-                                isCreatingRoute ? 'bg-amber-500 text-white shadow-amber-500/20' : 'bg-red-600 hover:bg-red-500 text-white shadow-red-600/20'
-                            }`}
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Buat Rute Baru</span>
-                        </button>
+                        <>
+                            {/* Tombol Buat Rute Baru */}
+                            <button 
+                                onClick={() => {
+                                    setIsCreatingRoute(true);
+                                    setIsEditingRoute(false);
+                                    setSelectedTrip(null);
+                                    setDraftLocation(null);
+                                    setDraftSelectedCombat(null);
+                                    setShowDetailCard(true);
+                                }}
+                                className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer shadow-xs active:scale-95 ${
+                                    isCreatingRoute ? 'bg-amber-500 text-white shadow-amber-500/20' : 'bg-red-600 hover:bg-red-500 text-white shadow-red-600/20'
+                                }`}
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Buat Rute Baru</span>
+                            </button>
+
+                            {/* Tombol Refresh Data Rute & Jejak GPS */}
+                            <button 
+                                type="button"
+                                onClick={handleManualRefresh}
+                                disabled={isRefreshing}
+                                title="Refresh data rute dan jejak GPS supir"
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                            >
+                                <RotateCcw className={`w-3.5 h-3.5 text-slate-500 dark:text-slate-400 ${isRefreshing ? 'animate-spin text-red-500' : ''}`} />
+                                <span>Refresh</span>
+                            </button>
+
+                            {/* Tombol Riwayat Trip */}
+                            <button 
+                                onClick={() => setViewMode('history')} 
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-red-600/10 hover:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer shadow-xs active:scale-95"
+                            >
+                                <History className="w-3.5 h-3.5 text-red-500" />
+                                <span>Riwayat Trip</span>
+                            </button>
+
+                            {/* Dropdown Pemilihan Rute */}
+                            <DropdownMenu onOpenChange={(open) => { if (!open) setSearchTrip(''); }}>
+                                <DropdownMenuTrigger className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer outline-none max-w-[220px]">
+                                    <RouteIcon className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+                                    <span className="truncate">
+                                        {selectedTrip ? `${selectedTrip.combat?.asset_name || selectedTrip.destination_name}` : `Pilih Rute (${allTrips.length})`}
+                                    </span>
+                                    <ChevronDown className="w-3 h-3 text-slate-400 shrink-0 ml-0.5 opacity-70" />
+                                </DropdownMenuTrigger>
+
+                                <DropdownMenuContent align="end" className="w-80 max-h-80 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-1 shadow-2xl z-50 rounded-xl">
+                                    <DropdownMenuSearchInput 
+                                        value={searchTrip} 
+                                        onChange={(e) => setSearchTrip(e.target.value)} 
+                                        onKeyDown={(e) => e.stopPropagation()} 
+                                        placeholder="Cari rute, unit, atau tujuan..." 
+                                    />
+
+                                    {filteredDropdownTrips.length === 0 ? (
+                                        <div className="px-3 py-4 text-xs text-slate-400 text-center">Tidak ada rute ditemukan</div>
+                                    ) : (
+                                        filteredDropdownTrips.map((tripItem) => {
+                                            const isSelected = selectedTrip?.id === tripItem.id;
+                                            const st = tripItem.status || 'COMPLETED';
+
+                                            return (
+                                                <DropdownMenuItem 
+                                                    key={tripItem.id}
+                                                    onClick={() => handleSelectTripFromDropdown(tripItem)}
+                                                    className={`cursor-pointer py-2 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors ${
+                                                        isSelected ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                                                    }`}
+                                                >
+                                                    <div className="flex flex-col text-left pr-2 truncate">
+                                                        <span className="font-semibold text-xs truncate">{tripItem.combat?.asset_name || 'Unit COMBAT'}</span>
+                                                        <span className="text-[10px] text-slate-400 truncate mt-0.5">Tujuan: {tripItem.destination_name} • PIC: {tripItem.pic_name}</span>
+                                                    </div>
+                                                    <span className={`shrink-0 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase border ${
+                                                        st === 'IN_TRANSIT' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                                        st === 'ASSIGNED' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                                        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                                    }`}>
+                                                        {st}
+                                                    </span>
+                                                </DropdownMenuItem>
+                                            );
+                                        })
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </>
                     )}
 
-                    <button 
-                        onClick={() => setViewMode('history')} 
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold bg-red-600/10 hover:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer shadow-xs active:scale-95"
-                    >
-                        <History className="w-3.5 h-3.5 text-red-500" />
-                        <span>Riwayat Trip</span>
-                    </button>
-
-                    {viewMode === 'rute' && (
-                        <DropdownMenu onOpenChange={(open) => { if (!open) setSearchTrip(''); }}>
-                            <DropdownMenuTrigger className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer outline-none max-w-[220px]">
-                                <RouteIcon className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-                                <span className="truncate">
-                                    {selectedTrip ? `${selectedTrip.combat?.asset_name || selectedTrip.destination_name}` : `Pilih Rute (${allTrips.length})`}
-                                </span>
-                                <ChevronDown className="w-3 h-3 text-slate-400 shrink-0 ml-0.5 opacity-70" />
-                            </DropdownMenuTrigger>
-
-                            <DropdownMenuContent align="end" className="w-80 max-h-80 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-1 shadow-2xl z-50 rounded-xl">
-                                <DropdownMenuSearchInput 
-                                    value={searchTrip} 
-                                    onChange={(e) => setSearchTrip(e.target.value)} 
-                                    onKeyDown={(e) => e.stopPropagation()} 
-                                    placeholder="Cari rute, unit, atau tujuan..." 
-                                />
-
-                                {filteredDropdownTrips.length === 0 ? (
-                                    <div className="px-3 py-4 text-xs text-slate-400 text-center">Tidak ada rute ditemukan</div>
-                                ) : (
-                                    filteredDropdownTrips.map((tripItem) => {
-                                        const isSelected = selectedTrip?.id === tripItem.id;
-                                        const st = tripItem.status || 'COMPLETED';
-
-                                        return (
-                                            <DropdownMenuItem 
-                                                key={tripItem.id}
-                                                onClick={() => handleSelectTripFromDropdown(tripItem)}
-                                                className={`cursor-pointer py-2 px-2.5 rounded-lg text-xs flex items-center justify-between transition-colors ${
-                                                    isSelected ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                                                }`}
-                                            >
-                                                <div className="flex flex-col text-left pr-2 truncate">
-                                                    <span className="font-semibold text-xs truncate">{tripItem.combat?.asset_name || 'Unit COMBAT'}</span>
-                                                    <span className="text-[10px] text-slate-400 truncate mt-0.5">Tujuan: {tripItem.destination_name} • PIC: {tripItem.pic_name}</span>
-                                                </div>
-                                                <span className={`shrink-0 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase border ${
-                                                    st === 'IN_TRANSIT' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                                    st === 'ASSIGNED' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                                                    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                                }`}>
-                                                    {st}
-                                                </span>
-                                            </DropdownMenuItem>
-                                        );
-                                    })
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
-
+                    {/* KHUSUS MODE DASHBOARD: HANYA MENAMPILKAN JUMLAH TERDETEKSI */}
                     {viewMode === 'dashboard' && (
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 pl-1 select-none">
                             <strong className="font-bold text-slate-700 dark:text-slate-200">{validLocationCount}</strong> / {totalCombat} Terdeteksi
@@ -434,6 +460,7 @@ export default function MapCombat({
                 </div>
             </div>
 
+            {/* AREA RENDER PETA DAN MODAL */}
             <div className="p-0 relative">
                 <Map 
                     onMapClick={handleMapClick}
