@@ -267,7 +267,6 @@ export default function GrafikRpm({ summary = {} }) {
             <div className="w-full h-[290px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 25 }}>
-                  {/* 👉 PERBAIKAN: yAxisId="left" memastikan garis putus-putus muncul di SETIAP RANGE TINGKATAN */}
                   <CartesianGrid 
                     yAxisId="left"
                     strokeDasharray="3 3" 
@@ -299,7 +298,6 @@ export default function GrafikRpm({ summary = {} }) {
                     }}
                   />
                   
-                  {/* 👉 SUMBU Y KIRI DENGAN tickCount={5} dan allowDecimals={false} */}
                   <YAxis 
                     yAxisId="left" 
                     stroke="#64748b" 
@@ -313,14 +311,12 @@ export default function GrafikRpm({ summary = {} }) {
                   
                   <Tooltip cursor={{ fill: 'rgba(225, 29, 72, 0.05)' }} wrapperStyle={{ zIndex: 50, outline: 'none' }} content={<CustomComposedTooltip />} />
                   
-                  {/* BATANG WARNA MERAH SOLID */}
                   <Bar yAxisId="left" dataKey="total" name="Total Site" barSize={32} radius={[5, 5, 0, 0]}>
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.total > 0 ? '#e11d48' : '#94a3b8'} />
                     ))}
                   </Bar>
 
-                  {/* GARIS PERSENTASE BERSIH */}
                   <Line 
                     yAxisId="right" 
                     type="monotone" 
@@ -390,7 +386,7 @@ export default function GrafikRpm({ summary = {} }) {
       </div>
 
       {/* =========================================================================
-       * SEKSI 2: LINE CHART PERSENTASE DENGAN RANGE 0, 25, 50, 75, 100 & RATA KIRI
+       * SEKSI 2: LINE CHART PERSENTASE (LEGENDA FILTER FLAT TANPA CARD/BORDER TEBAL)
        * ========================================================================= */}
       <Card className="bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 rounded-xl shadow-sm">
         <CardHeader className="pb-3 pt-4 px-5 border-b border-slate-100 dark:border-slate-800/50">
@@ -404,23 +400,23 @@ export default function GrafikRpm({ summary = {} }) {
               </div>
             </div>
 
-            {/* LEGEND FILTER INTERAKTIF */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] text-slate-400 mr-1 font-medium hidden sm:inline">Filter Garis:</span>
+            {/* 👉 LEGENDA FILTER FLAT (HANYA TITIK + TEKS TANPA KOTAK CARD) */}
+            <div className="flex flex-wrap items-center gap-3">
               {legendConfig.map((item) => {
                 const isActive = activeStatus[item.key];
                 return (
                   <button
                     key={item.key}
+                    type="button"
                     onClick={() => toggleStatus(item.key)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all duration-200 border cursor-pointer select-none ${
+                    className={`flex items-center gap-1.5 text-xs transition-all duration-150 cursor-pointer select-none ${
                       isActive
-                        ? 'bg-slate-800 dark:bg-slate-800 text-slate-100 border-slate-700 shadow-sm opacity-100 scale-100'
-                        : 'bg-slate-100 dark:bg-slate-950 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-900 line-through opacity-50 scale-95'
+                        ? 'text-slate-700 dark:text-slate-200 font-semibold opacity-100'
+                        : 'text-slate-400 dark:text-slate-500 line-through opacity-40'
                     }`}
                     title={`Klik untuk ${isActive ? 'menyembunyikan' : 'menampilkan'} garis ${item.label}`}
                   >
-                    <span className={`w-2 h-2 rounded-full transition-all ${isActive ? item.color : 'bg-slate-500'}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all ${isActive ? item.color : 'bg-slate-400 dark:bg-slate-600'}`} />
                     <span>{item.label}</span>
                   </button>
                 );
