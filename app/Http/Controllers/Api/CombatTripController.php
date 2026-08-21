@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\CombatDriverLocationUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\CombatMaster;
 use App\Models\CombatTrip;
+use App\Models\CombatTripCoordinate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -118,7 +120,7 @@ class CombatTripController extends Controller
             'latest_coord' => $activeTrip->latestCoordinate,
         ]);
     }
-    
+
     /**
      * 4. ADMIN: Membatalkan Penugasan Trip
      */
@@ -307,7 +309,7 @@ class CombatTripController extends Controller
     }
 
     /**
-     * 10. DRIVER: Menerima Ping Koordinat GPS Berkala
+     * 10. DRIVER: Menerima Ping Koordinat GPS Berkala & Siaran Live via Pusher
      */
     public function ping(Request $request, $token)
     {
@@ -333,22 +335,36 @@ class CombatTripController extends Controller
             }
         }
 
-        DB::transaction(function () use ($request, $trip) {
-            $trip->coordinates()->create([
-                'latitude'    => $request->latitude,
-                'longitude'   => $request->longitude,
-                'speed'       => $request->speed ?? 0,
-                'accuracy'    => $request->accuracy,
-            ]);
+        $lat   = (float) $request->latitude;
+        $lng   = (float) $request->longitude;
+        $speed = (float) ($request->speed ?? 0);
+        $acc   = $request->accuracy ? (float) $request->accuracy : null;
 
+        DB::transaction(function () use ($lat, $lng, $speed, $acc, $trip) {
+            // Update titik terkini di Master Unit
             if ($trip->combat) {
                 $trip->combat->update([
-                    'long_lat' => $request->latitude . ';' . $request->longitude,
+                    'long_lat' => $lat . ';' . $lng,
                 ]);
             }
+
+            // Simpan jejak histori koordinat
+            $trip->coordinates()->create([
+                'latitude'  => $lat,
+                'longitude' => $lng,
+                'speed'     => $speed,
+                'accuracy'  => $acc,
+            ]);
         });
 
-        return response()->json(['message' => 'Ping GPS diterima.']);
+        // Broadcast Real-Time ke Pusher
+        try {
+            broadcast(new CombatDriverLocationUpdated($trip, $lat, $lng, $speed, $acc));
+        } catch (\Throwable $e) {
+            // Lanjutkan jika ada kendala jaringan Pusher
+        }
+
+        return response()->json(['message' => 'Ping GPS diterima dan disiarkan live.']);
     }
 
     /**
@@ -444,7 +460,7 @@ class CombatTripController extends Controller
     }
 
     /**
-     * 👉 13. EXPORT EXCEL: Mengunduh Riwayat Perjalanan ke File CSV/Excel (Tanpa Kolom No Telp PIC)
+     * 13. EXPORT EXCEL: Mengunduh Riwayat Perjalanan ke File CSV/Excel
      */
     public function exportTripsHistory(Request $request)
     {
@@ -462,7 +478,6 @@ class CombatTripController extends Controller
             "Expires"             => "0"
         ];
 
-        // 👉 Kolom 'No. Telp PIC' sudah dihapus sesuai permintaan
         $columns = [
             'ID Trip', 'Nama Asset COMBAT', 'Serial Number (SN)', 'Tipe COMBAT', 
             'Jenis Pergerakan', 'Titik Asal', 'Site Tujuan', 'PIC Driver', 
@@ -471,7 +486,7 @@ class CombatTripController extends Controller
 
         $callback = function () use ($trips, $columns) {
             $file = fopen('php://output', 'w');
-            fputs($file, "\xEF\xBB\xBF"); // UTF-8 BOM agar rapi saat dibuka di Microsoft Excel
+            fputs($file, "\xEF\xBB\xBF");
             fputcsv($file, $columns);
 
             foreach ($trips as $t) {
@@ -496,8 +511,7 @@ class CombatTripController extends Controller
     }
 
     /**
-     * 👉 14. RESET BULANAN OTOMATIS: Membersihkan seluruh riwayat COMBAT yang sudah selesai
-     * Dipanggil otomatis oleh Vercel Cron Job setiap akhir/awal bulan
+     * 14. RESET BULANAN OTOMATIS: Membersihkan seluruh riwayat COMBAT yang sudah selesai
      */
     public function resetMonthlyTripsHistory(Request $request)
     {
@@ -520,7 +534,7 @@ class CombatTripController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => "Reset bulanan berhasil! {$count} data riwayat COMBAT yang selesai telah dibersihkan dari database Aiven."
+            'message' => "Reset bulanan berhasil! {$count} data riwayat COMBAT yang selesai telah dibersihkan dari database."
         ]);
     }
 }

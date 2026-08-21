@@ -5,12 +5,15 @@ import axios from 'axios';
 export const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
     const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return (R * c).toFixed(1);
 };
 
@@ -27,8 +30,12 @@ export const getJenisPergerakanInfo = (trip) => {
     if (jenisId === 'MAINTENANCE') return { label: 'Maintenance (Ke Workshop)', badgeClass: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };
 
     const dest = (trip.destination_name || '').toLowerCase();
-    if (dest.includes('workshop') || dest.includes('repair') || dest.includes('perbaikan')) return { label: 'Maintenance (Ke Workshop)', badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' };
-    if (dest.includes('gudang') || dest.includes('basecamp') || dest.includes('wh')) return { label: 'Penarikan (Site ke Gudang)', badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
+    if (dest.includes('workshop') || dest.includes('repair') || dest.includes('perbaikan')) {
+        return { label: 'Maintenance (Ke Workshop)', badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' };
+    }
+    if (dest.includes('gudang') || dest.includes('basecamp') || dest.includes('wh')) {
+        return { label: 'Penarikan (Site ke Gudang)', badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
+    }
     return { label: 'Deploy (Gudang ke Site)', badgeClass: 'bg-sky-500/10 text-sky-400 border-sky-500/20' };
 };
 
@@ -50,6 +57,7 @@ export default function useDriverTracker(trip) {
     const [gpsError, setGpsError] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [lastPingTime, setLastPingTime] = useState(null);
+    const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
     // 👉 STATE DETEKSI GOOGLE MAPS & BACKGROUND
     const [isAppInBackground, setIsAppInBackground] = useState(false);
@@ -63,7 +71,8 @@ export default function useDriverTracker(trip) {
                 latitude: parseFloat(latest.latitude),
                 longitude: parseFloat(latest.longitude),
                 speed: latest.speed ? String(latest.speed) : '0.0',
-                accuracy: latest.accuracy ? parseInt(latest.accuracy) : 0,
+                accuracy: latest.accuracy ? parseInt(latest.accuracy, 10) : 0,
+                heading: latest.heading || 0,
             };
         }
         if (trip?.combat?.long_lat && trip.combat.long_lat.includes(';')) {
@@ -73,6 +82,7 @@ export default function useDriverTracker(trip) {
                 longitude: parseFloat(parts[1]),
                 speed: '0.0',
                 accuracy: 0,
+                heading: 0,
             };
         }
         return null;
@@ -83,6 +93,7 @@ export default function useDriverTracker(trip) {
     const [speedHistory, setSpeedHistory] = useState([{ time: 'Mulai', speed: 0 }]);
 
     const token = trip?.tracking_token;
+    const isMountedRef = useRef(true);
     const watchIdRef = useRef(null);
     const wakeLockRef = useRef(null);
     const lastPingTimestampRef = useRef(0);
@@ -95,44 +106,88 @@ export default function useDriverTracker(trip) {
         return true;
     }, [status, lockedDeviceToken, myDeviceToken]);
 
-    // 🔍 DETEKSI OTOMATIS SAAT DRIVER BERPINDAH KE GOOGLE MAPS / MINIMIZE BROWSER
+    // Metadata jenis pergerakan trip
+    const jenisPergerakan = useMemo(() => getJenisPergerakanInfo(trip), [trip]);
+
+    // Kalkulasi sisa jarak otomatis ke target (KM)
+    const remainingDistanceKm = useMemo(() => {
+        const destLat = trip?.destination_latitude || trip?.dest_lat;
+        const destLon = trip?.destination_longitude || trip?.dest_lon;
+        if (!currentCoords?.latitude || !currentCoords?.longitude || !destLat || !destLon) {
+            return null;
+        }
+        return calculateDistanceKm(
+            currentCoords.latitude,
+            currentCoords.longitude,
+            parseFloat(destLat),
+            parseFloat(destLon)
+        );
+    }, [currentCoords, trip]);
+
+    // 🔒 WAKE LOCK HANDLER
+    const requestWakeLock = useCallback(async () => {
+        if ('wakeLock' in navigator && !wakeLockRef.current) {
+            try {
+                wakeLockRef.current = await navigator.wakeLock.request('screen');
+                wakeLockRef.current.addEventListener('release', () => {
+                    wakeLockRef.current = null;
+                });
+            } catch (err) {
+                // WakeLock silent error
+            }
+        }
+    }, []);
+
+    const releaseWakeLock = useCallback(() => {
+        if (wakeLockRef.current) {
+            wakeLockRef.current.release().then(() => {
+                wakeLockRef.current = null;
+            }).catch(() => {});
+        }
+    }, []);
+
+    // 🔍 DETEKSI VISIBILITY CHANGE & RE-ACQUIRE WAKE LOCK
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden) {
                 setIsAppInBackground(true);
             } else {
                 setIsAppInBackground(false);
-                setIsNavigatingMaps(false); // Reset saat driver kembali melihat halaman web
+                setIsNavigatingMaps(false);
+                // WakeLock otomatis mati saat minimize di Android/iOS, minta kembali saat aktif
+                if (status === 'IN_TRANSIT' && isAuthorizedDriver) {
+                    requestWakeLock();
+                }
             }
         };
 
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, [status, isAuthorizedDriver, requestWakeLock]);
+
+    // Cleanup saat komponen unmount
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
         };
     }, []);
 
-    const requestWakeLock = async () => {
-        if ('wakeLock' in navigator) {
-            try {
-                wakeLockRef.current = await navigator.wakeLock.request('screen');
-            } catch (err) {}
-        }
-    };
-
-    const releaseWakeLock = () => {
-        if (wakeLockRef.current) {
-            wakeLockRef.current.release().then(() => {
-                wakeLockRef.current = null;
-            });
-        }
-    };
-
     // 1. PING GPS
-    const sendGpsPing = useCallback(async (lat, lng, speed, accuracy) => {
-        if (!isAuthorizedDriver) return;
+    const sendGpsPing = useCallback(async (lat, lng, speed, accuracy, heading = null) => {
+        if (!isAuthorizedDriver || !token) return;
         const now = Date.now();
-        if (now - lastPingTimestampRef.current < 4000) return;
+        if (now - lastPingTimestampRef.current < 4000) return; // Throttle 4 detik
         lastPingTimestampRef.current = now;
 
         try {
@@ -141,16 +196,23 @@ export default function useDriverTracker(trip) {
                 longitude: lng,
                 speed: speed ? Number(speed) : 0,
                 accuracy: accuracy ? Number(accuracy) : null,
+                heading: heading ? Number(heading) : null,
                 device_token: myDeviceToken,
-                is_background: document.hidden // Kirim info ke backend apakah supir sedang minimize/buka maps
+                is_background: document.hidden,
             });
 
-            const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            if (!isMountedRef.current) return;
+            const timeStr = new Date().toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+
             setLastPingTime(timeStr);
             setGpsError(null);
-
-            setSpeedHistory(prev => [...prev, { time: timeStr, speed: parseFloat(speed) || 0 }].slice(-15));
+            setSpeedHistory((prev) => [...prev, { time: timeStr, speed: parseFloat(speed) || 0 }].slice(-15));
         } catch (err) {
+            if (!isMountedRef.current) return;
             if (err.response?.status === 403) {
                 setGpsError('Perangkat ini bukan driver utama. Masuk ke Mode Pantau.');
                 stopGpsWatcher();
@@ -170,9 +232,14 @@ export default function useDriverTracker(trip) {
         setGpsError(null);
         requestWakeLock();
 
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+
         watchIdRef.current = navigator.geolocation.watchPosition(
             (position) => {
-                const { latitude, longitude, speed, accuracy } = position.coords;
+                if (!isMountedRef.current) return;
+                const { latitude, longitude, speed, accuracy, heading } = position.coords;
                 lastValidCoordRef.current = { latitude, longitude };
                 setGpsError(null);
 
@@ -182,20 +249,24 @@ export default function useDriverTracker(trip) {
                     longitude,
                     speed: speedKmh,
                     accuracy: Math.round(accuracy || 0),
+                    heading: heading || 0,
                 });
 
-                sendGpsPing(latitude, longitude, speedKmh, accuracy);
+                sendGpsPing(latitude, longitude, speedKmh, accuracy, heading);
             },
             (error) => {
+                if (!isMountedRef.current) return;
                 if (error.code === error.PERMISSION_DENIED) {
                     setGpsError('Izin GPS ditolak. Buka pengaturan browser HP dan izinkan akses lokasi.');
+                } else if (error.code === error.TIMEOUT) {
+                    setGpsError('Koneksi satelit GPS melambat. Memperbarui sinyal...');
                 } else {
                     setGpsError('Mencari sinyal satelit GPS...');
                 }
             },
             { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
         );
-    }, [sendGpsPing, isAuthorizedDriver]);
+    }, [sendGpsPing, isAuthorizedDriver, requestWakeLock]);
 
     const stopGpsWatcher = useCallback(() => {
         if (watchIdRef.current !== null) {
@@ -204,13 +275,15 @@ export default function useDriverTracker(trip) {
         }
         setIsGpsActive(false);
         releaseWakeLock();
-    }, []);
+    }, [releaseWakeLock]);
 
     // 3. POLLING POSISI UNTUK MODE PANTAU (HP KEDUA)
     const fetchObserverLiveStatus = useCallback(async () => {
+        if (!token) return;
         try {
             const res = await axios.get(`/track-api/${token}/status`);
             const data = res.data;
+            if (!isMountedRef.current) return;
 
             if (data.status) setStatus(data.status);
             if (data.device_token) setLockedDeviceToken(data.device_token);
@@ -221,35 +294,43 @@ export default function useDriverTracker(trip) {
                     longitude: data.driver_coords.longitude,
                     speed: data.driver_coords.speed || '0.0',
                     accuracy: data.driver_coords.accuracy || 0,
+                    heading: data.driver_coords.heading || 0,
                 });
 
                 if (data.driver_coords.recorded_at) setLastPingTime(data.driver_coords.recorded_at);
 
-                setSpeedHistory(prev => [...prev, { 
-                    time: data.driver_coords.recorded_at || 'Sync', 
-                    speed: parseFloat(data.driver_coords.speed) || 0 
-                }].slice(-15));
+                setSpeedHistory((prev) => [
+                    ...prev,
+                    {
+                        time: data.driver_coords.recorded_at || 'Sync',
+                        speed: parseFloat(data.driver_coords.speed) || 0,
+                    },
+                ].slice(-15));
             }
         } catch (err) {
-            console.error("Gagal menarik data live driver:", err);
+            console.error('Gagal menarik data live driver:', err);
         }
     }, [token]);
 
     useEffect(() => {
+        let pollInterval = null;
         if (status === 'IN_TRANSIT') {
             if (isAuthorizedDriver) {
                 startGpsWatcher();
             } else {
                 fetchObserverLiveStatus();
-                const pollInterval = setInterval(fetchObserverLiveStatus, 4000);
-                return () => clearInterval(pollInterval);
+                pollInterval = setInterval(fetchObserverLiveStatus, 4000);
             }
         }
-        return () => stopGpsWatcher();
+        return () => {
+            if (pollInterval) clearInterval(pollInterval);
+            stopGpsWatcher();
+        };
     }, [status, isAuthorizedDriver, startGpsWatcher, stopGpsWatcher, fetchObserverLiveStatus]);
 
-    // 4. ACTION HANDLERS: MULAI, SELESAI, DAN BUKA GOOGLE MAPS
+    // 4. ACTION HANDLERS
     const handleStartTrip = async () => {
+        if (!token) return;
         setIsSubmitting(true);
         try {
             await axios.post(`/track-api/${token}/start`, { device_token: myDeviceToken });
@@ -259,7 +340,7 @@ export default function useDriverTracker(trip) {
         } catch (err) {
             alert(err.response?.data?.message || 'Gagal memulai perjalanan.');
         } finally {
-            setIsSubmitting(false);
+            if (isMountedRef.current) setIsSubmitting(false);
         }
     };
 
@@ -275,7 +356,7 @@ export default function useDriverTracker(trip) {
                 await axios.post(`/track-api/${token}/complete`, {
                     final_latitude: lat,
                     final_longitude: lng,
-                    device_token: myDeviceToken
+                    device_token: myDeviceToken,
                 });
             } catch (err) {
                 console.error('Gagal sinkronisasi trip ke server:', err);
@@ -291,7 +372,7 @@ export default function useDriverTracker(trip) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => executeComplete(pos.coords.latitude, pos.coords.longitude),
                 () => {
-                    setIsSubmitting(false);
+                    if (isMountedRef.current) setIsSubmitting(false);
                     alert('GPS belum mengunci posisi. Pastikan izin lokasi browser HP aktif.');
                 },
                 { enableHighAccuracy: true, timeout: 5000 }
@@ -299,7 +380,6 @@ export default function useDriverTracker(trip) {
         }
     };
 
-    // 👉 Handler saat tombol Google Maps diklik
     const handleOpenGoogleMapsClick = (url) => {
         setIsNavigatingMaps(true);
         window.open(url, '_blank', 'noreferrer');
@@ -310,14 +390,19 @@ export default function useDriverTracker(trip) {
         isGpsActive,
         gpsError,
         isSubmitting,
+        lastPingTime,
+        isOnline,
         currentCoords,
         speedHistory,
+        remainingDistanceKm,
+        jenisPergerakan,
         isAuthorizedDriver,
-        isAppInBackground,   // 👉 Status apakah aplikasi sedang di latar belakang
-        isNavigatingMaps,    // 👉 Status apakah driver sedang membuka Google Maps
+        isAppInBackground,
+        isNavigatingMaps,
         startGpsWatcher,
+        stopGpsWatcher,
         handleStartTrip,
         handleCompleteTrip,
-        handleOpenGoogleMapsClick // 👉 Fungsi pembuka Maps
+        handleOpenGoogleMapsClick,
     };
 }

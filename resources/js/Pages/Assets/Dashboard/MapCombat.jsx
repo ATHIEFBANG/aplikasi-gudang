@@ -35,7 +35,8 @@ export default function MapCombat({
     
     const [selectedTrip, setSelectedTrip] = useState(() => activeTrip || activeTripsRaw[0] || null);
     const [liveGpsCoords, setLiveGpsCoords] = useState([]);
-    const [isRefreshing, setIsRefreshing] = useState(false); // Loading state tombol refresh manual
+    const [liveDriverMarker, setLiveDriverMarker] = useState(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const [isCreatingRoute, setIsCreatingRoute] = useState(false);
     const [isEditingRoute, setIsEditingRoute] = useState(false);
@@ -66,22 +67,28 @@ export default function MapCombat({
         fetchTripsList();
     }, [viewMode, fetchTripsList]);
 
-    // 2. Tarik jejak koordinat riil GPS supir dari database (Breadcrumb Trail)
+    // 2. Tarik jejak koordinat riil GPS supir dari database (Breadcrumb Trail Awal)
     const fetchGpsTrail = useCallback(async (trip) => {
         if (!trip?.id) {
             setLiveGpsCoords([]);
+            setLiveDriverMarker(null);
             return;
         }
         try {
             const res = await axios.get(`/combat-api/trips/${trip.id}/route`);
             const coords = res.data?.data?.coordinates || [];
             setLiveGpsCoords(coords);
+
+            if (coords.length > 0) {
+                const last = coords[coords.length - 1];
+                setLiveDriverMarker({ latitude: last[1], longitude: last[0] });
+            }
         } catch (err) {
             setLiveGpsCoords([]);
         }
     }, []);
 
-    // 3. Handler Refresh Manual (Anti-lag / Anti-stuck)
+    // 3. Handler Refresh Manual
     const handleManualRefresh = async () => {
         setIsRefreshing(true);
         try {
@@ -96,19 +103,41 @@ export default function MapCombat({
         }
     };
 
-    // 4. Polling otomatis koordinat GPS tiap 5 detik jika trip sedang berjalan (IN_TRANSIT)
+    // 4. Real-time WebSocket Pusher (Berjalan otomatis di background)
     useEffect(() => {
-        if (viewMode === 'rute' && selectedTrip && !isCreatingRoute) {
-            fetchGpsTrail(selectedTrip);
+        if (typeof window !== 'undefined' && window.Echo) {
+            const channel = window.Echo.channel('combat-tracking');
 
-            if (selectedTrip.status === 'IN_TRANSIT') {
-                const interval = setInterval(() => {
-                    fetchGpsTrail(selectedTrip);
-                }, 5000);
-                return () => clearInterval(interval);
-            }
+            channel.listen('.driver.location.updated', (event) => {
+                const { trip_id, latitude, longitude, speed } = event;
+
+                if (selectedTrip && Number(selectedTrip.id) === Number(trip_id)) {
+                    setLiveDriverMarker({ latitude, longitude, speed });
+                    
+                    setLiveGpsCoords((prevCoords) => {
+                        const newCoord = [longitude, latitude];
+                        return [...prevCoords, newCoord];
+                    });
+                }
+
+                setAllTrips((prevTrips) => 
+                    prevTrips.map((t) => {
+                        if (Number(t.id) === Number(trip_id)) {
+                            return {
+                                ...t,
+                                latest_coordinate: { latitude, longitude, speed }
+                            };
+                        }
+                        return t;
+                    })
+                );
+            });
+
+            return () => {
+                window.Echo.leaveChannel('combat-tracking');
+            };
         }
-    }, [viewMode, selectedTrip?.id, selectedTrip?.status, isCreatingRoute, fetchGpsTrail]);
+    }, [selectedTrip]);
 
     const handleSelectTripFromDropdown = (trip) => {
         setIsCreatingRoute(false);
@@ -162,6 +191,7 @@ export default function MapCombat({
             setSelectedTrip(null);
             setIsEditingRoute(false);
             setLiveGpsCoords([]);
+            setLiveDriverMarker(null);
             fetchTripsList();
         } catch (err) {
             alert(err.response?.data?.message || 'Gagal menghapus penugasan.');
@@ -183,7 +213,6 @@ export default function MapCombat({
         if (viewMode === 'rute') {
             let data = [];
             
-            // Mode Buat Rute Baru (Draft)
             if (isCreatingRoute) {
                 if (draftSelectedCombat) {
                     const originCoord = parseCoordinates(draftSelectedCombat);
@@ -215,9 +244,7 @@ export default function MapCombat({
                     });
                 }
             } 
-            // Mode Rute Terpilih
             else if (selectedTrip) {
-                // Pin 1: Titik Asal Unit COMBAT
                 const originCoord = parseCoordinates(selectedTrip.combat || selectedTrip);
                 if (originCoord) {
                     data.push({ 
@@ -234,7 +261,6 @@ export default function MapCombat({
                     });
                 }
 
-                // Pin 2: Titik Tujuan Site
                 const destLat = (isEditingRoute && draftLocation) ? draftLocation.lat : parseFloat(selectedTrip.destination_lat);
                 const destLng = (isEditingRoute && draftLocation) ? draftLocation.lng : parseFloat(selectedTrip.destination_lng);
 
@@ -251,16 +277,15 @@ export default function MapCombat({
                     });
                 }
 
-                // Pin 3: Posisi Live Driver (Saat sedang berjalan)
                 if (selectedTrip.status === 'IN_TRANSIT') {
-                    let driverLat = null;
-                    let driverLng = null;
+                    let driverLat = liveDriverMarker?.latitude || null;
+                    let driverLng = liveDriverMarker?.longitude || null;
 
-                    if (liveGpsCoords.length > 0) {
+                    if (!driverLat && liveGpsCoords.length > 0) {
                         const lastCoord = liveGpsCoords[liveGpsCoords.length - 1];
                         driverLng = lastCoord[0];
                         driverLat = lastCoord[1];
-                    } else if (selectedTrip.latest_coordinate || selectedTrip.latestCoordinate) {
+                    } else if (!driverLat && (selectedTrip.latest_coordinate || selectedTrip.latestCoordinate)) {
                         const c = selectedTrip.latest_coordinate || selectedTrip.latestCoordinate;
                         driverLat = parseFloat(c.latitude);
                         driverLng = parseFloat(c.longitude);
@@ -275,7 +300,7 @@ export default function MapCombat({
                             properties: {
                                 asset_name: `POSISI DRIVER: ${selectedTrip.pic_name || 'Tim Pelaksana'}`,
                                 status_combat: 'IN TRANSIT',
-                                note: 'Sedang dalam perjalanan'
+                                note: 'Sedang melaju live'
                             }
                         });
                     }
@@ -284,21 +309,17 @@ export default function MapCombat({
             return data;
         }
         return [];
-    }, [activeMapRaw, viewMode, isCreatingRoute, draftLocation, draftSelectedCombat, selectedTrip, isEditingRoute, liveGpsCoords]);
+    }, [activeMapRaw, viewMode, isCreatingRoute, draftLocation, draftSelectedCombat, selectedTrip, isEditingRoute, liveGpsCoords, liveDriverMarker]);
 
-    // 6. GARIS JEJAK RIIL GPS SUPIR (BREADCRUMB TRAIL MURNI)
     const activePolylineCoords = useMemo(() => {
-        // Jika ada prop histori khusus dari modal riwayat
         if (selectedTripInfo && Array.isArray(routeHistory) && routeHistory.length >= 2) {
             return routeHistory;
         }
 
-        // Tampilkan garis jika jejak GPS supir dari database sudah memiliki minimal 2 titik
         if (Array.isArray(liveGpsCoords) && liveGpsCoords.length >= 2) {
             return liveGpsCoords;
         }
 
-        // Jika belum ada rekaman titik supir, kosongkan polyline
         return [];
     }, [selectedTripInfo, routeHistory, liveGpsCoords]);
 
@@ -356,7 +377,6 @@ export default function MapCombat({
                 
                 {/* TOOLBAR KANAN */}
                 <div className="flex items-center gap-2 flex-wrap">
-                    {/* KHUSUS MODE RUTE: TOMBOL BUAT RUTE, REFRESH, RIWAYAT, & DROPDOWN */}
                     {viewMode === 'rute' && (
                         <>
                             {/* Tombol Buat Rute Baru */}
@@ -377,24 +397,24 @@ export default function MapCombat({
                                 <span>Buat Rute Baru</span>
                             </button>
 
-                            {/* Tombol Refresh Data Rute & Jejak GPS */}
+                            {/* Tombol Refresh (Flat / Tanpa Card) */}
                             <button 
                                 type="button"
                                 onClick={handleManualRefresh}
                                 disabled={isRefreshing}
                                 title="Refresh data rute dan jejak GPS supir"
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer disabled:opacity-50"
                             >
-                                <RotateCcw className={`w-3.5 h-3.5 text-slate-500 dark:text-slate-400 ${isRefreshing ? 'animate-spin text-red-500' : ''}`} />
+                                <RotateCcw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-red-500' : ''}`} />
                                 <span>Refresh</span>
                             </button>
 
-                            {/* Tombol Riwayat Trip */}
+                            {/* Tombol Riwayat Trip (Flat / Tanpa Card) */}
                             <button 
                                 onClick={() => setViewMode('history')} 
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-red-600/10 hover:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer shadow-xs active:scale-95"
+                                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
                             >
-                                <History className="w-3.5 h-3.5 text-red-500" />
+                                <History className="w-3.5 h-3.5" />
                                 <span>Riwayat Trip</span>
                             </button>
 
@@ -451,7 +471,6 @@ export default function MapCombat({
                         </>
                     )}
 
-                    {/* KHUSUS MODE DASHBOARD: HANYA MENAMPILKAN JUMLAH TERDETEKSI */}
                     {viewMode === 'dashboard' && (
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 pl-1 select-none">
                             <strong className="font-bold text-slate-700 dark:text-slate-200">{validLocationCount}</strong> / {totalCombat} Terdeteksi

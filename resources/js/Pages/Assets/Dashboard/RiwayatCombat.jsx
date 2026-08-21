@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { 
-    History, Search, Calendar, ArrowRight, User, Truck, 
+    Search, Calendar, ArrowRight, User, Truck, 
     Navigation, Loader2, ArrowLeft, ChevronLeft, ChevronRight, 
     Clock, ListFilter, RotateCcw, X, Activity, Route as RouteIcon,
     FileSpreadsheet
@@ -117,12 +117,10 @@ export default function RiwayatCombat({ initialTrips = [], onBack }) {
         }
     }, []);
 
-    // 👉 HANDLER EXPORT EXCEL / CSV
     const handleExportExcel = () => {
         window.location.href = '/combat-api/history/export';
     };
 
-    // Handler Buka Modal Jejak (Hanya untuk COMPLETED / ONSITE)
     const handleOpenTrailModal = async (tripItem) => {
         setSelectedTrailTrip(tripItem);
         setIsLoadingTrail(true);
@@ -232,27 +230,27 @@ export default function RiwayatCombat({ initialTrips = [], onBack }) {
             <div>
                 {/* HEADER UTAMA */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
+                        {/* Navigasi Back Tanpa Card Box */}
                         <button 
+                            type="button"
                             onClick={onBack} 
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors cursor-pointer py-1"
                         >
-                            <ArrowLeft className="w-4 h-4 text-slate-500" />
+                            <ArrowLeft className="w-4 h-4" />
                             <span>Kembali ke Dashboard</span>
                         </button>
-                        <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
-                        <div className="flex items-center gap-2.5">
-                            <div className="p-1.5 rounded-lg bg-red-500/10 text-red-500">
-                                <History className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">Riwayat Perjalanan COMBAT</h3>
-                                <p className="text-xs text-slate-400">Catatan pergerakan, rekaman jejak GPS selesai, dan arsip mobilisasi</p>
-                            </div>
+                        
+                        <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+                        
+                        {/* Judul & Deskripsi Tanpa Emot/Icon Badge */}
+                        <div>
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">Riwayat Perjalanan COMBAT</h3>
+                            <p className="text-xs text-slate-400">Catatan pergerakan, rekaman jejak GPS selesai, dan arsip mobilisasi</p>
                         </div>
                     </div>
 
-                    {/* 👉 TOMBOL EXPORT EXCEL (BERSIH TANPA TOMBOL RESET) */}
+                    {/* TOMBOL EXPORT EXCEL */}
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
@@ -395,8 +393,6 @@ export default function RiwayatCombat({ initialTrips = [], onBack }) {
                                                     {st}
                                                 </span>
                                             </td>
-
-                                            {/* 👉 AKSI: HANYA STATUS COMPLETED / ONSITE YANG MEMILIKI TOMBOL LIHAT JEJAK */}
                                             <td className="py-3 px-4 text-center">
                                                 {isTripCompleted ? (
                                                     <button
@@ -460,7 +456,7 @@ export default function RiwayatCombat({ initialTrips = [], onBack }) {
                                         Rekaman Lintasan: {selectedTrailTrip.asset_name} ({selectedTrailTrip.sn})
                                     </h4>
                                     <p className="text-[11px] text-slate-400 truncate">
-                                        Rute: <span className="text-slate-300">{selectedTrailTrip.origin_name}</span> $\rightarrow$ <span className="font-semibold text-emerald-400">{selectedTrailTrip.destination_name}</span>
+                                        Rute: <span className="text-slate-300">{selectedTrailTrip.origin_name}</span> &rarr; <span className="font-semibold text-emerald-400">{selectedTrailTrip.destination_name}</span>
                                     </p>
                                 </div>
                             </div>
