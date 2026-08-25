@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            // Kolom role langsung didefinisikan di sini
+            $table->enum('role', ['admin', 'staff', 'view'])->default('view');
             $table->rememberToken();
             $table->timestamps();
         });
