@@ -6,6 +6,7 @@ use App\Models\Barang;
 use App\Models\Gudang;
 use App\Models\Stok;
 use App\Models\Transaksi;
+use App\Models\TransaksiDetail;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,19 +17,26 @@ class DashboardController extends Controller
 {
     public function index(Request $request): Response
     {
-        // 1. STATISTIK KPI
+        // 1. STATISTIK KPI (Dihitung berdasarkan Total Akumulasi Unit QTY Fisik)
         $totalBarang    = Barang::count();
         $totalStokFisik = (int) Stok::sum('jumlah');
         $totalGudang    = Gudang::where('is_active', true)->count();
         
-        // Barang dengan stok di bawah atau sama dengan min_stock
-        $lowStockCount = Barang::whereHas('stoks')
-            ->withSum('stoks', 'jumlah')
-            ->get()
-            ->filter(fn($b) => ($b->stoks_sum_jumlah ?? 0) <= $b->min_stock)
-            ->count();
+        // Total Volume QTY Barang Keluar
+        $totalBarangKeluar = (int) TransaksiDetail::whereHas('transaksi', function ($q) {
+            $q->where('jenis_transaksi', 'KELUAR')
+              ->where('status', 'COMPLETED');
+        })->sum('qty');
 
-        // 2. DATA PETA SEBARAN GUDANG (Support format lat_long "lat,lng" / "lat;lng")
+        // Total Volume QTY Transfer Antar-Gudang
+        $totalTransfer = (int) TransaksiDetail::whereHas('transaksi', function ($q) {
+            $q->where(function ($qb) {
+                $qb->where('jenis_transaksi', 'TRANSFER')
+                   ->orWhere('sub_jenis', 'TRANSFER_GUDANG');
+            })->where('status', 'COMPLETED');
+        })->sum('qty');
+
+        // 2. DATA PETA SEBARAN GUDANG
         $warehouseMapData = Gudang::where('is_active', true)
             ->whereNotNull('lat_long')
             ->where('lat_long', '!=', '')
@@ -39,14 +47,11 @@ class DashboardController extends Controller
                 $raw = trim($g->lat_long);
                 $parts = preg_split('/[\s,;\/]+/', $raw);
                 if (count($parts) < 2) return null;
-
                 $v1 = (float) str_replace(',', '.', $parts[0]);
                 $v2 = (float) str_replace(',', '.', $parts[1]);
                 if ($v1 == 0 && $v2 == 0) return null;
-
                 $lat = abs($v1) <= 90 ? $v1 : $v2;
                 $lng = abs($v1) <= 90 ? $v2 : $v1;
-
                 return [
                     'id'          => $g->id,
                     'kode_gudang' => $g->kode_gudang,
@@ -62,19 +67,22 @@ class DashboardController extends Controller
             ->filter()
             ->values();
 
-        // 3. GRAFIK TRANSAKSI BULANAN (Mendukung MySQL, PostgreSQL & SQLite)
+        // 3. GRAFIK BULANAN (Menjumlahkan Total QTY Fisik per Kategori)
         $currentYear = date('Y');
-        $isSqlite    = DB::connection()->getDriverName() === 'sqlite';
-        $monthField  = $isSqlite ? "CAST(strftime('%m', tanggal) AS INTEGER)" : "EXTRACT(MONTH FROM tanggal)";
+        $driverName  = DB::connection()->getDriverName();
+        $isSqlite    = $driverName === 'sqlite';
+        $monthField  = $isSqlite ? "CAST(strftime('%m', transaksis.tanggal) AS INTEGER)" : "EXTRACT(MONTH FROM transaksis.tanggal)";
 
-        $monthlyRaw = Transaksi::selectRaw("
+        $monthlyRaw = DB::table('transaksi_details')
+            ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
+            ->selectRaw("
                 {$monthField} as bulan,
-                SUM(CASE WHEN jenis_transaksi = 'MASUK' THEN 1 ELSE 0 END) as masuk,
-                SUM(CASE WHEN jenis_transaksi = 'KELUAR' THEN 1 ELSE 0 END) as keluar,
-                SUM(CASE WHEN jenis_transaksi = 'TRANSFER' THEN 1 ELSE 0 END) as transfer
+                SUM(CASE WHEN (transaksis.jenis_transaksi = 'MASUK' AND (transaksis.sub_jenis != 'TRANSFER_GUDANG' OR transaksis.sub_jenis IS NULL)) THEN transaksi_details.qty ELSE 0 END) as masuk,
+                SUM(CASE WHEN transaksis.jenis_transaksi = 'KELUAR' THEN transaksi_details.qty ELSE 0 END) as keluar,
+                SUM(CASE WHEN (transaksis.jenis_transaksi = 'TRANSFER' OR transaksis.sub_jenis = 'TRANSFER_GUDANG') THEN transaksi_details.qty ELSE 0 END) as transfer
             ")
-            ->whereYear('tanggal', $currentYear)
-            ->where('status', 'COMPLETED')
+            ->whereYear('transaksis.tanggal', $currentYear)
+            ->where('transaksis.status', 'COMPLETED')
             ->groupBy(DB::raw($monthField))
             ->get()
             ->keyBy(fn($item) => (int) $item->bulan);
@@ -104,10 +112,11 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard/Index', [
             'kpi' => [
-                'totalBarang'    => $totalBarang,
-                'totalStokFisik' => $totalStokFisik,
-                'totalGudang'    => $totalGudang,
-                'lowStockCount'  => $lowStockCount,
+                'totalBarang'       => $totalBarang,
+                'totalStokFisik'    => $totalStokFisik,
+                'totalBarangKeluar' => $totalBarangKeluar,
+                'totalTransfer'     => $totalTransfer,
+                'totalGudang'       => $totalGudang,
             ],
             'mapData'            => $warehouseMapData,
             'chartData'          => $chartData,
@@ -140,7 +149,6 @@ class DashboardController extends Controller
     public function updateGudang(Request $request, int $id)
     {
         $gudang = Gudang::findOrFail($id);
-
         $validated = $request->validate([
             'kode_gudang' => 'required|string|max:50|unique:gudangs,kode_gudang,' . $gudang->id,
             'nama_gudang' => 'required|string|max:255',
@@ -163,7 +171,6 @@ class DashboardController extends Controller
     {
         $gudang = Gudang::findOrFail($id);
         $gudang->delete();
-
         return redirect()->back()->with('success', 'Lokasi gudang berhasil dihapus.');
     }
 }
