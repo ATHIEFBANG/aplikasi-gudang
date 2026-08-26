@@ -45,7 +45,16 @@ export default function CrudTable({
                         );
 
                     case 'sub_jenis': {
-                        const statusSub = item.sub_jenis || item.jenis_transaksi;
+                        let statusSub = item.sub_jenis;
+                        if (!statusSub || statusSub === 'MASUK') {
+                            const noTrx = item.no_transaksi || '';
+                            if (noTrx.includes('BUY')) statusSub = 'PEMBELIAN';
+                            else if (noTrx.includes('BORROW')) statusSub = 'PEMINJAMAN';
+                            else if (noTrx.includes('RET')) statusSub = 'PENGEMBALIAN';
+                            else if (noTrx.includes('TRF')) statusSub = 'TRANSFER_GUDANG';
+                            else statusSub = 'PEMBELIAN';
+                        }
+
                         const badgeColor = {
                             PEMBELIAN: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
                             PEMINJAMAN: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
@@ -53,8 +62,12 @@ export default function CrudTable({
                             TRANSFER_GUDANG: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
                             TRANSFER: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
                         };
+
                         return (
-                            <Badge className={`${badgeColor[statusSub] || 'bg-slate-100 text-slate-600'} text-[10px] font-bold px-2 py-0.5 rounded-md`}>
+                            <Badge 
+                                variant="outline" 
+                                className={`${badgeColor[statusSub] || 'bg-blue-500/10 text-blue-600 border-blue-500/20'} text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide`}
+                            >
                                 {statusSub?.replace('_', ' ')}
                             </Badge>
                         );
@@ -68,12 +81,23 @@ export default function CrudTable({
                         );
 
                     case 'nama_barang': {
-                        const namaLengkap = [barang.brand, barang.tipe, barang.kategori].filter(Boolean).join(' ');
-                        const hasilNama = namaLengkap || barang.nama_barang || '-';
+                        const brandNama = barang.brand || barang.nama_barang || '-';
+                        const subDeskripsi = [barang.tipe, barang.kategori].filter(Boolean).join(' • ');
+
                         return (
-                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate block max-w-[200px]" title={hasilNama}>
-                                {hasilNama}
-                            </span>
+                            <div 
+                                className="flex flex-col justify-center max-w-[210px] leading-tight"
+                                title={`${brandNama}${subDeskripsi ? ` (${subDeskripsi})` : ''}`}
+                            >
+                                <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+                                    {brandNama}
+                                </span>
+                                {subDeskripsi && (
+                                    <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                        {subDeskripsi}
+                                    </span>
+                                )}
+                            </div>
                         );
                     }
 

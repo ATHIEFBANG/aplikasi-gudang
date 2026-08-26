@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { router } from '@inertiajs/react';
 
+// --- Komponen Dropdown Select Shadcn UI ---
 const SelectDropdown = ({ value, options = [], onChange, placeholder = "Pilih...", disabled = false, triggerClassName = '' }) => {
     const selected = options.find(o => String(o.value) === String(value));
     return (
@@ -155,7 +156,6 @@ export default function ModalTransaksi({
         }
     }, [subJenis, kondisi]);
 
-    // Inisialisasi State Tambah vs Edit
     useEffect(() => {
         if (isOpen) {
             if (isEditMode && selectedItem) {
@@ -331,34 +331,34 @@ export default function ModalTransaksi({
                 <div className="flex items-center gap-2">
                     <Badge 
                         variant="secondary" 
-                        className="bg-slate-800 text-slate-200 border border-slate-700 text-[11px] font-mono font-bold px-2.5 py-0.5"
+                        className="bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-[11px] font-mono font-bold px-2.5 py-0.5"
                     >
                         MODE: {subJenis.replace('_', ' ')}
                     </Badge>
                 </div>
             }
         >
-            <Alert className="shrink-0 mb-3 bg-blue-950/40 border-blue-800/60 text-blue-300 p-2.5 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+            <Alert className="shrink-0 mb-3 bg-blue-50 border border-blue-200 text-blue-900 dark:bg-blue-950/40 dark:border-blue-800/60 dark:text-blue-300 p-2.5 flex items-start gap-2 rounded-xl">
+                <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                 <AlertDescription className="text-[11px] leading-relaxed">
                     <strong>Pencatatan Stok Masuk:</strong> Pastikan rincian item, kuantitas, dokumen IMC/OMC, dan tujuan gudang telah sesuai dengan barang fisik.
                 </AlertDescription>
             </Alert>
 
             <div className="space-y-4">
-                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 relative space-y-3">
+                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 relative space-y-3">
                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
                         <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
                             <PackageCheck className="w-4 h-4" /> {isEditMode ? 'Formulir Edit Data Transaksi' : 'Formulir Rincian Barang Masuk'}
                         </span>
-                        <span className="text-[11px] text-slate-400 font-mono">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                             Status Item: <strong className="text-blue-600 dark:text-blue-400 font-bold">{statusItemText}</strong>
                         </span>
                     </div>
 
                     {!isEditMode && (
                         <div className="space-y-1 pt-1">
-                            <Label className="text-[11px] font-medium">Jenis Penerimaan *</Label>
+                            <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Jenis Penerimaan *</Label>
                             <div className="flex flex-wrap items-center gap-2">
                                 {categories.map((cat) => {
                                     const Icon = cat.icon;
@@ -370,7 +370,7 @@ export default function ModalTransaksi({
                                             onClick={() => setSubJenis(cat.id)}
                                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                                                 isSelected
-                                                    ? 'bg-blue-600 text-white border-blue-500 shadow-xs'
+                                                    ? 'bg-blue-600 text-white border-blue-500 shadow-2xs'
                                                     : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
                                             }`}
                                         >
@@ -385,8 +385,9 @@ export default function ModalTransaksi({
                     )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        {/* 1. KODE PPL */}
                         <div className="space-y-1">
-                            <Label className="text-[11px] font-medium">Kode PPL *</Label>
+                            <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Kode PPL *</Label>
                             <SelectDropdown
                                 value={selectedBarangId}
                                 options={barangPplOptions}
@@ -397,8 +398,9 @@ export default function ModalTransaksi({
                             />
                         </div>
 
+                        {/* 2. NAMA BARANG */}
                         <div className="space-y-1">
-                            <Label className="text-[11px] font-medium">Nama Barang *</Label>
+                            <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Nama Barang *</Label>
                             <SelectDropdown
                                 value={selectedBarangId}
                                 options={barangNamaOptions}
@@ -408,6 +410,7 @@ export default function ModalTransaksi({
                             />
                         </div>
 
+                        {/* 3. PART NUMBER ORIGINAL */}
                         <div className="space-y-1">
                             <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                                 Part Number Original
@@ -420,6 +423,7 @@ export default function ModalTransaksi({
                             />
                         </div>
 
+                        {/* 4. SATUAN / UNIT */}
                         <div className="space-y-1">
                             <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                                 Satuan / Unit *
@@ -431,21 +435,30 @@ export default function ModalTransaksi({
                             />
                         </div>
 
+                        {/* 5. TANGGAL TRANSAKSI (ANTI-KEDIP) */}
                         <div className="space-y-1">
-                            <Label className="text-[11px] font-medium">Tanggal Transaksi *</Label>
+                            <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Tanggal Transaksi *</Label>
                             <Input
                                 type="date"
                                 disabled={isProcessing}
                                 value={tanggal}
+                                onClick={(e) => {
+                                    try {
+                                        if (typeof e.target.showPicker === 'function') {
+                                            e.target.showPicker();
+                                        }
+                                    } catch (err) {}
+                                }}
                                 onChange={(e) => setTanggal(e.target.value)}
-                                className="h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
                                 required
                             />
                         </div>
 
+                        {/* 6. QUANTITY */}
                         <div className="space-y-1">
                             <div className="flex items-center justify-between">
-                                <Label className="text-[11px] font-medium">Quantity *</Label>
+                                <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Quantity *</Label>
                                 <span className="text-[9px] text-slate-400 font-mono">Maks. 10</span>
                             </div>
                             <Input
@@ -455,13 +468,14 @@ export default function ModalTransaksi({
                                 disabled={isProcessing || isEditMode}
                                 value={qty}
                                 onChange={(e) => handleQtyChange(e.target.value)}
-                                className="h-8 text-xs bg-white dark:bg-slate-900 font-bold border-slate-200 dark:border-slate-700"
+                                className="h-8 text-xs bg-white dark:bg-slate-900 font-bold text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
                                 required
                             />
                         </div>
 
+                        {/* 7. KONDISI FISIK */}
                         <div className="space-y-1">
-                            <Label className="text-[11px] font-medium">Kondisi Fisik *</Label>
+                            <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Kondisi Fisik *</Label>
                             <SelectDropdown
                                 value={kondisi}
                                 options={kondisiOptions}
@@ -471,22 +485,24 @@ export default function ModalTransaksi({
                             />
                         </div>
 
+                        {/* 8. NOMOR IMC */}
                         <div className="space-y-1">
-                            <Label className="text-[11px] font-medium">Nomor IMC *</Label>
+                            <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Nomor IMC *</Label>
                             <Input
                                 placeholder="Contoh: IMC-00123"
                                 disabled={isProcessing}
                                 value={nomorImc}
                                 onChange={(e) => setNomorImc(e.target.value)}
-                                className="h-8 text-xs bg-white dark:bg-slate-900 font-mono border-slate-200 dark:border-slate-700"
+                                className="h-8 text-xs bg-white dark:bg-slate-900 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
                                 required
                             />
                         </div>
 
+                        {/* 9. ASAL PENGIRIM */}
                         {subJenis === 'TRANSFER_GUDANG' ? (
                             <>
                                 <div className="space-y-1">
-                                    <Label className="text-[11px] font-medium">Gudang Asal*</Label>
+                                    <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Gudang Asal*</Label>
                                     <SelectDropdown
                                         value={gudangAsalId}
                                         options={gudangOptions}
@@ -497,31 +513,32 @@ export default function ModalTransaksi({
                                 </div>
 
                                 <div className="space-y-1">
-                                    <Label className="text-[11px] font-medium">Nomor OMC *</Label>
+                                    <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Nomor OMC *</Label>
                                     <Input
                                         placeholder="Contoh: OMC-2026-01"
                                         disabled={isProcessing}
                                         value={nomorOmc}
                                         onChange={(e) => setNomorOmc(e.target.value)}
-                                        className="h-8 text-xs bg-white dark:bg-slate-900 font-mono border-slate-200 dark:border-slate-700"
+                                        className="h-8 text-xs bg-white dark:bg-slate-900 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
                                         required
                                     />
                                 </div>
                             </>
                         ) : (
                             <div className="space-y-1 sm:col-span-2">
-                                <Label className="text-[11px] font-medium">{getPihakAsalLabel()}</Label>
+                                <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">{getPihakAsalLabel()}</Label>
                                 <Input
                                     placeholder="Nama supplier atau pihak terkait..."
                                     disabled={isProcessing}
                                     value={pihakAsal}
                                     onChange={(e) => setPihakAsal(e.target.value)}
-                                    className="h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                    className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
                                     required
                                 />
                             </div>
                         )}
 
+                        {/* 10. GUDANG TUJUAN */}
                         <div className="space-y-1 sm:col-span-2">
                             <Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                                 Gudang Tujuan (Penerima Fisik) *
@@ -536,6 +553,7 @@ export default function ModalTransaksi({
                             />
                         </div>
 
+                        {/* 11. GRID INPUT SERIAL NUMBER */}
                         {isWajibSn && !isEditMode && (
                             <div className="space-y-2 col-span-1 sm:col-span-2 lg:col-span-4 pt-2 border-t border-slate-200 dark:border-slate-700">
                                 <div className="flex items-center justify-between">
@@ -550,10 +568,10 @@ export default function ModalTransaksi({
                                     </span>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-44 overflow-y-auto p-1.5 bg-white/40 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-44 overflow-y-auto p-1.5 bg-white/60 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700">
                                     {serials.map((sn, idx) => (
                                         <div key={idx} className="space-y-0.5">
-                                            <Label className="text-[10px] text-slate-400 font-mono">
+                                            <Label className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                                 SN Unit #{idx + 1}
                                             </Label>
                                             <Input
@@ -561,7 +579,7 @@ export default function ModalTransaksi({
                                                 disabled={isProcessing}
                                                 value={sn}
                                                 onChange={(e) => handleSerialChange(idx, e.target.value)}
-                                                className="h-8 text-xs bg-white dark:bg-slate-900 font-mono border-slate-200 dark:border-slate-700"
+                                                className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-mono border-slate-200 dark:border-slate-700"
                                                 required
                                             />
                                         </div>
