@@ -21,6 +21,19 @@ export default function ModalBarang({
     const [editData, setEditData] = useState({});
     const [addItems, setAddItems] = useState([]);
 
+    // Helper Otomatisasi Format Kode PPL (PPL + Maks 8 Digit Angka)
+    const formatKodePPL = (input = '') => {
+        if (!input) return '';
+        const upper = input.toUpperCase();
+        // Ambil murni angka saja dan batasi maksimal 8 digit
+        const digits = upper.replace(/[^0-9]/g, '').slice(0, 8);
+        
+        if (digits.length === 0) {
+            return upper.startsWith('PPL') ? 'PPL' : '';
+        }
+        return `PPL${digits}`;
+    };
+
     const createEmptyRow = useCallback(() => ({
         kode_barang: '',
         brand: '',
@@ -39,7 +52,7 @@ export default function ModalBarang({
             if (isEditMode && selectedItem) {
                 setEditData({
                     id: selectedItem.id,
-                    kode_barang: selectedItem.kode_barang || '',
+                    kode_barang: formatKodePPL(selectedItem.kode_barang || ''),
                     brand: selectedItem.brand || '',
                     tipe: selectedItem.tipe || '',
                     kategori: selectedItem.kategori || '',
@@ -74,7 +87,7 @@ export default function ModalBarang({
             const cells = rowStr.split('\t').map(c => c.trim().replace(/^"(.*)"$/, '$1'));
             const rowObj = createEmptyRow();
             
-            rowObj.kode_barang = cells[0] ?? '';
+            rowObj.kode_barang = formatKodePPL(cells[0] ?? '');
             rowObj.brand       = cells[1] ?? '';
             rowObj.tipe        = cells[2] ?? '';
             rowObj.kategori    = cells[3] ?? '';
@@ -83,7 +96,6 @@ export default function ModalBarang({
             rowObj.satuan      = cells[5] ?? '';
             rowObj.deskripsi   = cells[5] ?? '';
             
-            // Cek status SN & PN dari paste Excel
             if (cells[6]) {
                 const c6 = String(cells[6]).toLowerCase();
                 rowObj.is_wajib_sn = c6.includes('ya') || c6 === '1' || c6.includes('sn');
@@ -140,7 +152,8 @@ export default function ModalBarang({
     const handleAddItemChange = useCallback((index, field, value) => {
         setAddItems(prev => {
             const updated = [...prev];
-            updated[index] = { ...updated[index], [field]: value };
+            const finalVal = field === 'kode_barang' ? formatKodePPL(value) : value;
+            updated[index] = { ...updated[index], [field]: finalVal };
             
             if (field === 'part_number' && !updated[index].nama_barang) {
                 updated[index].nama_barang = value;
@@ -152,7 +165,6 @@ export default function ModalBarang({
         });
     }, []);
 
-    // TOGGLE SN: Berdiri sendiri tanpa mematikan PN
     const handleToggleSN = (index = null) => {
         if (isEditMode) {
             setEditData(prev => ({ ...prev, is_wajib_sn: !prev.is_wajib_sn }));
@@ -165,7 +177,6 @@ export default function ModalBarang({
         }
     };
 
-    // TOGGLE PN: Berdiri sendiri tanpa mematikan SN
     const handleTogglePN = (index = null) => {
         if (isEditMode) {
             setEditData(prev => {
@@ -201,12 +212,12 @@ export default function ModalBarang({
         e?.preventDefault();
 
         if (isEditMode) {
-            if (!editData.kode_barang || editData.kode_barang.trim().length < 8) {
-                alert('Kode PPL minimal harus 8 karakter (contoh: PPL89043758).');
+            if (!editData.kode_barang || editData.kode_barang.length !== 11) {
+                alert('Kode PPL harus berformat PPL diikuti 8 digit angka (contoh: PPL01000701).');
                 return;
             }
             if (!editData.brand?.trim() || !editData.tipe?.trim() || !editData.kategori?.trim() || !editData.satuan?.trim()) {
-                alert('Harap lengkapi semua formulir utama (Brand, Tipe, Kategori, Satuan).');
+                alert('Harap lengkapi formulir utama (Brand, Tipe, Kategori, Satuan).');
                 return;
             }
             if (editData.is_wajib_pn && !editData.part_number?.trim()) {
@@ -239,8 +250,8 @@ export default function ModalBarang({
         } else {
             for (let i = 0; i < addItems.length; i++) {
                 const item = addItems[i];
-                if (!item.kode_barang || item.kode_barang.trim().length < 8) {
-                    alert(`Baris #${i + 1}: Kode PPL minimal harus 8 karakter (contoh: PPL89043758).`);
+                if (!item.kode_barang || item.kode_barang.length !== 11) {
+                    alert(`Baris #${i + 1}: Kode PPL harus berformat PPL diikuti 8 digit angka (contoh: PPL01000701).`);
                     return;
                 }
                 if (!item.brand?.trim() || !item.tipe?.trim() || !item.kategori?.trim() || !item.satuan?.trim()) {
@@ -348,15 +359,17 @@ export default function ModalBarang({
                         /* MODE EDIT SINGLE */
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
                             <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold">Kode PPL (Min. 8 Karakter) *</Label>
+                                <Label className="text-xs font-semibold">Kode PPL (8 Digit Angka) *</Label>
                                 <Input 
                                     disabled={isProcessing} 
-                                    minLength={8}
+                                    maxLength={11}
                                     value={editData.kode_barang || ''} 
-                                    onChange={(e) => setEditData({ ...editData, kode_barang: e.target.value })} 
-                                    placeholder="Contoh: PPL89043758" 
+                                    onChange={(e) => setEditData({ ...editData, kode_barang: formatKodePPL(e.target.value) })} 
+                                    placeholder="Contoh: PPL01000701" 
+                                    className="font-mono font-bold"
                                     required 
                                 />
+                                <p className="text-[10px] text-slate-400">Otomatis berawalan PPL + maks 8 digit angka</p>
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold">Brand / Merk *</Label>
@@ -408,7 +421,7 @@ export default function ModalBarang({
                                 <div className="flex items-center justify-between">
                                     <Label className="text-xs font-semibold">Keterangan SN / PN</Label>
                                     <span className="text-[10px] text-slate-400">
-                                        Status saat ini:{' '}
+                                        Status:{' '}
                                         <strong className="text-blue-600 dark:text-blue-400">
                                             {getStatusText(editData.is_wajib_sn, editData.is_wajib_pn)}
                                         </strong>
@@ -484,8 +497,16 @@ export default function ModalBarang({
                                     
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                         <div className="space-y-1">
-                                            <Label className="text-[11px] font-medium">Kode PPL (Min. 8 Karakter) *</Label>
-                                            <Input disabled={isProcessing} minLength={8} value={item.kode_barang} onChange={(e) => handleAddItemChange(idx, 'kode_barang', e.target.value)} placeholder="PPL89043758" className="h-8 text-xs bg-white dark:bg-slate-900 font-mono font-bold" required />
+                                            <Label className="text-[11px] font-medium">Kode PPL (8 Digit Angka) *</Label>
+                                            <Input 
+                                                disabled={isProcessing} 
+                                                maxLength={11}
+                                                value={item.kode_barang} 
+                                                onChange={(e) => handleAddItemChange(idx, 'kode_barang', e.target.value)} 
+                                                placeholder="Ketik angka, misal: 01000701" 
+                                                className="h-8 text-xs bg-white dark:bg-slate-900 font-mono font-bold" 
+                                                required 
+                                            />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-[11px] font-medium">Brand / Merk *</Label>
@@ -501,7 +522,7 @@ export default function ModalBarang({
                                         </div>
                                         <div className="space-y-1 sm:col-span-2 lg:col-span-2">
                                             <Label className="text-[11px] font-medium">Satuan *</Label>
-                                            <Input list="list-satuan" disabled={isProcessing} value={item.satuan} onChange={(e) => handleAddItemChange(idx, 'satuan', e.target.value)} placeholder="Ketik Satuan (Pcs, Box, Roll, Meter, dll)" className="h-8 text-xs bg-white dark:bg-slate-900" required />
+                                            <Input list="list-satuan" disabled={isProcessing} value={item.satuan} onChange={(e) => handleAddItemChange(idx, 'satuan', e.target.value)} placeholder="Ketik Satuan (Pcs, Box, Roll, Meter, Batang, dll)" className="h-8 text-xs bg-white dark:bg-slate-900" required />
                                         </div>
 
                                         {/* TOGGLE INDEPENDEN SN & PN MULTI-ROW */}

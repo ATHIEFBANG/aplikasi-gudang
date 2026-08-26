@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import InputError from '@/components/InputError';
+import ApplicationLogo from '@/components/ApplicationLogo';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
-    Signal, 
     Lock, 
     Mail, 
     Eye, 
     EyeOff,
     Wifi,
     BatteryCharging,
-    Server,
-    Activity,
-    Folder,
+    Boxes,
+    Truck,
+    Warehouse,
     Volume2,
     Search,
-    ShieldCheck,
-    Image as ImageIcon
+    Image as ImageIcon,
+    LayoutGrid
 } from 'lucide-react';
 
 export default function Login({ status, canResetPassword }) {
@@ -28,7 +28,7 @@ export default function Login({ status, canResetPassword }) {
     const [currentDate, setCurrentDate] = useState('');
     const [bgIndex, setBgIndex] = useState(0);
 
-    // Real-time clock & date for Windows Taskbar
+    // Real-time clock & date
     useEffect(() => {
         const updateClock = () => {
             const now = new Date();
@@ -40,7 +40,7 @@ export default function Login({ status, canResetPassword }) {
         return () => clearInterval(interval);
     }, []);
 
-    // Auto-switch background wallpaper every 7 seconds
+    // Auto-switch background wallpaper
     useEffect(() => {
         const bgTimer = setInterval(() => {
             setBgIndex((prev) => (prev + 1) % 3);
@@ -62,230 +62,227 @@ export default function Login({ status, canResetPassword }) {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-hidden font-sans selection:bg-red-600 selection:text-white">
-            <Head title="Login - Mitratel Desktop" />
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
+            <Head title="Login - System Gudang" />
 
-            {/* CUSTOM ANIMATION STYLES UNTUK GRAFIK BERGERAK */}
+            {/* ANIMASI CSS TERORGANISIR */}
             <style>{`
-                @keyframes flowLine {
-                    0% { stroke-dashoffset: 100; }
+                @keyframes conveyorTrack {
+                    0% { stroke-dashoffset: 24; }
                     100% { stroke-dashoffset: 0; }
                 }
-                @keyframes scanMove {
-                    0% { transform: translateX(10px); opacity: 0.2; }
-                    50% { opacity: 0.8; }
-                    100% { transform: translateX(320px); opacity: 0.2; }
+                @keyframes scanLine {
+                    0% { transform: translateY(0px); opacity: 0.2; }
+                    50% { opacity: 1; }
+                    100% { transform: translateY(140px); opacity: 0.2; }
                 }
-                @keyframes signalRipple {
-                    0% { r: 5px; opacity: 0.9; stroke-width: 2px; }
-                    100% { r: 75px; opacity: 0; stroke-width: 0.5px; }
+                @keyframes pulseData {
+                    0%, 100% { opacity: 0.3; }
+                    50% { opacity: 0.9; }
                 }
-                @keyframes packetFlow {
-                    0% { offset-distance: 0%; }
-                    100% { offset-distance: 100%; }
+                .animate-conveyor-track {
+                    stroke-dasharray: 6 6;
+                    animation: conveyorTrack 1s linear infinite;
                 }
-                .animate-flow-dash {
-                    stroke-dasharray: 12 6;
-                    animation: flowLine 2s linear infinite;
+                .animate-scan-line {
+                    animation: scanLine 2.5s ease-in-out infinite alternate;
                 }
-                .animate-scanline {
-                    animation: scanMove 4s ease-in-out infinite alternate;
-                }
-                .animate-ripple-1 {
-                    animation: signalRipple 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
-                }
-                .animate-ripple-2 {
-                    animation: signalRipple 3s cubic-bezier(0.1, 0.8, 0.3, 1) 1.5s infinite;
+                .animate-pulse-data {
+                    animation: pulseData 2s ease-in-out infinite;
                 }
             `}</style>
 
-            {/* LOGO & BRAND MITRATEL (POJOK KIRI ATAS HALAMAN) */}
+            {/* LOGO UTAMA (PANCA PILAR LAKSANA) */}
             <Link 
                 href="/" 
-                className="absolute top-6 left-6 sm:top-8 sm:left-8 z-50 flex items-center gap-2.5 group transition-transform duration-200 hover:scale-105"
+                className="absolute top-6 left-6 sm:top-8 sm:left-8 z-50 flex items-center gap-3 transition-transform duration-200 hover:scale-105"
                 title="Kembali ke Halaman Utama"
             >
-                <div className="p-2 bg-red-600 text-white rounded-xl shadow-lg shadow-red-600/30 group-hover:bg-red-500 transition-colors">
-                    <Signal className="w-5 h-5" />
-                </div>
-                <div>
-                    <h2 className="font-bold text-white text-base tracking-wider uppercase leading-none">
-                        Mitratel
-                    </h2>
-                    <span className="text-[10px] text-slate-400 font-medium group-hover:text-slate-300 transition-colors">
-                        Enterprise System
-                    </span>
-                </div>
+                <ApplicationLogo className="h-10 sm:h-12 w-auto text-sky-300 fill-current drop-shadow-[0_0_18px_rgba(56,189,248,0.85)]" />
             </Link>
 
-            {/* AMBIENT LIGHTING OUTSIDE LAPTOP */}
-            <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 blur-[140px] rounded-full pointer-events-none animate-pulse duration-[5000ms]" />
-            <div className="absolute bottom-1/3 right-1/3 translate-x-1/2 translate-y-1/2 w-[450px] h-[450px] bg-rose-700/10 blur-[130px] rounded-full pointer-events-none" />
+            {/* AMBIENT LIGHTING */}
+            <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/15 blur-[140px] rounded-full pointer-events-none animate-pulse duration-[5000ms]" />
+            <div className="absolute bottom-1/3 right-1/3 translate-x-1/2 translate-y-1/2 w-[450px] h-[450px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none" />
 
             {/* LAPTOP MOCKUP CONTAINER */}
             <div className="w-full max-w-4xl relative z-10 my-auto pt-12 sm:pt-0">
-                
-                {/* 1. SCREEN FRAME (BEZEL) */}
                 <div className="bg-slate-900 border border-slate-700/80 rounded-t-2xl p-2.5 sm:p-3.5 shadow-2xl relative z-20">
                     
                     {/* Webcam Notch */}
                     <div className="flex justify-center items-center pb-2 pt-0.5">
                         <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-950 border border-slate-800">
                             <div className="w-2 h-2 rounded-full bg-slate-800" />
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                         </div>
                     </div>
 
-                    {/* ========================================================================= */}
-                    {/* INNER DISPLAY - WINDOWS DESKTOP OS CANVAS */}
-                    {/* ========================================================================= */}
+                    {/* INNER DISPLAY */}
                     <div className="relative w-full min-h-[480px] sm:min-h-[520px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800/80 flex flex-col justify-between">
                         
-                        {/* --------------------------------------------------------------------- */}
-                        {/* MAIN WORKSPACE: ANIMATED GRAPHIC BACKGROUNDS & FORM */}
-                        {/* --------------------------------------------------------------------- */}
+                        {/* WORKSPACE */}
                         <div className="relative flex-1 py-6 px-6 sm:px-10 md:px-12 flex items-center justify-between overflow-hidden">
                             
-                            {/* LAYER BACKGROUND GRAFIK ANIMASI SEMENTARA */}
+                            {/* BACKGROUND ANIMASI GRAFIK GUDANG */}
                             <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
-                                {/* Grid Base Pattern */}
                                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b20_1px,transparent_1px),linear-gradient(to_bottom,#1e293b20_1px,transparent_1px)] bg-[size:32px_32px] z-10" />
 
-                                {/* BACKGROUND TEMA 1: RED LIVE TOWER & SCANNING GRAPH */}
+                                {/* TEMA 1: RAK & CONVEYOR BELT */}
                                 <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${bgIndex === 0 ? 'opacity-100' : 'opacity-0'}`}>
-                                    <div className="absolute right-10 top-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-red-600/15 rounded-full blur-3xl" />
+                                    <div className="absolute right-10 top-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-blue-600/15 rounded-full blur-3xl" />
                                     
-                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-40">
-                                        <svg viewBox="0 0 380 300" className="w-full h-auto max-h-[350px] drop-shadow-[0_0_20px_rgba(239,68,68,0.25)]">
-                                            <defs>
-                                                <linearGradient id="areaGlowRed" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#ef4444" stopOpacity="0.35" />
-                                                    <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
-                                                </linearGradient>
-                                                <linearGradient id="scanGradient" x1="0" y1="0" x2="1" y2="0">
-                                                    <stop offset="0%" stopColor="#ef4444" stopOpacity="0" />
-                                                    <stop offset="100%" stopColor="#ef4444" stopOpacity="0.8" />
-                                                </linearGradient>
-                                            </defs>
-
-                                            {/* Ripple Waves dari Puncak Menara */}
-                                            <circle cx="190" cy="45" r="10" fill="none" stroke="#ef4444" className="animate-ripple-1" />
-                                            <circle cx="190" cy="45" r="10" fill="none" stroke="#ef4444" className="animate-ripple-2" />
-
-                                            {/* Radar Ring */}
-                                            <circle cx="190" cy="150" r="100" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
-                                            <circle cx="190" cy="150" r="70" fill="none" stroke="#ef4444" strokeWidth="1" className="animate-spin duration-[20s]" strokeDasharray="8 8" />
-
-                                            {/* Menara Telekomunikasi */}
-                                            <g stroke="#f43f5e" strokeLinecap="round">
-                                                <line x1="190" y1="45" x2="155" y2="235" strokeWidth="2" />
-                                                <line x1="190" y1="45" x2="225" y2="235" strokeWidth="2" />
-                                                <line x1="178" y1="95" x2="202" y2="95" strokeWidth="1.5" />
-                                                <line x1="170" y1="145" x2="210" y2="145" strokeWidth="1.5" />
-                                                <line x1="162" y1="195" x2="218" y2="195" strokeWidth="1.5" />
-                                                <circle cx="190" cy="45" r="4.5" fill="#ef4444" className="animate-pulse" />
+                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-55">
+                                        <svg viewBox="0 0 440 300" className="w-full h-auto max-h-[360px]">
+                                            <g stroke="#334155" strokeWidth="1.5" fill="none">
+                                                <rect x="40" y="40" width="160" height="180" rx="4" stroke="#1e293b" strokeWidth="2" />
+                                                <line x1="40" y1="100" x2="200" y2="100" stroke="#2563eb" strokeWidth="1.5" />
+                                                <line x1="40" y1="160" x2="200" y2="160" stroke="#2563eb" strokeWidth="1.5" />
+                                                
+                                                <line x1="93" y1="40" x2="93" y2="220" stroke="#1e293b" strokeDasharray="3 3" />
+                                                <line x1="146" y1="40" x2="146" y2="220" stroke="#1e293b" strokeDasharray="3 3" />
                                             </g>
 
-                                            {/* Scanning Bar Vertikal Bergerak Kiri-Kanan */}
-                                            <rect x="20" y="40" width="30" height="200" fill="url(#scanGradient)" className="animate-scanline" />
+                                            <g fill="#0f172a" stroke="#3b82f6" strokeWidth="1.5">
+                                                <rect x="48" y="65" width="38" height="30" rx="3" />
+                                                <rect x="101" y="65" width="38" height="30" rx="3" fill="#1e293b" stroke="#f59e0b" />
+                                                <rect x="154" y="125" width="38" height="30" rx="3" />
+                                                <rect x="48" y="185" width="38" height="30" rx="3" fill="#1e293b" stroke="#3b82f6" />
+                                                <rect x="101" y="185" width="38" height="30" rx="3" stroke="#f59e0b" />
+                                            </g>
 
-                                            {/* Grafik Sinyal Yang Beneran Mengalir (Flowing Wave) */}
-                                            <path d="M 20 200 Q 70 130 110 170 T 190 90 T 270 150 T 360 100 L 360 240 L 20 240 Z" fill="url(#areaGlowRed)" />
-                                            <path d="M 20 200 Q 70 130 110 170 T 190 90 T 270 150 T 360 100" fill="none" stroke="#ef4444" strokeWidth="2.5" className="animate-flow-dash" />
+                                            <g transform="translate(48, 48)">
+                                                <rect x="0" y="0" width="45" height="12" rx="2" fill="#1e293b" stroke="#334155" strokeWidth="1" />
+                                                <text x="22.5" y="8.5" textAnchor="middle" fill="#94a3b8" fontSize="7" fontStyle="monospace" fontWeight="bold">BAY A-01</text>
+                                            </g>
+
+                                            <g>
+                                                <line x1="200" y1="190" x2="400" y2="190" stroke="#0284c7" strokeWidth="2" />
+                                                <line x1="200" y1="190" x2="400" y2="190" stroke="#fbbf24" strokeWidth="2" className="animate-conveyor-track" />
+                                                
+                                                {[220, 250, 280, 310, 340, 370].map((cx, i) => (
+                                                    <circle key={i} cx={cx} cy={195} r="3" fill="#0f172a" stroke="#38bdf8" strokeWidth="1" />
+                                                ))}
+
+                                                <g transform="translate(260, 155)">
+                                                    <rect x="0" y="0" width="40" height="32" rx="4" fill="#1e293b" stroke="#3b82f6" strokeWidth="1.5" />
+                                                    <path d="M 0 10 L 40 10" stroke="#3b82f6" strokeWidth="1" />
+                                                    <rect x="14" y="16" width="12" height="8" rx="1" fill="#2563eb" />
+                                                </g>
+
+                                                <g transform="translate(340, 155)">
+                                                    <rect x="0" y="0" width="40" height="32" rx="4" fill="#0f172a" stroke="#f59e0b" strokeWidth="1.5" />
+                                                    <path d="M 0 10 L 40 10" stroke="#f59e0b" strokeWidth="1" />
+                                                    <circle cx="20" cy="20" r="4" fill="#fbbf24" className="animate-ping" />
+                                                </g>
+                                            </g>
                                         </svg>
                                     </div>
                                 </div>
 
-                                {/* BACKGROUND TEMA 2: CYAN FIBER OPTIC STREAMING DATA */}
+                                {/* TEMA 2: TELEMETRI & RFID HUD */}
                                 <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${bgIndex === 1 ? 'opacity-100' : 'opacity-0'}`}>
-                                    <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-sky-500/15 rounded-full blur-3xl" />
+                                    <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-amber-500/15 rounded-full blur-3xl" />
                                     
-                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-40">
-                                        <svg viewBox="0 0 380 300" className="w-full h-auto max-h-[350px] drop-shadow-[0_0_20px_rgba(56,189,248,0.25)]">
-                                            <defs>
-                                                <linearGradient id="areaGlowCyan" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                                                    <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
-                                                </linearGradient>
-                                            </defs>
+                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-55">
+                                        <svg viewBox="0 0 440 300" className="w-full h-auto max-h-[360px]">
+                                            <g transform="translate(100, 50)">
+                                                <path d="M 0 20 L 0 0 L 20 0" stroke="#f59e0b" strokeWidth="2" fill="none" />
+                                                <path d="M 220 0 L 240 0 L 240 20" stroke="#f59e0b" strokeWidth="2" fill="none" />
+                                                <path d="M 0 160 L 0 180 L 20 180" stroke="#f59e0b" strokeWidth="2" fill="none" />
+                                                <path d="M 220 180 L 240 180 L 240 160" stroke="#f59e0b" strokeWidth="2" fill="none" />
 
-                                            {/* Aliran Jalur Kabel Fiber Optik */}
-                                            <path d="M 10 100 Q 100 200 190 120 T 370 180" fill="none" stroke="#0284c7" strokeWidth="1.5" strokeDasharray="4 4" />
-                                            <path d="M 10 140 Q 120 80 200 160 T 370 110" fill="none" stroke="#38bdf8" strokeWidth="2.5" className="animate-flow-dash" />
+                                                <rect x="35" y="25" width="170" height="130" rx="6" fill="#0f172a" stroke="#334155" strokeWidth="1.5" strokeDasharray="4 4" />
+                                                
+                                                <g transform="translate(60, 50)">
+                                                    {[0, 8, 14, 26, 34, 40, 52, 64, 72, 80, 92, 100, 110].map((x, i) => (
+                                                        <rect key={i} x={x} y="0" width={i % 3 === 0 ? 5 : 2} height="45" fill={i % 2 === 0 ? "#60a5fa" : "#fbbf24"} />
+                                                    ))}
+                                                    <text x="60" y="60" textAnchor="middle" fill="#94a3b8" fontSize="8" fontStyle="monospace">SYS-RFID-9942-X</text>
+                                                </g>
 
-                                            {/* Pulse Node Points */}
-                                            <circle cx="200" cy="160" r="6" fill="#38bdf8" className="animate-ping" />
-                                            <circle cx="120" cy="80" r="4" fill="#0284c7" />
-                                            <circle cx="290" cy="135" r="5" fill="#38bdf8" className="animate-pulse" />
+                                                <g className="animate-scan-line" transform="translate(15, 20)">
+                                                    <line x1="0" y1="0" x2="210" y2="0" stroke="#fbbf24" strokeWidth="2" />
+                                                    <rect x="0" y="0" width="210" height="12" fill="url(#scanGlow)" opacity="0.4" />
+                                                </g>
 
-                                            {/* Equalizer Bar Bergerak */}
-                                            <g fill="#38bdf8" opacity="0.6">
-                                                <rect x="50" y="180" width="4" height="40" className="animate-pulse" />
-                                                <rect x="60" y="160" width="4" height="60" className="animate-pulse" style={{ animationDelay: '0.2s' }} />
-                                                <rect x="70" y="190" width="4" height="30" className="animate-pulse" style={{ animationDelay: '0.4s' }} />
-                                                <rect x="80" y="150" width="4" height="70" className="animate-pulse" style={{ animationDelay: '0.1s' }} />
+                                                <g transform="translate(45, 125)" className="animate-pulse-data">
+                                                    <rect x="0" y="0" width="70" height="18" rx="3" fill="#1e293b" stroke="#3b82f6" strokeWidth="1" />
+                                                    <text x="35" y="12" textAnchor="middle" fill="#60a5fa" fontSize="8" fontStyle="monospace" fontWeight="bold">STATUS: OK</text>
+                                                    
+                                                    <rect x="80" y="0" width="70" height="18" rx="3" fill="#1e293b" stroke="#f59e0b" strokeWidth="1" />
+                                                    <text x="115" y="12" textAnchor="middle" fill="#fbbf24" fontSize="8" fontStyle="monospace" fontWeight="bold">MATCH: 100%</text>
+                                                </g>
                                             </g>
 
-                                            {/* Area Wave */}
-                                            <path d="M 30 220 Q 100 150 180 210 T 350 160 L 350 260 L 30 260 Z" fill="url(#areaGlowCyan)" />
+                                            <defs>
+                                                <linearGradient id="scanGlow" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.8" />
+                                                    <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
+                                                </linearGradient>
+                                            </defs>
                                         </svg>
                                     </div>
                                 </div>
 
-                                {/* BACKGROUND TEMA 3: EMERALD 5G MATRIX & NETWORK NODES */}
+                                {/* TEMA 3: ALUR ISOMETRIK PALET */}
                                 <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${bgIndex === 2 ? 'opacity-100' : 'opacity-0'}`}>
-                                    <div className="absolute right-10 bottom-10 w-[450px] h-[450px] bg-emerald-500/15 rounded-full blur-3xl" />
+                                    <div className="absolute right-10 bottom-10 w-[450px] h-[450px] bg-blue-500/15 rounded-full blur-3xl" />
                                     
-                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-40">
-                                        <svg viewBox="0 0 380 300" className="w-full h-auto max-h-[350px] drop-shadow-[0_0_20px_rgba(52,211,153,0.25)]">
-                                            <defs>
-                                                <linearGradient id="areaGlowEmerald" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#34d399" stopOpacity="0.4" />
-                                                    <stop offset="100%" stopColor="#34d399" stopOpacity="0.0" />
-                                                </linearGradient>
-                                            </defs>
+                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center opacity-45">
+                                        <svg viewBox="0 0 400 300" className="w-full h-auto max-h-[360px]">
+                                            <g transform="translate(140, 90)">
+                                                <polygon points="40,0 80,20 40,40 0,20" fill="#3b82f6" opacity="0.8" stroke="#60a5fa" strokeWidth="1" />
+                                                <polygon points="0,20 40,40 40,80 0,60" fill="#1d4ed8" opacity="0.9" stroke="#3b82f6" strokeWidth="1" />
+                                                <polygon points="40,40 80,20 80,60 40,80" fill="#1e40af" stroke="#3b82f6" strokeWidth="1" />
+                                            </g>
 
-                                            {/* Rotating Hexagon Network Mesh */}
-                                            <polygon points="190,40 280,100 280,200 190,260 100,200 100,100" fill="none" stroke="#059669" strokeWidth="1.5" strokeDasharray="6 6" className="animate-spin duration-[30s]" />
-                                            <polygon points="190,70 250,110 250,180 190,220 130,180 130,110" fill="none" stroke="#34d399" strokeWidth="2" className="animate-flow-dash" />
+                                            <g transform="translate(200, 120)">
+                                                <polygon points="40,0 80,20 40,40 0,20" fill="#fbbf24" opacity="0.9" stroke="#fef08a" strokeWidth="1" />
+                                                <polygon points="0,20 40,40 40,80 0,60" fill="#d97706" opacity="0.9" stroke="#fbbf24" strokeWidth="1" />
+                                                <polygon points="40,40 80,20 80,60 40,80" fill="#b45309" stroke="#fbbf24" strokeWidth="1" />
+                                            </g>
 
-                                            {/* Central Core Signal Ripple */}
-                                            <circle cx="190" cy="145" r="8" fill="#10b981" className="animate-ping" />
-                                            <circle cx="190" cy="145" r="10" fill="none" stroke="#34d399" className="animate-ripple-1" />
+                                            <g transform="translate(80, 150)">
+                                                <polygon points="40,0 80,20 40,40 0,20" fill="#0284c7" opacity="0.8" stroke="#38bdf8" strokeWidth="1" />
+                                                <polygon points="0,20 40,40 40,80 0,60" fill="#0369a1" stroke="#0284c7" strokeWidth="1" />
+                                                <polygon points="40,40 80,20 80,60 40,80" fill="#075985" stroke="#0284c7" strokeWidth="1" />
+                                            </g>
 
-                                            {/* Dynamic Wave line */}
-                                            <path d="M 40 180 Q 110 230 190 145 T 340 210" fill="none" stroke="#34d399" strokeWidth="2.5" className="animate-flow-dash" />
-                                            <path d="M 40 180 Q 110 230 190 145 T 340 210 Z" fill="url(#areaGlowEmerald)" />
+                                            <path d="M 120 170 L 180 110 L 240 140 L 310 90" fill="none" stroke="#fbbf24" strokeWidth="2" strokeDasharray="6 4" className="animate-conveyor-track" />
+                                            
+                                            <circle cx="180" cy="110" r="4" fill="#3b82f6" />
+                                            <circle cx="240" cy="140" r="5" fill="#fbbf24" className="animate-ping" />
+                                            <circle cx="310" cy="90" r="4" fill="#3b82f6" />
                                         </svg>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* SHORTCUT DESKTOP ICONS (POJOK KIRI ATAS) */}
+                            {/* SHORTCUT DESKTOP ICONS */}
                             <div className="hidden lg:flex flex-col gap-4 z-10 select-none absolute top-6 left-6 xl:left-8">
                                 <div className="flex flex-col items-center gap-1 group cursor-pointer w-16">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-red-400 group-hover:bg-red-600 group-hover:text-white transition-all shadow-md backdrop-blur-sm">
-                                        <Server className="w-5 h-5" />
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-amber-400 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md backdrop-blur-sm">
+                                        <Boxes className="w-5 h-5" />
                                     </div>
-                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Assets</span>
+                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Stok Barang</span>
                                 </div>
 
                                 <div className="flex flex-col items-center gap-1 group cursor-pointer w-16">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-sky-400 group-hover:bg-sky-600 group-hover:text-white transition-all shadow-md backdrop-blur-sm">
-                                        <Activity className="w-5 h-5" />
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md backdrop-blur-sm">
+                                        <Truck className="w-5 h-5" />
                                     </div>
-                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Maintenance</span>
+                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Logistik</span>
                                 </div>
 
                                 <div className="flex flex-col items-center gap-1 group cursor-pointer w-16">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-md backdrop-blur-sm">
-                                        <Folder className="w-5 h-5" />
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition-all shadow-md backdrop-blur-sm">
+                                        <Warehouse className="w-5 h-5" />
                                     </div>
-                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Data Management</span>
+                                    <span className="text-[10px] text-slate-300 font-medium group-hover:text-white text-center drop-shadow-md">Area Gudang</span>
                                 </div>
                             </div>
 
-                            {/* WALLPAPER SWITCHER INDICATOR (POJOK KANAN ATAS DESKTOP) */}
+                            {/* WALLPAPER SWITCHER */}
                             <div className="absolute top-5 right-6 sm:right-8 z-20 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-800 shadow-lg">
                                 <ImageIcon className="w-3 h-3 text-slate-400 mr-1" />
                                 {[0, 1, 2].map((idx) => (
@@ -294,20 +291,16 @@ export default function Login({ status, canResetPassword }) {
                                         onClick={() => setBgIndex(idx)}
                                         className={`w-2 h-2 rounded-full transition-all duration-300 ${
                                             bgIndex === idx 
-                                                ? (idx === 0 ? 'bg-red-500 w-4' : idx === 1 ? 'bg-sky-400 w-4' : 'bg-emerald-400 w-4')
+                                                ? (idx === 0 ? 'bg-blue-500 w-4' : idx === 1 ? 'bg-amber-400 w-4' : 'bg-sky-400 w-4')
                                                 : 'bg-slate-700 hover:bg-slate-500'
                                         }`}
-                                        title={`Switch wallpaper theme ${idx + 1}`}
+                                        title={`Ganti grafik tema ${idx + 1}`}
                                     />
                                 ))}
                             </div>
 
-                            {/* ----------------------------------------------------------------- */}
-                            {/* FORM LOGIN DI SEBELAH KANAN */}
-                            {/* ----------------------------------------------------------------- */}
+                            {/* FORM LOGIN */}
                             <div className="relative z-10 w-full max-w-sm ml-auto my-auto py-2 pr-1 sm:pr-2">
-                                
-                                {/* Form Header */}
                                 <div>
                                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white drop-shadow-md">
                                         Selamat Datang
@@ -317,16 +310,13 @@ export default function Login({ status, canResetPassword }) {
                                     </p>
                                 </div>
 
-                                {/* Status Alert */}
                                 {status && (
-                                    <div className="mt-4 text-xs font-medium text-emerald-400 bg-emerald-950/80 p-3 rounded-xl border border-emerald-800/80 backdrop-blur-sm">
+                                    <div className="mt-4 text-xs font-medium text-amber-300 bg-amber-950/60 p-3 rounded-xl border border-amber-800/80 backdrop-blur-sm">
                                         {status}
                                     </div>
                                 )}
 
-                                {/* Form Inputs */}
                                 <form onSubmit={submit} className="space-y-4 mt-5">
-                                    {/* Email Field */}
                                     <div className="space-y-1.5">
                                         <Label htmlFor="email" className="text-xs font-medium text-slate-300">
                                             Email
@@ -340,15 +330,14 @@ export default function Login({ status, canResetPassword }) {
                                                 value={data.email}
                                                 autoComplete="username"
                                                 autoFocus
-                                                placeholder="nama@mitratel.co.id"
+                                                placeholder="nama@domain.com"
                                                 onChange={(e) => setData('email', e.target.value)}
-                                                className="pl-10 h-10 text-xs rounded-xl bg-slate-900/90 border-slate-700/80 text-slate-100 placeholder:text-slate-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 shadow-sm"
+                                                className="pl-10 h-10 text-xs rounded-xl bg-slate-900/90 border-slate-700/80 text-slate-100 placeholder:text-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 shadow-sm"
                                             />
                                         </div>
                                         <InputError message={errors.email} />
                                     </div>
 
-                                    {/* Password Field */}
                                     <div className="space-y-1.5">
                                         <Label htmlFor="password" className="text-xs font-medium text-slate-300">
                                             Password
@@ -363,7 +352,7 @@ export default function Login({ status, canResetPassword }) {
                                                 autoComplete="current-password"
                                                 placeholder="••••••••"
                                                 onChange={(e) => setData('password', e.target.value)}
-                                                className="pl-10 pr-10 h-10 text-xs rounded-xl bg-slate-900/90 border-slate-700/80 text-slate-100 placeholder:text-slate-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 shadow-sm"
+                                                className="pl-10 pr-10 h-10 text-xs rounded-xl bg-slate-900/90 border-slate-700/80 text-slate-100 placeholder:text-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 shadow-sm"
                                             />
                                             <button
                                                 type="button"
@@ -376,14 +365,13 @@ export default function Login({ status, canResetPassword }) {
                                         <InputError message={errors.password} />
                                     </div>
 
-                                    {/* Remember Me & Forgot Password */}
                                     <div className="flex items-center justify-between pt-1">
                                         <div className="flex items-center space-x-2">
                                             <Checkbox
                                                 id="remember"
                                                 checked={data.remember}
                                                 onCheckedChange={(checked) => setData('remember', !!checked)}
-                                                className="border-slate-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                                                className="border-slate-600 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                                             />
                                             <Label htmlFor="remember" className="text-xs text-slate-300 cursor-pointer font-normal">
                                                 Ingat saya
@@ -393,42 +381,36 @@ export default function Login({ status, canResetPassword }) {
                                         {canResetPassword && (
                                             <Link
                                                 href={route('password.request')}
-                                                className="text-xs font-medium text-red-500 hover:text-red-400 transition-colors"
+                                                className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
                                             >
                                                 Lupa password?
                                             </Link>
                                         )}
                                     </div>
 
-                                    {/* Submit Button */}
                                     <Button 
                                         type="submit" 
                                         disabled={processing}
-                                        className="w-full h-10 bg-red-600 hover:bg-red-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-red-600/30 transition-all duration-200 active:scale-[0.99] mt-2"
+                                        className="w-full h-10 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-blue-600/30 transition-all duration-200 active:scale-[0.99] mt-2"
                                     >
                                         {processing ? 'Memproses...' : 'Masuk ke Dashboard'}
                                     </Button>
                                 </form>
 
-                                {/* Footer Notice */}
                                 <div className="pt-4 border-t border-slate-800/80 mt-5">
                                     <p className="text-[11px] text-slate-400">
-                                        Ada masalah saat login? Hubungi <span className="font-semibold text-slate-200">Admin Mitratel</span>.
+                                        Ada masalah saat login? Hubungi <span className="font-semibold text-slate-200">Administrator Gudang</span>.
                                     </p>
                                 </div>
                             </div>
 
                         </div>
 
-                        {/* --------------------------------------------------------------------- */}
                         {/* WINDOWS BOTTOM TASKBAR */}
-                        {/* --------------------------------------------------------------------- */}
                         <div className="w-full h-10 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-4 flex items-center justify-between text-xs text-slate-300 select-none z-30">
-                            
-                            {/* Left Side: Start Button & Taskbar Apps */}
                             <div className="flex items-center gap-2">
-                                <button className="flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg font-semibold text-xs transition-all shadow-md shadow-red-600/20 active:scale-95">
-                                    <Signal className="w-3.5 h-3.5" />
+                                <button className="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold text-xs transition-all shadow-md shadow-blue-600/20 active:scale-95">
+                                    <LayoutGrid className="w-3.5 h-3.5 text-amber-400" />
                                     <span>Start</span>
                                 </button>
 
@@ -438,57 +420,48 @@ export default function Login({ status, canResetPassword }) {
                                 </div>
 
                                 <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
-                                    <div className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer" title="System Dashboard">
-                                        <Server className="w-3.5 h-3.5 text-red-400" />
+                                    <div className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer" title="Stok Barang">
+                                        <Boxes className="w-3.5 h-3.5 text-amber-400" />
                                     </div>
-                                    <div className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer" title="Network Explorer">
-                                        <Folder className="w-3.5 h-3.5 text-emerald-400" />
+                                    <div className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer" title="Area Gudang">
+                                        <Warehouse className="w-3.5 h-3.5 text-blue-400" />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Right Side: System Tray & Clock */}
                             <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
-                                <span className="hidden sm:flex items-center gap-1 text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
-                                    <ShieldCheck className="w-3 h-3" /> Secure 5G
-                                </span>
                                 <Wifi className="w-3.5 h-3.5 text-slate-300" />
                                 <Volume2 className="w-3.5 h-3.5 text-slate-300" />
-                                <BatteryCharging className="w-3.5 h-3.5 text-emerald-400" />
+                                <BatteryCharging className="w-3.5 h-3.5 text-amber-400" />
                                 
                                 <div className="flex flex-col items-end text-[10px] leading-tight text-slate-200 border-l border-slate-800 pl-2.5">
                                     <span className="font-semibold">{currentTime || '12:00'}</span>
-                                    <span className="text-slate-500 text-[9px]">{currentDate || '11/08/2026'}</span>
+                                    <span className="text-slate-500 text-[9px]">{currentDate || '01/01/2026'}</span>
                                 </div>
                             </div>
-                        </div>
 
+                        </div>
                     </div>
                 </div>
 
-                {/* 2. LAPTOP HINGE */}
-                <div className="w-[96%] mx-auto h-2 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-x border-slate-700/60 relative z-20" />
-
-                {/* 3. LAPTOP BASE DECK & SOFT SHADOW */}
-                <div className="relative z-10 -mt-0.5">
-                    <div className="w-[108%] -ml-[4%] h-3.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 rounded-b-md border-t border-slate-500/60 shadow-md relative z-20 flex items-start justify-center">
-                        <div className="w-24 h-1.5 bg-slate-950 rounded-b-md border-x border-b border-slate-700/70" />
+                {/* KAKI & DASAR CHASSIS LAPTOP (LEBAR MELEBIHI WIDE DISPLAY BEZEL) */}
+                <div className="relative mx-auto w-[108%] -ml-[4%] select-none pointer-events-none z-10">
+                    {/* Flat Wide Base Lip / Deck */}
+                    <div className="h-4 sm:h-5 bg-slate-900 rounded-b-lg border-x border-b border-slate-800/90 shadow-[0_20px_50px_rgba(0,0,0,0.95)] relative flex justify-center items-center overflow-hidden">
+                        {/* Highlights Edge Line */}
+                        <div className="absolute top-0 inset-x-0 h-[1px] bg-slate-700/60" />
+                        
+                        {/* Center Notch Slot */}
+                        <div className="w-32 sm:w-40 h-1.5 bg-slate-950 rounded-full border border-slate-800/90 shadow-inner flex justify-center items-center">
+                            <div className="w-12 h-[1px] bg-slate-700/50" />
+                        </div>
                     </div>
 
-                    <div 
-                        className="w-[114%] -ml-[7%] h-20 bg-gradient-to-b from-black/40 via-black/15 to-transparent blur-md relative z-0 -mt-1 pointer-events-none opacity-40"
-                        style={{
-                            clipPath: 'polygon(4% 0%, 96% 0%, 100% 100%, 0% 100%)'
-                        }}
-                    />
+                    {/* Full-width Bottom Rubber Stand Strip */}
+                    <div className="w-full h-1 bg-slate-950 rounded-b-sm border-b border-slate-800/80 shadow-md mx-auto -mt-[1px]" />
                 </div>
 
             </div>
-
-            {/* Copyright */}
-            <p className="text-[11px] text-slate-600 mt-2 relative z-10 text-center font-medium">
-                &copy; {new Date().getFullYear()} PT Dayamitra Telekomunikasi Tbk. All rights reserved.
-            </p>
         </div>
     );
 }

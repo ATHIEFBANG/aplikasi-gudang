@@ -1,6 +1,9 @@
 import { Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect, createContext, useContext } from 'react';
 
+// --- IMPORT LOGO COMPONENT ---
+import ApplicationLogo from '@/components/ApplicationLogo';
+
 // --- IMPORT KOMPONEN NOTIFIKASI, CONFIRM MODAL & LOADING ---
 import { Toast, ConfirmModal } from '@/components/ui/Notifikasi';
 import Loading from '@/components/ui/Loading';
@@ -25,7 +28,6 @@ import {
     ChevronDown,
     ChevronUp,
     Shield,
-    Boxes,
 } from 'lucide-react';
 
 const ConfirmContext = createContext();
@@ -234,20 +236,11 @@ export default function AuthenticatedLayout({ header, children }) {
                             <div className="flex items-center gap-4">
                                 <Link 
                                     href={getRoute('dashboard')} 
-                                    className="flex items-center gap-3.5 group/logo focus:outline-none transition-transform active:scale-95"
+                                    className="focus:outline-none transition-transform active:scale-95"
                                     title="Panca Pilar Laksana"
                                 >
-                                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 group-hover/logo:scale-105 group-hover/logo:shadow-amber-500/40 transition-all duration-300">
-                                        <Boxes className="w-5 h-5 text-amber-200" />
-                                    </div>
-                                    <div className="hidden sm:block">
-                                        <span className="font-extrabold text-base tracking-wider text-slate-800 dark:text-slate-100 block leading-none group-hover/logo:text-blue-600 dark:group-hover/logo:text-amber-400 transition-colors duration-200">
-                                            PANCA PILAR LAKSANA
-                                        </span>
-                                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold tracking-[0.2em] uppercase mt-1 block">
-                                            Warehouse Management
-                                        </span>
-                                    </div>
+                                    {/* ApplicationLogo Component */}
+                                    <ApplicationLogo />
                                 </Link>
 
                                 {header && (

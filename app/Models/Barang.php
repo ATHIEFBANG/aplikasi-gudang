@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Barang extends Model
 {
@@ -17,25 +18,30 @@ class Barang extends Model
         'min_stock'   => 'integer',
     ];
 
-    // Relasi stok di seluruh gudang
-    public function stoks()
+    protected $appends = ['total_stok'];
+
+    public function stoks(): HasMany
     {
         return $this->hasMany(Stok::class);
     }
 
-    // Helper untuk hitung total seluruh stok fisik di semua gudang
     public function getTotalStokAttribute(): int
     {
         return (int) $this->stoks()->sum('jumlah');
     }
 
-    public function serials()
+    public function serials(): HasMany
     {
         return $this->hasMany(BarangSerial::class);
     }
 
-    public function transaksiDetails()
+    public function transaksiDetails(): HasMany
     {
         return $this->hasMany(TransaksiDetail::class);
+    }
+
+    public function stockLogs(): HasMany
+    {
+        return $this->hasMany(StockLog::class);
     }
 }

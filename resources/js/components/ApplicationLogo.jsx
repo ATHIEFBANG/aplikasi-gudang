@@ -1,22 +1,38 @@
 import { cn } from '@/lib/utils';
+import { Boxes } from 'lucide-react';
 
-export function AppLogo({ className, ...props }) {
+export function AppLogo({ 
+    className, 
+    imageSrc = '/images/ppl.png', // Default universal logo
+    showTextOnMobile = false, 
+    ...props 
+}) {
     return (
-        <div className={cn('flex items-center gap-2.5 select-none', className)} {...props}>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-700 to-red-500 flex items-center justify-center text-white font-black text-xl shadow-md shadow-red-600/30">
-                M
-            </div>
-            <div className="flex flex-col">
-                <span className="font-extrabold text-base tracking-wider text-slate-900 dark:text-white leading-none">
-                    MITRATEL
+        <div className={cn('flex items-center gap-3 select-none group/logo', className)} {...props}>
+            {/* LOGO IMAGE / FALLBACK ICON */}
+            {imageSrc ? (
+                <img 
+                    src={imageSrc} 
+                    alt="Logo Panca Pilar Laksana" 
+                    className="w-10 h-10 object-contain group-hover/logo:scale-105 transition-transform duration-300"
+                />
+            ) : (
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 group-hover/logo:scale-105 group-hover/logo:shadow-amber-500/40 transition-all duration-300">
+                    <Boxes className="w-5 h-5 text-amber-200" />
+                </div>
+            )}
+
+            {/* BRAND TEXT */}
+            <div className={showTextOnMobile ? "flex flex-col" : "hidden sm:flex flex-col"}>
+                <span className="font-extrabold text-base tracking-wider text-slate-800 dark:text-slate-100 block leading-none group-hover/logo:text-blue-600 dark:group-hover/logo:text-amber-400 transition-colors duration-200">
+                    PANCA PILAR LAKSANA
                 </span>
-                <span className="text-[9px] font-bold text-red-600 dark:text-red-400 tracking-widest uppercase mt-0.5">
-                    Command Center
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold tracking-[0.2em] uppercase mt-1 block">
+                    Warehouse Management
                 </span>
             </div>
         </div>
     );
 }
 
-// Tambahkan baris ini di paling bawah agar support default import & named import sekaligus:
 export default AppLogo;

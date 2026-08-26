@@ -17,9 +17,9 @@ class DashboardController extends Controller
     public function index(Request $request): Response
     {
         // 1. STATISTIK KPI
-        $totalBarang   = Barang::count();
+        $totalBarang    = Barang::count();
         $totalStokFisik = (int) Stok::sum('jumlah');
-        $totalGudang   = Gudang::where('is_active', true)->count();
+        $totalGudang    = Gudang::where('is_active', true)->count();
         
         // Barang dengan stok di bawah atau sama dengan min_stock
         $lowStockCount = Barang::whereHas('stoks')
@@ -62,17 +62,20 @@ class DashboardController extends Controller
             ->filter()
             ->values();
 
-        // 3. GRAFIK TRANSAKSI BULANAN (Tahun Berjalan)
+        // 3. GRAFIK TRANSAKSI BULANAN (Mendukung MySQL, PostgreSQL & SQLite)
         $currentYear = date('Y');
+        $isSqlite    = DB::connection()->getDriverName() === 'sqlite';
+        $monthField  = $isSqlite ? "CAST(strftime('%m', tanggal) AS INTEGER)" : "EXTRACT(MONTH FROM tanggal)";
+
         $monthlyRaw = Transaksi::selectRaw("
-                EXTRACT(MONTH FROM tanggal) as bulan,
+                {$monthField} as bulan,
                 SUM(CASE WHEN jenis_transaksi = 'MASUK' THEN 1 ELSE 0 END) as masuk,
                 SUM(CASE WHEN jenis_transaksi = 'KELUAR' THEN 1 ELSE 0 END) as keluar,
                 SUM(CASE WHEN jenis_transaksi = 'TRANSFER' THEN 1 ELSE 0 END) as transfer
             ")
             ->whereYear('tanggal', $currentYear)
             ->where('status', 'COMPLETED')
-            ->groupBy(DB::raw("EXTRACT(MONTH FROM tanggal)"))
+            ->groupBy(DB::raw($monthField))
             ->get()
             ->keyBy(fn($item) => (int) $item->bulan);
 
@@ -111,5 +114,56 @@ class DashboardController extends Controller
             'recentTransactions' => $recentTransactions,
             'teamMembers'        => $teamMembers,
         ]);
+    }
+
+    public function storeGudang(Request $request)
+    {
+        $validated = $request->validate([
+            'kode_gudang' => 'required|string|max:50|unique:gudangs,kode_gudang',
+            'nama_gudang' => 'required|string|max:255',
+            'lokasi'      => 'nullable|string|max:255',
+            'latitude'    => 'required|numeric|between:-90,90',
+            'longitude'   => 'required|numeric|between:-180,180',
+        ]);
+
+        Gudang::create([
+            'kode_gudang' => strtoupper(trim($validated['kode_gudang'])),
+            'nama_gudang' => trim($validated['nama_gudang']),
+            'lokasi'      => trim($validated['lokasi'] ?? ''),
+            'lat_long'    => "{$validated['latitude']}, {$validated['longitude']}",
+            'is_active'   => true,
+        ]);
+
+        return redirect()->back()->with('success', 'Lokasi gudang baru berhasil ditambahkan.');
+    }
+
+    public function updateGudang(Request $request, int $id)
+    {
+        $gudang = Gudang::findOrFail($id);
+
+        $validated = $request->validate([
+            'kode_gudang' => 'required|string|max:50|unique:gudangs,kode_gudang,' . $gudang->id,
+            'nama_gudang' => 'required|string|max:255',
+            'lokasi'      => 'nullable|string|max:255',
+            'latitude'    => 'required|numeric|between:-90,90',
+            'longitude'   => 'required|numeric|between:-180,180',
+        ]);
+
+        $gudang->update([
+            'kode_gudang' => strtoupper(trim($validated['kode_gudang'])),
+            'nama_gudang' => trim($validated['nama_gudang']),
+            'lokasi'      => trim($validated['lokasi'] ?? ''),
+            'lat_long'    => "{$validated['latitude']}, {$validated['longitude']}",
+        ]);
+
+        return redirect()->back()->with('success', 'Data lokasi gudang berhasil diperbarui.');
+    }
+
+    public function destroyGudang(int $id)
+    {
+        $gudang = Gudang::findOrFail($id);
+        $gudang->delete();
+
+        return redirect()->back()->with('success', 'Lokasi gudang berhasil dihapus.');
     }
 }

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Transaksi extends Model
 {
@@ -15,28 +17,33 @@ class Transaksi extends Model
         'tanggal' => 'date',
     ];
 
-    public function details()
+    public function details(): HasMany
     {
         return $this->hasMany(TransaksiDetail::class);
     }
 
-    public function gudangAsal()
+    public function gudangAsal(): BelongsTo
     {
         return $this->belongsTo(Gudang::class, 'gudang_asal_id');
     }
 
-    public function gudangTujuan()
+    public function gudangTujuan(): BelongsTo
     {
         return $this->belongsTo(Gudang::class, 'gudang_tujuan_id');
     }
 
-    public function supplier()
+    public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
     }
 
-    public function picUser()
+    public function picUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'pic_user_id');
+    }
+
+    public function stockLogs(): HasMany
+    {
+        return $this->hasMany(StockLog::class);
     }
 }

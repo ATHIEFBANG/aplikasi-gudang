@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Stok extends Model
 {
@@ -11,12 +12,16 @@ class Stok extends Model
 
     protected $guarded = ['id'];
 
-    public function barang()
+    protected $casts = [
+        'jumlah' => 'integer',
+    ];
+
+    public function barang(): BelongsTo
     {
         return $this->belongsTo(Barang::class);
     }
 
-    public function gudang()
+    public function gudang(): BelongsTo
     {
         return $this->belongsTo(Gudang::class);
     }
