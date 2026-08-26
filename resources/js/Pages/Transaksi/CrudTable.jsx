@@ -189,13 +189,14 @@ export default function CrudTable({
                     case 'serials': {
                         const listSn = detail.serials || item.serials || [];
                         return (
-                            <div className="flex flex-wrap gap-1 max-w-[170px]">
+                            /* DIPERBARUI: Lebar diperlebar ke samping (max-w-[260px]) dan menggunakan flex-wrap agar badge berjajar ke samping */
+                            <div className="flex flex-wrap gap-1 max-w-[260px] max-h-24 overflow-y-auto py-1">
                                 {listSn.length > 0 ? (
                                     listSn.map((s, idx) => (
                                         <Badge 
                                             key={idx} 
                                             variant="outline" 
-                                            className="text-[9px] font-mono text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.2"
+                                            className="text-[9px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.5 shrink-0"
                                         >
                                             {s.serial_number || s}
                                         </Badge>

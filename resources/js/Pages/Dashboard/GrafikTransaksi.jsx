@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, PieChart as PieChartIcon } from 'lucide-react';
 import {
@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 
 // Custom Floating Tooltip
-const CustomBarTooltip = ({ active, payload }) => {
+const CustomBarTooltip = ({ active, payload, activeStatus }) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         return (
@@ -29,27 +29,33 @@ const CustomBarTooltip = ({ active, payload }) => {
                     </span>
                 </div>
                 <div className="space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="text-slate-300 font-medium">Barang Masuk</span>
+                    {activeStatus.MASUK && (
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                <span className="text-slate-300 font-medium">Barang Masuk</span>
+                            </div>
+                            <span className="font-bold text-emerald-400">{data.MASUK || 0}</span>
                         </div>
-                        <span className="font-bold text-emerald-400">{data.MASUK || 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                            <span className="text-slate-300 font-medium">Barang Keluar</span>
+                    )}
+                    {activeStatus.KELUAR && (
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                                <span className="text-slate-300 font-medium">Barang Keluar</span>
+                            </div>
+                            <span className="font-bold text-rose-400">{data.KELUAR || 0}</span>
                         </div>
-                        <span className="font-bold text-rose-400">{data.KELUAR || 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
-                            <span className="text-slate-300 font-medium">Transfer Gudang</span>
+                    )}
+                    {activeStatus.TRANSFER && (
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
+                                <span className="text-slate-300 font-medium">Transfer Gudang</span>
+                            </div>
+                            <span className="font-bold text-sky-400">{data.TRANSFER || 0}</span>
                         </div>
-                        <span className="font-bold text-sky-400">{data.TRANSFER || 0}</span>
-                    </div>
+                    )}
                 </div>
             </div>
         );
@@ -58,6 +64,26 @@ const CustomBarTooltip = ({ active, payload }) => {
 };
 
 export default function GrafikTransaksi({ chartData = [] }) {
+    // State Filter Interaktif Legend Klik (Show/Hide Batang)
+    const [activeStatus, setActiveStatus] = useState({
+        MASUK: true,
+        KELUAR: true,
+        TRANSFER: true,
+    });
+
+    const toggleStatus = (key) => {
+        setActiveStatus((prev) => ({
+            ...prev,
+            [key]: !prev[key],
+        }));
+    };
+
+    const legendConfig = [
+        { key: 'MASUK', label: 'Masuk', color: 'bg-emerald-500', fill: '#10b981' },
+        { key: 'KELUAR', label: 'Keluar', color: 'bg-rose-500', fill: '#f43f5e' },
+        { key: 'TRANSFER', label: 'Transfer', color: 'bg-sky-500', fill: '#0284c7' },
+    ];
+
     const monthFullNames = [
         'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
         'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -116,7 +142,7 @@ export default function GrafikTransaksi({ chartData = [] }) {
             {/* 1. MULTI-BAR CHART AKTIVITAS LOGISTIK BULANAN */}
             <Card className="lg:col-span-2 bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 rounded-xl shadow-xs">
                 <CardHeader className="pb-3 pt-4 px-5 border-b border-slate-100 dark:border-slate-800/50">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                             <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-200">
@@ -124,20 +150,31 @@ export default function GrafikTransaksi({ chartData = [] }) {
                             </CardTitle>
                         </div>
 
-                        {/* LEGENDA FLAT DI HEADER */}
-                        <div className="flex items-center gap-3 text-[11px]">
-                            <div className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500" />
-                                <span className="text-slate-600 dark:text-slate-300 font-medium">Masuk</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-xs bg-rose-500" />
-                                <span className="text-slate-600 dark:text-slate-300 font-medium">Keluar</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-xs bg-sky-500" />
-                                <span className="text-slate-600 dark:text-slate-300 font-medium">Transfer</span>
-                            </div>
+                        {/* TOMBOL FILTER INTERAKTIF BISA DIKLIK */}
+                        <div className="flex items-center gap-3">
+                            {legendConfig.map((item) => {
+                                const isActive = activeStatus[item.key];
+                                return (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        onClick={() => toggleStatus(item.key)}
+                                        className={`flex items-center gap-1.5 text-xs transition-all duration-150 cursor-pointer select-none ${
+                                            isActive
+                                                ? 'text-slate-700 dark:text-slate-200 font-semibold opacity-100'
+                                                : 'text-slate-400 dark:text-slate-500 line-through opacity-40'
+                                        }`}
+                                        title={`Klik untuk ${isActive ? 'menyembunyikan' : 'menampilkan'} data ${item.label}`}
+                                    >
+                                        <span
+                                            className={`w-2.5 h-2.5 rounded-xs shrink-0 transition-all ${
+                                                isActive ? item.color : 'bg-slate-400 dark:bg-slate-600'
+                                            }`}
+                                        />
+                                        <span>{item.label}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </CardHeader>
@@ -156,7 +193,7 @@ export default function GrafikTransaksi({ chartData = [] }) {
                                     opacity={0.25}
                                 />
 
-                                {/* SUMBU X: NAMA BULAN + ANGKA MASUK, KELUAR, TRANSFER DI BAWAHNYA */}
+                                {/* SUMBU X: NAMA BULAN + RINCIAN ANGKA AKTIF */}
                                 <XAxis
                                     dataKey="name"
                                     interval={0}
@@ -171,9 +208,15 @@ export default function GrafikTransaksi({ chartData = [] }) {
                                         const keluar = item?.KELUAR ?? 0;
                                         const transfer = item?.TRANSFER ?? 0;
 
+                                        // Kumpulkan baris angka yang statusnya sedang aktif
+                                        const activeLines = [];
+                                        if (activeStatus.MASUK) activeLines.push({ val: masuk, color: '#10b981' });
+                                        if (activeStatus.KELUAR) activeLines.push({ val: keluar, color: '#f43f5e' });
+                                        if (activeStatus.TRANSFER) activeLines.push({ val: transfer, color: '#0284c7' });
+
                                         return (
                                             <g transform={`translate(${x},${y})`}>
-                                                {/* Baris 1: Nama Bulan */}
+                                                {/* Nama Bulan */}
                                                 <text
                                                     x={0}
                                                     y={0}
@@ -186,44 +229,21 @@ export default function GrafikTransaksi({ chartData = [] }) {
                                                     {payload.value}
                                                 </text>
 
-                                                {/* Baris 2: Angka Masuk (Hijau) */}
-                                                <text
-                                                    x={0}
-                                                    y={0}
-                                                    dy={25}
-                                                    textAnchor="middle"
-                                                    fill="#10b981"
-                                                    fontSize={9}
-                                                    fontWeight={800}
-                                                >
-                                                    {masuk > 0 ? masuk : '-'}
-                                                </text>
-
-                                                {/* Baris 3: Angka Keluar (Merah) */}
-                                                <text
-                                                    x={0}
-                                                    y={0}
-                                                    dy={36}
-                                                    textAnchor="middle"
-                                                    fill="#f43f5e"
-                                                    fontSize={9}
-                                                    fontWeight={800}
-                                                >
-                                                    {keluar > 0 ? keluar : '-'}
-                                                </text>
-
-                                                {/* Baris 4: Angka Transfer (Biru) */}
-                                                <text
-                                                    x={0}
-                                                    y={0}
-                                                    dy={47}
-                                                    textAnchor="middle"
-                                                    fill="#0284c7"
-                                                    fontSize={9}
-                                                    fontWeight={800}
-                                                >
-                                                    {transfer > 0 ? transfer : '-'}
-                                                </text>
+                                                {/* Render baris angka sesuai filter aktif */}
+                                                {activeLines.map((l, i) => (
+                                                    <text
+                                                        key={i}
+                                                        x={0}
+                                                        y={0}
+                                                        dy={25 + i * 11}
+                                                        textAnchor="middle"
+                                                        fill={l.color}
+                                                        fontSize={9}
+                                                        fontWeight={800}
+                                                    >
+                                                        {l.val > 0 ? l.val : '-'}
+                                                    </text>
+                                                ))}
                                             </g>
                                         );
                                     }}
@@ -241,32 +261,38 @@ export default function GrafikTransaksi({ chartData = [] }) {
                                 <Tooltip
                                     cursor={{ fill: 'rgba(255, 255, 255, 0.04)' }}
                                     wrapperStyle={{ zIndex: 50, outline: 'none' }}
-                                    content={<CustomBarTooltip />}
+                                    content={<CustomBarTooltip activeStatus={activeStatus} />}
                                 />
 
                                 {/* BATANG 1: BARANG MASUK */}
-                                <Bar
-                                    dataKey="MASUK"
-                                    name="Barang Masuk"
-                                    fill="#10b981"
-                                    radius={[4, 4, 0, 0]}
-                                />
+                                {activeStatus.MASUK && (
+                                    <Bar
+                                        dataKey="MASUK"
+                                        name="Barang Masuk"
+                                        fill="#10b981"
+                                        radius={[4, 4, 0, 0]}
+                                    />
+                                )}
 
                                 {/* BATANG 2: BARANG KELUAR */}
-                                <Bar
-                                    dataKey="KELUAR"
-                                    name="Barang Keluar"
-                                    fill="#f43f5e"
-                                    radius={[4, 4, 0, 0]}
-                                />
+                                {activeStatus.KELUAR && (
+                                    <Bar
+                                        dataKey="KELUAR"
+                                        name="Barang Keluar"
+                                        fill="#f43f5e"
+                                        radius={[4, 4, 0, 0]}
+                                    />
+                                )}
 
                                 {/* BATANG 3: TRANSFER GUDANG */}
-                                <Bar
-                                    dataKey="TRANSFER"
-                                    name="Transfer Gudang"
-                                    fill="#0284c7"
-                                    radius={[4, 4, 0, 0]}
-                                />
+                                {activeStatus.TRANSFER && (
+                                    <Bar
+                                        dataKey="TRANSFER"
+                                        name="Transfer Gudang"
+                                        fill="#0284c7"
+                                        radius={[4, 4, 0, 0]}
+                                    />
+                                )}
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
