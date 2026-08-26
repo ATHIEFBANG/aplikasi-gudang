@@ -8,12 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. Tabel Transaksi Utama
+        // 1. Tabel Transaksi Utama (LENGKAP)
         Schema::create('transaksis', function (Blueprint $table) {
             $table->id();
             $table->string('no_transaksi', 50)->unique();
             $table->enum('jenis_transaksi', ['MASUK', 'KELUAR', 'TRANSFER', 'PINJAM', 'KEMBALI']);
+            $table->string('sub_jenis')->nullable()->index(); // <-- Tambahkan
             $table->date('tanggal')->index();
+            $table->string('kondisi')->nullable()->default('Baru'); // <-- Tambahkan
+            $table->string('nomor_imc')->nullable()->index(); // <-- Tambahkan
+            $table->string('nomor_omc')->nullable()->index(); // <-- Tambahkan
+            $table->string('pihak_asal')->nullable(); // <-- Tambahkan
             
             // Relasi Gudang, Supplier, PIC
             $table->foreignId('gudang_asal_id')->nullable()->constrained('gudangs')->nullOnDelete();
@@ -24,7 +29,7 @@ return new class extends Migration
             $table->text('keterangan')->nullable();
             $table->enum('status', ['DRAFT', 'COMPLETED', 'CANCELLED'])->default('COMPLETED')->index();
             $table->timestamps();
-
+            
             $table->index(['jenis_transaksi', 'tanggal']);
         });
 
@@ -38,7 +43,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 3. Detail Serial Number Transaksi (Relasi SN ke Transaksi Detail)
+        // 3. Detail Serial Number Transaksi
         Schema::create('transaksi_detail_serials', function (Blueprint $table) {
             $table->id();
             $table->foreignId('transaksi_detail_id')->constrained('transaksi_details')->cascadeOnDelete();
@@ -58,7 +63,7 @@ return new class extends Migration
             $table->integer('qty_akhir');
             $table->text('keterangan')->nullable();
             $table->timestamps();
-
+            
             $table->index(['barang_id', 'gudang_id']);
         });
     }
