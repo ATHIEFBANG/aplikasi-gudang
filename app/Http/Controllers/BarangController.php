@@ -40,8 +40,17 @@ class BarangController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        // Mengambil seluruh data unik dari database (100% Real Database, Tanpa Dummy)
+        $existingOptions = [
+            'brandList'    => Barang::whereNotNull('brand')->where('brand', '!=', '')->distinct()->pluck('brand')->values(),
+            'tipeList'     => Barang::whereNotNull('tipe')->where('tipe', '!=', '')->distinct()->pluck('tipe')->values(),
+            'kategoriList' => Barang::whereNotNull('kategori')->where('kategori', '!=', '')->distinct()->pluck('kategori')->values(),
+            'satuanList'   => Barang::whereNotNull('deskripsi')->where('deskripsi', '!=', '')->distinct()->pluck('deskripsi')->values(),
+        ];
+
         return Inertia::render('Barang/Index', [
-            'barangs' => $barangs,
+            'barangs'         => $barangs,
+            'existingOptions' => $existingOptions,
             'filters' => [
                 'search'   => $search ?? '',
                 'per_page' => $perPage,
@@ -52,6 +61,51 @@ class BarangController extends Controller
 
     public function store(Request $request)
     {
+        if ($request->has('items') && is_array($request->items)) {
+            $validated = $request->validate([
+                'items'               => 'required|array|min:1',
+                'items.*.kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang',
+                'items.*.brand'       => 'required|string|max:100',
+                'items.*.tipe'        => 'required|string|max:100',
+                'items.*.kategori'    => 'required|string|max:100',
+                'items.*.part_number' => 'nullable|string|max:255',
+                'items.*.nama_barang' => 'nullable|string|max:255',
+                'items.*.satuan'      => 'nullable|string|max:100',
+                'items.*.deskripsi'   => 'nullable|string|max:100',
+                'items.*.min_stock'   => 'nullable|integer|min:0',
+                'items.*.is_wajib_sn' => 'boolean',
+                'items.*.is_wajib_pn' => 'boolean',
+            ]);
+
+            DB::transaction(function () use ($validated) {
+                foreach ($validated['items'] as $item) {
+                    $isWajibSn = (bool) ($item['is_wajib_sn'] ?? false);
+                    $isWajibPn = (bool) ($item['is_wajib_pn'] ?? false);
+                    $partNumber = !empty($item['part_number']) ? trim($item['part_number']) : null;
+                    $namaBarang = trim(
+                        $item['nama_barang'] 
+                        ?? ($isWajibPn && $partNumber ? $partNumber : "{$item['brand']} {$item['tipe']}")
+                    );
+                    $satuan = trim($item['satuan'] ?? $item['deskripsi'] ?? '');
+
+                    Barang::create([
+                        'kode_barang' => trim($item['kode_barang']),
+                        'nama_barang' => $namaBarang,
+                        'kategori'    => trim($item['kategori']),
+                        'brand'       => trim($item['brand']),
+                        'tipe'        => trim($item['tipe']),
+                        'part_number' => $partNumber,
+                        'min_stock'   => $item['min_stock'] ?? 0,
+                        'is_wajib_sn' => $isWajibSn,
+                        'is_wajib_pn' => $isWajibPn,
+                        'deskripsi'   => $satuan !== '' ? $satuan : null,
+                    ]);
+                }
+            });
+
+            return redirect()->back()->with('success', count($validated['items']) . ' Master Barang PPL berhasil ditambahkan.');
+        }
+
         $validated = $request->validate([
             'kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang',
             'brand'       => 'required|string|max:100',
@@ -69,13 +123,10 @@ class BarangController extends Controller
         $isWajibSn = $request->boolean('is_wajib_sn');
         $isWajibPn = $request->boolean('is_wajib_pn');
         $partNumber = $request->filled('part_number') ? trim($request->part_number) : null;
-
-        // Penentuan nama_barang otomatis jika tidak dikirim spesifik
         $namaBarang = trim(
             $validated['nama_barang'] 
             ?? ($isWajibPn && $partNumber ? $partNumber : "{$validated['brand']} {$validated['tipe']}")
         );
-
         $satuan = trim($validated['satuan'] ?? $validated['deskripsi'] ?? '');
 
         Barang::create([
@@ -97,7 +148,6 @@ class BarangController extends Controller
     public function update(Request $request, int $id)
     {
         $barang = Barang::findOrFail($id);
-
         $validated = $request->validate([
             'kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang,' . $barang->id,
             'brand'       => 'required|string|max:100',
@@ -115,12 +165,10 @@ class BarangController extends Controller
         $isWajibSn = $request->boolean('is_wajib_sn');
         $isWajibPn = $request->boolean('is_wajib_pn');
         $partNumber = $request->filled('part_number') ? trim($request->part_number) : null;
-
         $namaBarang = trim(
             $validated['nama_barang'] 
             ?? ($isWajibPn && $partNumber ? $partNumber : "{$validated['brand']} {$validated['tipe']}")
         );
-
         $satuan = trim($validated['satuan'] ?? $validated['deskripsi'] ?? '');
 
         $barang->update([
@@ -143,7 +191,6 @@ class BarangController extends Controller
     {
         $barang = Barang::findOrFail($id);
         $barang->delete();
-
         return redirect()->back()->with('success', 'Barang berhasil dihapus.');
     }
 
@@ -153,9 +200,7 @@ class BarangController extends Controller
             'ids'   => 'required|array',
             'ids.*' => 'exists:barangs,id',
         ]);
-
         Barang::destroy($request->ids);
-
         return redirect()->back()->with('success', count($request->ids) . ' barang terpilih berhasil dihapus.');
     }
 
@@ -163,7 +208,6 @@ class BarangController extends Controller
     {
         $barangs = Barang::orderBy('id', 'asc')->get();
         $csvFileName = 'Master_Barang_PPL_' . date('Y-m-d_His') . '.csv';
-
         $headers = [
             'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$csvFileName}\"",
@@ -171,14 +215,12 @@ class BarangController extends Controller
             'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
             'Expires'             => '0',
         ];
-
         $columns = ['Kode PPL', 'Brand / Merk', 'Tipe / Jenis', 'Kategori', 'Part Number', 'Satuan', 'Wajib SN', 'Wajib PN'];
 
         $callback = function () use ($barangs, $columns) {
             $file = fopen('php://output', 'w');
-            fputs($file, "\xEF\xBB\xBF"); // UTF-8 BOM untuk kompatibilitas Excel
+            fputs($file, "\xEF\xBB\xBF");
             fputcsv($file, $columns, ';');
-
             foreach ($barangs as $b) {
                 fputcsv($file, [
                     $b->kode_barang,
@@ -210,7 +252,6 @@ class BarangController extends Controller
             Stok::truncate();
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
         } else {
-            // Kompatibel untuk SQLite & PostgreSQL
             Stok::query()->delete();
             Barang::query()->delete();
         }

@@ -20,6 +20,7 @@ export default function DashboardIndex({
     kpi = {}, 
     mapData = [], 
     chartData = [], 
+    kondisiChartData = [], 
     recentTransactions = [], 
     teamMembers = [] 
 }) {
@@ -33,7 +34,7 @@ export default function DashboardIndex({
     const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
     const yearOptions = [String(new Date().getFullYear()), String(new Date().getFullYear() - 1)];
 
-    // Fungsi Download Snapshot Dashboard PNG (Persis Mitratel)
+    // Fungsi Download Snapshot Dashboard PNG
     const handleDownloadDashboardImage = async () => {
         if (!dashboardRef.current) return;
         setIsExporting(true);
@@ -103,7 +104,7 @@ export default function DashboardIndex({
                     </div>
                 </div>
 
-                {/* 2. Filter Bar & Download Image Button (Sesuai Mitratel) */}
+                {/* 2. Filter Bar & Download Image Button */}
                 <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900/50 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl shadow-sm">
                     <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                         <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider pr-1">
@@ -155,7 +156,7 @@ export default function DashboardIndex({
                     </div>
                 </div>
 
-                {/* 3. Area Capture Dashboard (Terbungkus ref untuk download snapshot PNG) */}
+                {/* 3. Area Capture Dashboard */}
                 <div ref={dashboardRef} className="capture-area space-y-5 p-5 bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-900 rounded-xl overflow-hidden">
                     <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800/80 pb-3">
                         <div>
@@ -172,8 +173,11 @@ export default function DashboardIndex({
                     {/* A. Statistik KPI Cards */}
                     <StatistikGudang kpi={kpi} />
 
-                    {/* B. Grafik Transaksi & Donut */}
-                    <GrafikTransaksi chartData={chartData} />
+                    {/* B. Grafik Transaksi & Tren Kondisi Fisik Barang Bulanan */}
+                    <GrafikTransaksi 
+                        chartData={chartData} 
+                        kondisiChartData={kondisiChartData} 
+                    />
 
                     {/* C. Peta Sebaran Hub Gudang */}
                     <PetaGudang mapData={mapData} />

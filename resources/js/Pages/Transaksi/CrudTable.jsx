@@ -25,7 +25,8 @@ export default function CrudTable({
     onSelectAll, 
     onSelectRow, 
     onEditRow, 
-    getRowNumber 
+    getRowNumber,
+    zoomLevel = 100 // <-- Teruskan Zoom Level
 }) {
     const getItemId = (item) => item?.id;
 
@@ -189,7 +190,6 @@ export default function CrudTable({
                     case 'serials': {
                         const listSn = detail.serials || item.serials || [];
                         return (
-                            /* DIPERBARUI: Lebar diperlebar ke samping (max-w-[260px]) dan menggunakan flex-wrap agar badge berjajar ke samping */
                             <div className="flex flex-wrap gap-1 max-w-[260px] max-h-24 overflow-y-auto py-1">
                                 {listSn.length > 0 ? (
                                     listSn.map((s, idx) => (
@@ -225,6 +225,7 @@ export default function CrudTable({
             onEditRow={onEditRow}
             getItemId={getItemId}
             getRowNumber={getRowNumber}
+            zoomLevel={zoomLevel}
             emptyMessage="Belum ada riwayat transaksi barang masuk."
         />
     );

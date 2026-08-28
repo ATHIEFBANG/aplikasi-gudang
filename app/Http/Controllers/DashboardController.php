@@ -17,18 +17,16 @@ class DashboardController extends Controller
 {
     public function index(Request $request): Response
     {
-        // 1. STATISTIK KPI (Dihitung berdasarkan Total Akumulasi Unit QTY Fisik)
+        // 1. STATISTIK KPI
         $totalBarang    = Barang::count();
         $totalStokFisik = (int) Stok::sum('jumlah');
         $totalGudang    = Gudang::where('is_active', true)->count();
         
-        // Total Volume QTY Barang Keluar
         $totalBarangKeluar = (int) TransaksiDetail::whereHas('transaksi', function ($q) {
             $q->where('jenis_transaksi', 'KELUAR')
               ->where('status', 'COMPLETED');
         })->sum('qty');
 
-        // Total Volume QTY Transfer Antar-Gudang
         $totalTransfer = (int) TransaksiDetail::whereHas('transaksi', function ($q) {
             $q->where(function ($qb) {
                 $qb->where('jenis_transaksi', 'TRANSFER')
@@ -67,7 +65,7 @@ class DashboardController extends Controller
             ->filter()
             ->values();
 
-        // 3. GRAFIK BULANAN (Menjumlahkan Total QTY Fisik per Kategori)
+        // 3. GRAFIK BULANAN LOGISTIK (MASUK, KELUAR, TRANSFER)
         $currentYear = date('Y');
         $driverName  = DB::connection()->getDriverName();
         $isSqlite    = $driverName === 'sqlite';
@@ -87,25 +85,66 @@ class DashboardController extends Controller
             ->get()
             ->keyBy(fn($item) => (int) $item->bulan);
 
+        // 4. GRAFIK BULANAN KONDISI FISIK BARANG (BARU, BEKAS, RUSAK)
+        $kondisiMonthlyRaw = DB::table('transaksi_details')
+            ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
+            ->selectRaw("
+                {$monthField} as bulan,
+                SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BARU' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BAIK') THEN transaksi_details.qty ELSE 0 END) as baru,
+                SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%SECOND%') THEN transaksi_details.qty ELSE 0 END) as bekas,
+                SUM(CASE WHEN UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%RUSAK%' THEN transaksi_details.qty ELSE 0 END) as rusak
+            ")
+            ->whereYear('transaksis.tanggal', $currentYear)
+            ->where('transaksis.status', 'COMPLETED')
+            ->groupBy(DB::raw($monthField))
+            ->get()
+            ->keyBy(fn($item) => (int) $item->bulan);
+
         $monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        $monthFullNames = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+
         $chartData = [];
+        $kondisiChartData = [];
+
         for ($m = 1; $m <= 12; $m++) {
-            $row = $monthlyRaw->get($m);
+            $rowLogistik = $monthlyRaw->get($m);
             $chartData[] = [
                 'name'     => $monthNames[$m - 1],
-                'MASUK'    => (int) ($row->masuk ?? 0),
-                'KELUAR'   => (int) ($row->keluar ?? 0),
-                'TRANSFER' => (int) ($row->transfer ?? 0),
+                'fullName' => $monthFullNames[$m - 1],
+                'MASUK'    => (int) ($rowLogistik->masuk ?? 0),
+                'KELUAR'   => (int) ($rowLogistik->keluar ?? 0),
+                'TRANSFER' => (int) ($rowLogistik->transfer ?? 0),
+            ];
+
+            $rowKondisi = $kondisiMonthlyRaw->get($m);
+            $baru  = (int) ($rowKondisi->baru ?? 0);
+            $bekas = (int) ($rowKondisi->bekas ?? 0);
+            $rusak = (int) ($rowKondisi->rusak ?? 0);
+            $totalKondisi = $baru + $bekas + $rusak;
+
+            $kondisiChartData[] = [
+                'name'      => $monthNames[$m - 1],
+                'fullMonth' => $monthFullNames[$m - 1],
+                'monthNum'  => $m,
+                'total'     => $totalKondisi,
+                'Baru'      => $baru,
+                'Bekas'     => $bekas,
+                'Rusak'     => $rusak,
+                'pctBaru'   => $totalKondisi > 0 ? (float) number_format(($baru / $totalKondisi) * 100, 1, '.', '') : 0.0,
+                'pctBekas'  => $totalKondisi > 0 ? (float) number_format(($bekas / $totalKondisi) * 100, 1, '.', '') : 0.0,
+                'pctRusak'  => $totalKondisi > 0 ? (float) number_format(($rusak / $totalKondisi) * 100, 1, '.', '') : 0.0,
             ];
         }
 
-        // 4. DAFTAR TRANSAKSI TERAKHIR
+        // 5. TRANSAKSI TERAKHIR & TIM OPERASIONAL
         $recentTransactions = Transaksi::with(['gudangAsal', 'gudangTujuan', 'supplier', 'picUser', 'details.barang'])
             ->latest('id')
             ->take(6)
             ->get();
 
-        // 5. TIM OPERASIONAL GUDANG
         $teamMembers = User::select(['id', 'name', 'email', 'role', 'created_at'])
             ->orderBy('name', 'asc')
             ->get();
@@ -120,6 +159,7 @@ class DashboardController extends Controller
             ],
             'mapData'            => $warehouseMapData,
             'chartData'          => $chartData,
+            'kondisiChartData'   => $kondisiChartData,
             'recentTransactions' => $recentTransactions,
             'teamMembers'        => $teamMembers,
         ]);
