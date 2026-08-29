@@ -28,7 +28,7 @@ export default function CrudTable({
     onSelectRow, 
     onEditRow, 
     getRowNumber,
-    zoomLevel = 100
+    zoomLevel = 100 
 }) {
     const getItemId = (item) => item?.id;
 
@@ -158,21 +158,27 @@ export default function CrudTable({
                         );
 
                     case 'kondisi': {
-                        let valKondisi = item.kondisi || detail.kondisi || 'Baru';
-                        if (valKondisi.toUpperCase() === 'BAIK') valKondisi = 'Baru';
-                        
-                        const upperKondisi = valKondisi.toUpperCase();
+                        if (item.sub_jenis === 'TRANSFER_GUDANG' || item.jenis_transaksi === 'TRANSFER') {
+                            return <span className="text-slate-400 text-xs font-bold font-mono">-</span>;
+                        }
+
+                        const raw = String(item.kondisi || detail.kondisi || 'Baru').toUpperCase().trim();
+                        let displayKondisi = 'Baru';
                         let badgeStyle = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
-                        
-                        if (upperKondisi === 'RUSAK') {
+
+                        if (raw === 'RUSAK') {
+                            displayKondisi = 'Rusak';
                             badgeStyle = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
-                        } else if (upperKondisi === 'BEKAS' || upperKondisi === 'SECOND') {
+                        } else if (raw.includes('BEKAS') || raw.includes('SECOND')) {
+                            displayKondisi = 'Bekas';
                             badgeStyle = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+                        } else if (raw === '-') {
+                            return <span className="text-slate-400 text-xs font-bold font-mono">-</span>;
                         }
 
                         return (
                             <Badge variant="outline" className={`${badgeStyle} text-[10px] font-bold px-2 py-0.5 rounded-md`}>
-                                {valKondisi}
+                                {displayKondisi}
                             </Badge>
                         );
                     }

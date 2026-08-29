@@ -113,6 +113,10 @@ export function useModalBarangMasukControl({
                 const targetBarang = barangs.find(b => String(b.id) === String(detail.barang_id));
                 const isSn = Boolean(targetBarang?.is_wajib_sn);
                 const existingSns = detail.serials ? detail.serials.map(s => s.serial_number || s) : [];
+
+                let cleanKondisi = selectedItem.sub_jenis === 'TRANSFER_GUDANG' ? '-' : (selectedItem.kondisi || detail.kondisi || 'Baru');
+                if (cleanKondisi.toUpperCase() === 'BAIK') cleanKondisi = 'Baru';
+
                 setRows([{
                     id: selectedItem.id,
                     sub_jenis: selectedItem.sub_jenis || 'PEMBELIAN',
@@ -124,8 +128,8 @@ export function useModalBarangMasukControl({
                     gudang_tujuan_id: selectedItem.gudang_tujuan_id ? String(selectedItem.gudang_tujuan_id) : '',
                     barang_id: detail.barang_id ? String(detail.barang_id) : '',
                     qty: detail.qty || 1,
-                    harga: detail.harga || '',
-                    kondisi: selectedItem.kondisi || (detail.kondisi === 'RUSAK' ? 'Rusak' : 'Baru'),
+                    harga: detail.harga !== undefined && detail.harga !== null ? String(detail.harga) : '',
+                    kondisi: cleanKondisi,
                     serials: isSn ? (existingSns.length > 0 ? existingSns : ['']) : []
                 }]);
             } else {
@@ -159,6 +163,11 @@ export function useModalBarangMasukControl({
             let newBarangId = currentRow.barang_id;
             let newSerials = currentRow.serials;
             let newQty = currentRow.qty;
+            let newKondisi = field === 'kondisi' ? value : currentRow.kondisi;
+
+            if (newKondisi && newKondisi.toUpperCase() === 'BAIK') {
+                newKondisi = 'Baru';
+            }
 
             if (field === 'gudang_asal_id' && currentRow.sub_jenis === 'TRANSFER_GUDANG') {
                 const targetBarang = barangs.find(b => String(b.id) === String(newBarangId));
@@ -175,12 +184,17 @@ export function useModalBarangMasukControl({
 
             if (field === 'sub_jenis') {
                 if (value === 'TRANSFER_GUDANG') {
+                    newKondisi = '-';
                     const targetBarang = barangs.find(b => String(b.id) === String(newBarangId));
                     const stockInWh = getBarangStockInWarehouse(targetBarang, currentRow.gudang_asal_id);
                     if (stockInWh <= 0) newBarangId = '';
                     newSerials = [];
                     newQty = 1;
                 } else {
+                    if (newKondisi === '-') newKondisi = 'Baru';
+                    else if ((value === 'PEMBELIAN' || value === 'PEMINJAMAN') && newKondisi === 'Rusak') {
+                        newKondisi = 'Baru';
+                    }
                     const targetBarang = barangs.find(b => String(b.id) === String(newBarangId));
                     newSerials = targetBarang?.is_wajib_sn ? Array(newQty || 1).fill('') : [];
                 }
@@ -191,7 +205,8 @@ export function useModalBarangMasukControl({
                 [field]: value, 
                 barang_id: newBarangId, 
                 serials: newSerials,
-                qty: newQty
+                qty: newQty,
+                kondisi: newKondisi
             };
             return updated;
         });
@@ -287,6 +302,7 @@ export function useModalBarangMasukControl({
             updated[rowIdx] = {
                 ...currentRow,
                 qty: newQty,
+                kondisi: '-',
                 serials: newSerials
             };
             return updated;
@@ -303,6 +319,7 @@ export function useModalBarangMasukControl({
             updated[rowIdx] = {
                 ...currentRow,
                 qty: autoSelected.length > 0 ? autoSelected.length : targetQty,
+                kondisi: '-',
                 serials: autoSelected
             };
             return updated;
@@ -413,17 +430,19 @@ export function useModalBarangMasukControl({
         const payload = isEditMode
             ? {
                 tanggal: rows[0].tanggal,
-                kondisi: rows[0].kondisi,
+                kondisi: rows[0].sub_jenis === 'TRANSFER_GUDANG' ? '-' : (rows[0].kondisi || 'Baru'),
                 nomor_imc: rows[0].nomor_imc.trim(),
                 nomor_omc: rows[0].sub_jenis === 'TRANSFER_GUDANG' ? rows[0].nomor_omc.trim() : null,
                 pihak_asal: rows[0].sub_jenis !== 'TRANSFER_GUDANG' ? rows[0].pihak_asal.trim() : null,
                 gudang_tujuan_id: parseInt(rows[0].gudang_tujuan_id, 10),
+                qty: parseInt(rows[0].qty, 10) || 1,
+                harga: rows[0].sub_jenis === 'PEMBELIAN' && rows[0].harga !== '' ? parseFloat(rows[0].harga) : 0,
             }
             : {
                 items: rows.map(r => ({
                     sub_jenis: r.sub_jenis,
                     tanggal: r.tanggal,
-                    kondisi: r.kondisi === 'Rusak' ? 'RUSAK' : 'BAIK',
+                    kondisi: r.sub_jenis === 'TRANSFER_GUDANG' ? '-' : (r.kondisi || 'Baru'),
                     nomor_imc: r.nomor_imc.trim(),
                     nomor_omc: r.sub_jenis === 'TRANSFER_GUDANG' ? r.nomor_omc.trim() : null,
                     pihak_asal: r.sub_jenis !== 'TRANSFER_GUDANG' ? r.pihak_asal.trim() : null,

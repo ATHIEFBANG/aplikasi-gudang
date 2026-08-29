@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. Tabel Transaksi Utama (LENGKAP)
+        // 1. Tabel Transaksi Utama
         Schema::create('transaksis', function (Blueprint $table) {
             $table->id();
             $table->string('no_transaksi', 50)->unique();
@@ -20,7 +20,6 @@ return new class extends Migration
             $table->string('nomor_omc')->nullable()->index();
             $table->string('pihak_asal')->nullable();
             
-            // Relasi Gudang, Supplier, PIC
             $table->foreignId('gudang_asal_id')->nullable()->constrained('gudangs')->nullOnDelete();
             $table->foreignId('gudang_tujuan_id')->nullable()->constrained('gudangs')->nullOnDelete();
             $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
@@ -39,8 +38,8 @@ return new class extends Migration
             $table->foreignId('transaksi_id')->constrained('transaksis')->cascadeOnDelete();
             $table->foreignId('barang_id')->constrained('barangs')->cascadeOnDelete();
             $table->integer('qty');
-            $table->decimal('harga', 15, 2)->nullable()->default(0); // <-- Kolom Harga Satuan
-            $table->enum('kondisi', ['BAIK', 'RUSAK'])->default('BAIK');
+            $table->decimal('harga', 15, 2)->nullable()->default(0);
+            $table->string('kondisi')->default('Baru'); // <-- Mendukung Baru, Bekas, Rusak
             $table->timestamps();
         });
 

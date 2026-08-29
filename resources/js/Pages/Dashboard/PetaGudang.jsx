@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import Tabel from '@/components/Tabel';
 import Map from '@/components/Map';
 import { MapPin, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -23,6 +22,9 @@ const TABLE_COLUMNS = [
     { key: 'nama_gudang', altKeys: ['nama_gudang', 'name', 'nama'], label: 'Nama Gudang' },
     { key: 'lokasi', altKeys: ['lokasi', 'alamat', 'address'], label: 'Alamat / Lokasi' },
     { key: 'koordinat', label: 'Koordinat (Lat, Lng)' },
+    { key: 'qty_baru', label: 'Stok Baru' },
+    { key: 'qty_bekas', label: 'Stok Bekas' },
+    { key: 'qty_rusak', label: 'Stok Rusak' },
     { key: 'total_qty', label: 'Total Stok Fisik' },
 ];
 
@@ -38,7 +40,7 @@ export default function PetaGudang({ mapData = [] }) {
     const [selectedItem, setSelectedItem] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
 
-    // State Pagination Tabel (Client-Side Pagination)
+    // Client-Side Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
     const [perPageInput, setPerPageInput] = useState(10);
@@ -46,7 +48,6 @@ export default function PetaGudang({ mapData = [] }) {
     const getItemId = useCallback((item) => item?.id, []);
     const getRowNumber = (index) => (currentPage - 1) * perPage + index + 1;
 
-    // Kalkulasi Pagination
     const totalData = mapData.length;
     const totalPages = Math.ceil(totalData / perPage) || 1;
     const fromIndex = totalData > 0 ? (currentPage - 1) * perPage + 1 : 0;
@@ -61,7 +62,6 @@ export default function PetaGudang({ mapData = [] }) {
         let val = parseInt(perPageInput, 10);
         if (isNaN(val) || val < 1) val = 10;
         else if (val > 100) val = 100;
-
         setPerPageInput(val);
         setPerPage(val);
         setCurrentPage(1);
@@ -135,30 +135,56 @@ export default function PetaGudang({ mapData = [] }) {
                                 {value || '-'}
                             </span>
                         );
+
                     case 'nama_gudang':
                         return (
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
                                 {value || '-'}
                             </span>
                         );
+
                     case 'lokasi':
                         return (
                             <span className="text-slate-600 dark:text-slate-400 text-xs">
                                 {value || '-'}
                             </span>
                         );
+
                     case 'koordinat':
                         return (
                             <span className="font-mono text-slate-500 text-[11px]">
                                 {item.latitude && item.longitude ? `${Number(item.latitude).toFixed(4)}, ${Number(item.longitude).toFixed(4)}` : '-'}
                             </span>
                         );
+
+                    case 'qty_baru':
+                        return (
+                            <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                {(item.qty_baru || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-400">Unit</span>
+                            </span>
+                        );
+
+                    case 'qty_bekas':
+                        return (
+                            <span className="font-mono text-xs font-bold text-amber-600 dark:text-amber-400">
+                                {(item.qty_bekas || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-400">Unit</span>
+                            </span>
+                        );
+
+                    case 'qty_rusak':
+                        return (
+                            <span className="font-mono text-xs font-bold text-rose-600 dark:text-rose-400">
+                                {(item.qty_rusak || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-400">Unit</span>
+                            </span>
+                        );
+
                     case 'total_qty':
                         return (
-                            <Badge variant="outline" className="font-mono text-[10px] font-bold text-amber-600 dark:text-amber-400 border-amber-500/30">
-                                {(item.total_qty || 0).toLocaleString('id-ID')} Unit
-                            </Badge>
+                            <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                                {(item.total_qty || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-400">Unit</span>
+                            </span>
                         );
+
                     default:
                         return value !== undefined && value !== null && value !== '' ? String(value) : '-';
                 }
@@ -168,7 +194,7 @@ export default function PetaGudang({ mapData = [] }) {
 
     return (
         <Card className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm flex flex-col">
-            {/* 1. HEADER CARD PETA */}
+            {/* 1. Header Card Peta */}
             <CardHeader className="px-5 py-3.5 border-b border-slate-200/80 dark:border-slate-800/80 flex flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-amber-400">
@@ -178,7 +204,6 @@ export default function PetaGudang({ mapData = [] }) {
                         Peta Sebaran Gudang Logistik
                     </CardTitle>
                 </div>
-
                 <div className="flex items-center gap-3">
                     <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
                         <strong className="text-blue-600 dark:text-amber-400 font-bold">{mapData.length}</strong> Lokasi Teridentifikasi
@@ -186,7 +211,7 @@ export default function PetaGudang({ mapData = [] }) {
                 </div>
             </CardHeader>
 
-            {/* 2. PETA LEAFLET */}
+            {/* 2. Peta Leaflet */}
             <CardContent className="p-0">
                 <div className="w-full h-[540px] relative border-b border-slate-200/80 dark:border-slate-800/80">
                     <Map
@@ -199,7 +224,9 @@ export default function PetaGudang({ mapData = [] }) {
                             details: [
                                 { label: 'Kode Gudang', value: item.kode_gudang || '-' },
                                 { label: 'Lokasi Area', value: item.lokasi || '-' },
-                                { label: 'Total Item SKU', value: `${item.total_item || 0} SKU` },
+                                { label: 'Stok Baru', value: `${(item.qty_baru || 0).toLocaleString('id-ID')} Unit` },
+                                { label: 'Stok Bekas', value: `${(item.qty_bekas || 0).toLocaleString('id-ID')} Unit` },
+                                { label: 'Stok Rusak', value: `${(item.qty_rusak || 0).toLocaleString('id-ID')} Unit` },
                                 { label: 'Total Stok Fisik', value: `${(item.total_qty || 0).toLocaleString('id-ID')} Unit` },
                                 { label: 'Koordinat', value: `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`, isMonospace: true }
                             ],
@@ -208,12 +235,11 @@ export default function PetaGudang({ mapData = [] }) {
                     />
                 </div>
 
-                {/* 3. SUB-HEADER TABEL */}
+                {/* 3. Sub-Header Tabel */}
                 <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                         Daftar Titik Gudang Operasional
                     </span>
-
                     <div className="flex items-center gap-2">
                         {isAdmin && selectedIds.length > 0 && (
                             <Button
@@ -227,11 +253,10 @@ export default function PetaGudang({ mapData = [] }) {
                                 <span>Hapus ({selectedIds.length})</span>
                             </Button>
                         )}
-
                         {canWrite && (
                             <Button 
-                                type="button" 
-                                size="sm" 
+                                type="button"
+                                size="sm"
                                 onClick={handleOpenAdd}
                                 className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors cursor-pointer"
                             >
@@ -242,7 +267,7 @@ export default function PetaGudang({ mapData = [] }) {
                     </div>
                 </div>
 
-                {/* 4. TABEL UNIVERSAL */}
+                {/* 4. Tabel Rincian Stok */}
                 <div className="w-full [&>div]:border-0 [&>div]:rounded-none [&>div]:shadow-none border-b border-slate-200 dark:border-slate-800">
                     <Tabel
                         data={paginatedList}
@@ -257,7 +282,7 @@ export default function PetaGudang({ mapData = [] }) {
                     />
                 </div>
 
-                {/* 5. FOOTER TABEL PERSIS MASTER DATA BARANG */}
+                {/* 5. Pagination Footer */}
                 <div className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="flex items-center gap-2">
                         <span>Tampilkan</span>
@@ -282,11 +307,9 @@ export default function PetaGudang({ mapData = [] }) {
                         />
                         <span>data per halaman</span>
                     </div>
-
                     <div className="text-slate-500">
                         Menampilkan <span className="font-semibold text-slate-700 dark:text-slate-300">{fromIndex}</span> - <span className="font-semibold text-slate-700 dark:text-slate-300">{toIndex}</span> dari <span className="font-semibold text-slate-700 dark:text-slate-300">{totalData}</span> data
                     </div>
-
                     <div className="flex items-center gap-1">
                         <Button
                             type="button"
@@ -298,7 +321,6 @@ export default function PetaGudang({ mapData = [] }) {
                         >
                             <ChevronLeft className="w-3.5 h-3.5" />
                         </Button>
-
                         {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                             <Button
                                 key={`page-${pageNum}`}
@@ -315,7 +337,6 @@ export default function PetaGudang({ mapData = [] }) {
                                 {pageNum}
                             </Button>
                         ))}
-
                         <Button
                             type="button"
                             variant="outline"
@@ -330,7 +351,7 @@ export default function PetaGudang({ mapData = [] }) {
                 </div>
             </CardContent>
 
-            {/* MODAL TAMBAH / EDIT GUDANG */}
+            {/* Modal Tambah/Edit Lokasi Gudang */}
             <ModalGudang
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}

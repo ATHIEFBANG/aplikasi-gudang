@@ -38,33 +38,31 @@ return new class extends Migration
             $table->string('brand')->nullable();
             $table->string('tipe')->nullable();
             $table->integer('min_stock')->default(0);
-            $table->boolean('is_wajib_sn')->default(false); // Validasi Wajib Serial Number
-            $table->boolean('is_wajib_pn')->default(false); // Validasi Wajib Part Number
-            $table->text('deskripsi')->nullable();          // Digunakan menyimpan nama Satuan
+            $table->boolean('is_wajib_sn')->default(false);
+            $table->boolean('is_wajib_pn')->default(false);
+            $table->text('deskripsi')->nullable();
             $table->string('foto')->nullable();
             $table->timestamps();
         });
 
-        // 4. Tabel Real-Time Stok (Pivot Barang x Gudang)
+        // 4. Tabel Real-Time Stok
         Schema::create('stoks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('barang_id')->constrained('barangs')->cascadeOnDelete();
             $table->foreignId('gudang_id')->constrained('gudangs')->cascadeOnDelete();
             $table->integer('jumlah')->default(0);
             $table->timestamps();
-
-            // Satu barang di satu gudang hanya memiliki satu baris stok
             $table->unique(['barang_id', 'gudang_id']);
         });
 
-        // 5. Tabel Serial Number (Spesifik per Unit Fisik)
+        // 5. Tabel Serial Number
         Schema::create('barang_serials', function (Blueprint $table) {
             $table->id();
             $table->foreignId('barang_id')->constrained('barangs')->cascadeOnDelete();
             $table->foreignId('gudang_id')->nullable()->constrained('gudangs')->nullOnDelete();
             $table->string('serial_number')->unique();
             $table->string('nomer_imc')->nullable();
-            $table->enum('kondisi', ['BAIK', 'RUSAK', 'MAINTENANCE'])->default('BAIK');
+            $table->string('kondisi')->default('Baru'); // <-- Mendukung Baru, Bekas, Rusak
             $table->enum('status', ['IN_WAREHOUSE', 'IN_USE', 'RETURNED'])->default('IN_WAREHOUSE');
             $table->timestamps();
         });
