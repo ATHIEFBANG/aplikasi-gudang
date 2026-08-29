@@ -2,9 +2,9 @@ import React, { useMemo } from 'react';
 import Tabel from '@/components/Tabel';
 import { Badge } from '@/components/ui/badge';
 
-const TABLE_COLUMNS = [
+const ALL_COLUMNS = [
     { key: 'no_transaksi', label: 'NO TRANSAKSI' },
-    { key: 'sub_jenis', label: 'JENIS PENERIMAAN' },
+    { key: 'sub_jenis', label: 'JENIS TRANSAKSI' },
     { key: 'kode_ppl', label: 'KODE PPL' },
     { key: 'nama_barang', label: 'NAMA BARANG' },
     { key: 'part_number', label: 'PART NUMBER' },
@@ -17,7 +17,7 @@ const TABLE_COLUMNS = [
     { key: 'nomor_imc', label: 'NOMOR IMC' },
     { key: 'nomor_omc', label: 'NOMOR OMC' },
     { key: 'asal', label: 'ASAL / PENGIRIM' },
-    { key: 'gudang_tujuan', label: 'GUDANG TUJUAN' },
+    { key: 'gudang_tujuan', label: 'TUJUAN / SITE' },
     { key: 'serials', label: 'SERIAL NUMBER (SN)' },
 ];
 
@@ -28,13 +28,44 @@ export default function CrudTable({
     onSelectRow, 
     onEditRow, 
     getRowNumber,
-    zoomLevel = 100 
+    zoomLevel = 100,
+    mainTab = 'MASUK'
 }) {
     const getItemId = (item) => item?.id;
 
     const formattedColumns = useMemo(() => {
-        return TABLE_COLUMNS.map((col) => ({
+        let visibleKeys = [];
+
+        if (mainTab === 'MASUK') {
+            // Tab Masuk: Lengkap dengan Harga, Total, Kondisi, IMC
+            visibleKeys = [
+                'no_transaksi', 'sub_jenis', 'kode_ppl', 'nama_barang', 'part_number', 
+                'satuan', 'tanggal', 'qty', 'harga', 'total_harga', 'kondisi', 
+                'nomor_imc', 'asal', 'gudang_tujuan', 'serials'
+            ];
+        } else if (mainTab === 'KELUAR') {
+            // Tab Keluar: Tanpa Harga, Total, Kondisi, IMC
+            visibleKeys = [
+                'no_transaksi', 'sub_jenis', 'kode_ppl', 'nama_barang', 'part_number', 
+                'satuan', 'tanggal', 'qty', 'nomor_omc', 'asal', 'gudang_tujuan', 'serials'
+            ];
+        } else if (mainTab === 'TRANSFER') {
+            // Tab Transfer: Tanpa Sub-Jenis, Tanpa Harga/Total/Kondisi
+            visibleKeys = [
+                'no_transaksi', 'kode_ppl', 'nama_barang', 'part_number', 'satuan', 
+                'tanggal', 'qty', 'nomor_omc', 'nomor_imc', 'asal', 'gudang_tujuan', 'serials'
+            ];
+        }
+
+        const activeCols = ALL_COLUMNS.filter((col) => visibleKeys.includes(col.key));
+
+        return activeCols.map((col) => ({
             ...col,
+            label: (col.key === 'asal' && mainTab === 'TRANSFER') 
+                ? 'GUDANG ASAL' 
+                : (col.key === 'gudang_tujuan' && mainTab === 'TRANSFER')
+                ? 'GUDANG TUJUAN'
+                : col.label,
             render: (item) => {
                 const detail = item.details?.[0] || {};
                 const barang = detail.barang || {};
@@ -51,29 +82,29 @@ export default function CrudTable({
 
                     case 'sub_jenis': {
                         let statusSub = item.sub_jenis;
-                        if (!statusSub || statusSub === 'MASUK') {
+                        if (!statusSub) {
                             const noTrx = item.no_transaksi || '';
                             if (noTrx.includes('BUY')) statusSub = 'PEMBELIAN';
-                            else if (noTrx.includes('BORROW')) statusSub = 'PEMINJAMAN';
-                            else if (noTrx.includes('RET')) statusSub = 'PENGEMBALIAN';
+                            else if (noTrx.includes('SITE')) statusSub = 'BARANG_KE_SITE';
+                            else if (noTrx.includes('INT')) statusSub = 'PEMAKAIAN_INTERNAL';
                             else if (noTrx.includes('TRF')) statusSub = 'TRANSFER_GUDANG';
-                            else statusSub = 'PEMBELIAN';
+                            else statusSub = item.jenis_transaksi || 'PEMBELIAN';
                         }
 
                         const badgeColor = {
                             PEMBELIAN: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
                             PEMINJAMAN: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
                             PENGEMBALIAN: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-                            TRANSFER_GUDANG: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-                            TRANSFER: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+                            BARANG_KE_SITE: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+                            PEMAKAIAN_INTERNAL: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
                         };
 
                         return (
                             <Badge 
                                 variant="outline" 
-                                className={`${badgeColor[statusSub] || 'bg-blue-500/10 text-blue-600 border-blue-500/20'} text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide`}
+                                className={`${badgeColor[statusSub] || 'bg-slate-500/10 text-slate-600 border-slate-500/20'} text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide`}
                             >
-                                {statusSub?.replace('_', ' ')}
+                                {statusSub?.replace(/_/g, ' ')}
                             </Badge>
                         );
                     }
@@ -158,10 +189,6 @@ export default function CrudTable({
                         );
 
                     case 'kondisi': {
-                        if (item.sub_jenis === 'TRANSFER_GUDANG' || item.jenis_transaksi === 'TRANSFER') {
-                            return <span className="text-slate-400 text-xs font-bold font-mono">-</span>;
-                        }
-
                         const raw = String(item.kondisi || detail.kondisi || 'Baru').toUpperCase().trim();
                         let displayKondisi = 'Baru';
                         let badgeStyle = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
@@ -172,8 +199,6 @@ export default function CrudTable({
                         } else if (raw.includes('BEKAS') || raw.includes('SECOND')) {
                             displayKondisi = 'Bekas';
                             badgeStyle = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
-                        } else if (raw === '-') {
-                            return <span className="text-slate-400 text-xs font-bold font-mono">-</span>;
                         }
 
                         return (
@@ -192,14 +217,14 @@ export default function CrudTable({
 
                     case 'nomor_omc':
                         return (
-                            <span className="font-mono text-xs text-slate-600 dark:text-slate-400">
+                            <span className="font-mono text-xs text-rose-600 dark:text-rose-400 font-bold">
                                 {item.nomor_omc || '-'}
                             </span>
                         );
 
                     case 'asal': {
-                        const asalText = (item.sub_jenis === 'TRANSFER_GUDANG' || item.jenis_transaksi === 'TRANSFER')
-                            ? item.gudang_asal?.nama_gudang
+                        const asalText = (mainTab === 'KELUAR' || mainTab === 'TRANSFER')
+                            ? (item.gudang_asal?.nama_gudang || '-')
                             : (item.pihak_asal || item.supplier?.nama_supplier);
                         return (
                             <span className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate block max-w-[150px]" title={asalText}>
@@ -208,27 +233,54 @@ export default function CrudTable({
                         );
                     }
 
-                    case 'gudang_tujuan':
+                    case 'gudang_tujuan': {
+                        const tujuanText = (mainTab === 'TRANSFER')
+                            ? item.gudang_tujuan?.nama_gudang
+                            : (mainTab === 'KELUAR' ? item.pihak_asal : item.gudang_tujuan?.nama_gudang);
                         return (
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 truncate block max-w-[150px]" title={item.gudang_tujuan?.nama_gudang}>
-                                {item.gudang_tujuan?.nama_gudang || '-'}
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 truncate block max-w-[150px]" title={tujuanText}>
+                                {tujuanText || '-'}
                             </span>
                         );
+                    }
 
                     case 'serials': {
                         const listSn = detail.serials || item.serials || [];
                         return (
-                            <div className="flex flex-wrap gap-1 max-w-[260px] max-h-24 overflow-y-auto py-1">
+                            <div className="flex flex-wrap gap-1 max-w-[280px] max-h-24 overflow-y-auto py-1">
                                 {listSn.length > 0 ? (
-                                    listSn.map((s, idx) => (
-                                        <Badge 
-                                            key={idx} 
-                                            variant="outline" 
-                                            className="text-[9px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.5 shrink-0"
-                                        >
-                                            {s.serial_number || s}
-                                        </Badge>
-                                    ))
+                                    listSn.map((s, idx) => {
+                                        const snVal = s.serial_number || s;
+                                        const rawKondisi = String(s.kondisi || '').toUpperCase().trim();
+                                        let kondisiText = '';
+                                        let badgeColor = '';
+
+                                        if (rawKondisi === 'RUSAK') {
+                                            kondisiText = 'Rusak';
+                                            badgeColor = 'bg-rose-500/20 text-rose-600';
+                                        } else if (rawKondisi.includes('BEKAS') || rawKondisi.includes('SECOND')) {
+                                            kondisiText = 'Bekas';
+                                            badgeColor = 'bg-amber-500/20 text-amber-600';
+                                        } else if (rawKondisi === 'BARU' || rawKondisi === 'BAIK') {
+                                            kondisiText = 'Baru';
+                                            badgeColor = 'bg-emerald-500/20 text-emerald-600';
+                                        }
+
+                                        return (
+                                            <Badge 
+                                                key={idx} 
+                                                variant="outline" 
+                                                className="text-[10px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.5 shrink-0 flex items-center gap-1"
+                                            >
+                                                <span>{snVal}</span>
+                                                {kondisiText && (
+                                                    <span className={`text-[8px] px-1 py-0.2 rounded font-sans font-bold uppercase ${badgeColor}`}>
+                                                        {kondisiText}
+                                                    </span>
+                                                )}
+                                            </Badge>
+                                        );
+                                    })
                                 ) : (
                                     <span className="text-slate-400 text-xs">-</span>
                                 )}
@@ -241,7 +293,7 @@ export default function CrudTable({
                 }
             },
         }));
-    }, []);
+    }, [mainTab]);
 
     return (
         <Tabel
@@ -254,7 +306,7 @@ export default function CrudTable({
             getItemId={getItemId}
             getRowNumber={getRowNumber}
             zoomLevel={zoomLevel}
-            emptyMessage="Belum ada riwayat transaksi barang masuk."
+            emptyMessage={`Belum ada riwayat data ${mainTab.toLowerCase()}.`}
         />
     );
 }

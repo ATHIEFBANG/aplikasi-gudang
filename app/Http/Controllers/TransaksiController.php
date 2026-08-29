@@ -23,7 +23,6 @@ class TransaksiController extends Controller
     public function index(Request $request): Response
     {
         $jenis    = $request->input('jenis_transaksi', 'MASUK');
-        $subJenis = $request->input('sub_jenis');
         $search   = $request->input('search');
         $perPage  = (int) $request->input('per_page', 10);
         
@@ -41,12 +40,19 @@ class TransaksiController extends Controller
             ->orderBy('tanggal', $order)
             ->orderBy('id', $order);
 
-        if ($jenis && $jenis !== 'ALL') {
-            $query->where('jenis_transaksi', $jenis);
-        }
-
-        if ($subJenis && $subJenis !== 'ALL') {
-            $query->where('sub_jenis', $subJenis);
+        // Filter 3 Tab Utama: MASUK, KELUAR, dan TRANSFER
+        if ($jenis === 'TRANSFER') {
+            $query->where(function ($q) {
+                $q->where('jenis_transaksi', 'TRANSFER')
+                  ->orWhere('sub_jenis', 'TRANSFER_GUDANG');
+            });
+        } elseif ($jenis === 'KELUAR') {
+            $query->where('jenis_transaksi', 'KELUAR')
+                  ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+        } else {
+            // Default: MASUK (Murni Inbound)
+            $query->where('jenis_transaksi', 'MASUK')
+                  ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         }
 
         if ($search) {
@@ -89,7 +95,6 @@ class TransaksiController extends Controller
             ]),
             'filters'    => [
                 'jenis_transaksi' => $jenis,
-                'sub_jenis'       => $subJenis ?? 'ALL',
                 'search'          => $search ?? '',
                 'order'           => $order,
                 'per_page'        => $perPage,
@@ -102,13 +107,12 @@ class TransaksiController extends Controller
         if ($request->has('items') && is_array($request->items)) {
             $validated = $request->validate([
                 'items'                     => 'required|array|min:1',
-                'items.*.sub_jenis'         => 'required|string|in:PEMBELIAN,PEMINJAMAN,PENGEMBALIAN,TRANSFER_GUDANG',
+                'items.*.sub_jenis'         => 'required|string|in:PEMBELIAN,PEMINJAMAN,PENGEMBALIAN',
                 'items.*.tanggal'           => 'required|date',
-                'items.*.kondisi'           => 'nullable|string|max:50',
+                'items.*.kondisi'           => 'required|string|max:50',
                 'items.*.nomor_imc'         => 'required|string|max:100',
                 'items.*.nomor_omc'         => 'nullable|string|max:100',
-                'items.*.pihak_asal'        => 'nullable|string|max:255',
-                'items.*.gudang_asal_id'    => 'nullable|exists:gudangs,id',
+                'items.*.pihak_asal'        => 'required|string|max:255',
                 'items.*.gudang_tujuan_id'  => 'required|exists:gudangs,id',
                 'items.*.barang_id'         => 'required|exists:barangs,id',
                 'items.*.qty'               => 'required|integer|min:1|max:50',
@@ -124,13 +128,12 @@ class TransaksiController extends Controller
                         'PEMBELIAN'       => 'TRX-IN-BUY',
                         'PEMINJAMAN'      => 'TRX-IN-BORROW',
                         'PENGEMBALIAN'    => 'TRX-IN-RET',
-                        'TRANSFER_GUDANG' => 'TRX-TRF',
                         default           => 'TRX-MASUK',
                     };
 
                     $randomSuffix = strtoupper(Str::random(4));
                     $noTransaksi  = $prefix . '-' . date('YmdHis') . '-' . $randomSuffix;
-                    $kondisiFix   = $subJenis === 'TRANSFER_GUDANG' ? '-' : ucfirst(strtolower($item['kondisi'] ?? 'Baru'));
+                    $kondisiFix   = ucfirst(strtolower($item['kondisi'] ?? 'Baru'));
 
                     $transaksi = Transaksi::create([
                         'no_transaksi'     => $noTransaksi,
@@ -138,10 +141,10 @@ class TransaksiController extends Controller
                         'sub_jenis'        => $subJenis,
                         'tanggal'          => $item['tanggal'],
                         'kondisi'          => $kondisiFix,
-                        'nomor_imc'        => $item['nomor_imc'] ?? null,
+                        'nomor_imc'        => $item['nomor_imc'],
                         'nomor_omc'        => $item['nomor_omc'] ?? null,
-                        'pihak_asal'       => $item['pihak_asal'] ?? null,
-                        'gudang_asal_id'   => $item['gudang_asal_id'] ?? null,
+                        'pihak_asal'       => $item['pihak_asal'],
+                        'gudang_asal_id'   => null,
                         'gudang_tujuan_id' => $item['gudang_tujuan_id'],
                         'pic_user_id'      => $request->user()->id,
                         'status'           => 'COMPLETED',
@@ -175,7 +178,7 @@ class TransaksiController extends Controller
                                 [
                                     'status'    => 'IN_WAREHOUSE', 
                                     'gudang_id' => $transaksi->gudang_tujuan_id,
-                                    'kondisi'   => 'Baru',
+                                    'kondisi'   => $kondisiFix,
                                     'nomer_imc' => $transaksi->nomor_imc
                                 ]
                             );
@@ -183,8 +186,8 @@ class TransaksiController extends Controller
                             $serialRecord->update([
                                 'status'    => 'IN_WAREHOUSE',
                                 'gudang_id' => $transaksi->gudang_tujuan_id,
-                                'kondisi'   => $subJenis === 'TRANSFER_GUDANG' ? ($serialRecord->kondisi ?? 'Baru') : $kondisiFix,
-                                'nomer_imc' => $transaksi->nomor_imc ?? $serialRecord->nomer_imc,
+                                'kondisi'   => $kondisiFix,
+                                'nomer_imc' => $transaksi->nomor_imc,
                             ]);
 
                             DB::table('transaksi_detail_serials')->insert([
@@ -214,150 +217,138 @@ class TransaksiController extends Controller
                             'keterangan'    => "Penerimaan Stok Masuk ({$transaksi->sub_jenis})",
                         ]);
                     }
-
-                    if ($transaksi->sub_jenis === 'TRANSFER_GUDANG' && $transaksi->gudang_asal_id) {
-                        $stokAsal = Stok::where('barang_id', $barangId)
-                            ->where('gudang_id', $transaksi->gudang_asal_id)
-                            ->lockForUpdate()
-                            ->first();
-
-                        if (!$stokAsal || $stokAsal->jumlah < $qty) {
-                            throw new \Exception("Stok di gudang asal tidak mencukupi untuk transfer barang '{$barang->nama_barang}'.");
-                        }
-
-                        $stokAsal->decrement('jumlah', $qty);
-                        $stokAsal->refresh();
-
-                        StockLog::create([
-                            'barang_id'     => $barangId,
-                            'gudang_id'     => $transaksi->gudang_asal_id,
-                            'transaksi_id'  => $transaksi->id,
-                            'user_id'       => $request->user()->id,
-                            'qty_perubahan' => -$qty,
-                            'qty_akhir'     => $stokAsal->jumlah,
-                            'keterangan'    => "Transfer Keluar ke Gudang #{$transaksi->gudang_tujuan_id}",
-                        ]);
-                    }
                 }
             });
 
-            return redirect()->back()->with('success', count($validated['items']) . ' Data transaksi berhasil ditambahkan.');
+            return redirect()->back()->with('success', count($validated['items']) . ' Data transaksi masuk berhasil dicatat.');
         }
 
+        return redirect()->back()->with('error', 'Format data tidak valid.');
+    }
+
+    // Endpoint khusus mencatat Transfer Antar-Gudang
+    public function storeTransfer(Request $request)
+    {
         $validated = $request->validate([
-            'sub_jenis'        => 'required|string|in:PEMBELIAN,PEMINJAMAN,PENGEMBALIAN,TRANSFER_GUDANG',
-            'tanggal'          => 'required|date',
-            'kondisi'          => 'nullable|string|max:50',
-            'nomor_imc'        => 'required|string|max:100',
-            'nomor_omc'        => 'nullable|string|max:100',
-            'pihak_asal'       => 'nullable|string|max:255',
-            'gudang_asal_id'   => 'nullable|exists:gudangs,id',
-            'gudang_tujuan_id' => 'required|exists:gudangs,id',
-            'barang_id'        => 'required|exists:barangs,id',
-            'qty'              => 'required|integer|min:1|max:50',
-            'harga'            => 'nullable|numeric|min:0',
-            'serials'          => 'nullable|array',
-            'serials.*'        => 'nullable|string|max:100',
+            'items'                    => 'required|array|min:1',
+            'items.*.tanggal'          => 'required|date',
+            'items.*.nomor_omc'        => 'required|string|max:100',
+            'items.*.nomor_imc'        => 'nullable|string|max:100',
+            'items.*.gudang_asal_id'   => 'required|exists:gudangs,id',
+            'items.*.gudang_tujuan_id' => 'required|exists:gudangs,id',
+            'items.*.barang_id'        => 'required|exists:barangs,id',
+            'items.*.qty'              => 'required|integer|min:1|max:50',
+            'items.*.serials'          => 'nullable|array',
+            'items.*.serials.*'        => 'nullable|string|max:100',
         ]);
 
         DB::transaction(function () use ($validated, $request) {
-            $prefix = match($validated['sub_jenis']) {
-                'PEMBELIAN'       => 'TRX-IN-BUY',
-                'PEMINJAMAN'      => 'TRX-IN-BORROW',
-                'PENGEMBALIAN'    => 'TRX-IN-RET',
-                'TRANSFER_GUDANG' => 'TRX-TRF',
-                default           => 'TRX-MASUK',
-            };
+            foreach ($validated['items'] as $item) {
+                $randomSuffix = strtoupper(Str::random(4));
+                $noTransaksi  = 'TRX-TRF-' . date('YmdHis') . '-' . $randomSuffix;
+                $barangId     = (int) $item['barang_id'];
+                $gudangAsalId = (int) $item['gudang_asal_id'];
+                $gudangTujuanId = (int) $item['gudang_tujuan_id'];
+                $qty          = (int) $item['qty'];
+                $barang       = Barang::findOrFail($barangId);
+                $serials      = array_filter($item['serials'] ?? []);
 
-            $randomSuffix = strtoupper(Str::random(4));
-            $noTransaksi  = $prefix . '-' . date('YmdHis') . '-' . $randomSuffix;
-            $kondisiFix   = $validated['sub_jenis'] === 'TRANSFER_GUDANG' ? '-' : ucfirst(strtolower($validated['kondisi'] ?? 'Baru'));
-
-            $transaksi = Transaksi::create([
-                'no_transaksi'     => $noTransaksi,
-                'jenis_transaksi'  => 'MASUK',
-                'sub_jenis'        => $validated['sub_jenis'],
-                'tanggal'          => $validated['tanggal'],
-                'kondisi'          => $kondisiFix,
-                'nomor_imc'        => $validated['nomor_imc'] ?? null,
-                'nomor_omc'        => $validated['nomor_omc'] ?? null,
-                'pihak_asal'       => $validated['pihak_asal'] ?? null,
-                'gudang_asal_id'   => $validated['gudang_asal_id'] ?? null,
-                'gudang_tujuan_id' => $validated['gudang_tujuan_id'],
-                'pic_user_id'      => $request->user()->id,
-                'status'           => 'COMPLETED',
-            ]);
-
-            $barangId = $validated['barang_id'];
-            $qty      = (int) $validated['qty'];
-            $harga    = $validated['sub_jenis'] === 'PEMBELIAN' ? (float) ($validated['harga'] ?? 0) : 0;
-            $serials  = array_filter($validated['serials'] ?? []);
-
-            $barang = Barang::findOrFail($barangId);
-            if ($barang->is_wajib_sn && count($serials) !== $qty) {
-                throw new \Exception("Jumlah Serial Number untuk barang '{$barang->nama_barang}' harus tepat {$qty} unit.");
-            }
-
-            $detail = TransaksiDetail::create([
-                'transaksi_id' => $transaksi->id,
-                'barang_id'    => $barangId,
-                'qty'          => $qty,
-                'harga'        => $harga,
-                'kondisi'      => $kondisiFix,
-            ]);
-
-            if (!empty($serials)) {
-                foreach ($serials as $sn) {
-                    $cleanSn = trim($sn);
-                    if ($cleanSn === '') continue;
-
-                    $serialRecord = BarangSerial::firstOrCreate(
-                        ['barang_id' => $barangId, 'serial_number' => $cleanSn],
-                        [
-                            'status'    => 'IN_WAREHOUSE', 
-                            'gudang_id' => $transaksi->gudang_tujuan_id,
-                            'kondisi'   => 'Baru',
-                            'nomer_imc' => $transaksi->nomor_imc
-                        ]
-                    );
-
-                    $serialRecord->update([
-                        'status'    => 'IN_WAREHOUSE',
-                        'gudang_id' => $transaksi->gudang_tujuan_id,
-                        'kondisi'   => $validated['sub_jenis'] === 'TRANSFER_GUDANG' ? ($serialRecord->kondisi ?? 'Baru') : $kondisiFix,
-                        'nomer_imc' => $transaksi->nomor_imc ?? $serialRecord->nomer_imc,
-                    ]);
-
-                    DB::table('transaksi_detail_serials')->insert([
-                        'transaksi_detail_id' => $detail->id,
-                        'barang_serial_id'    => $serialRecord->id,
-                        'created_at'          => now(),
-                        'updated_at'          => now(),
-                    ]);
+                if ($gudangAsalId === $gudangTujuanId) {
+                    throw new \Exception("Gudang Asal dan Gudang Tujuan tidak boleh sama.");
                 }
-            }
 
-            if ($transaksi->gudang_tujuan_id) {
+                $stokAsal = Stok::where('barang_id', $barangId)
+                    ->where('gudang_id', $gudangAsalId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$stokAsal || $stokAsal->jumlah < $qty) {
+                    $stokTersedia = $stokAsal ? $stokAsal->jumlah : 0;
+                    throw new \Exception("Stok barang '{$barang->nama_barang}' di gudang asal tidak mencukupi (Tersedia: {$stokTersedia}, Diminta: {$qty}).");
+                }
+
+                if ($barang->is_wajib_sn && count($serials) !== $qty) {
+                    throw new \Exception("Pilih Serial Number untuk barang '{$barang->nama_barang}' tepat {$qty} unit.");
+                }
+
+                $transaksi = Transaksi::create([
+                    'no_transaksi'     => $noTransaksi,
+                    'jenis_transaksi'  => 'TRANSFER',
+                    'sub_jenis'        => 'TRANSFER_GUDANG',
+                    'tanggal'          => $item['tanggal'],
+                    'kondisi'          => '-',
+                    'nomor_omc'        => $item['nomor_omc'],
+                    'nomor_imc'        => $item['nomor_imc'] ?? null,
+                    'gudang_asal_id'   => $gudangAsalId,
+                    'gudang_tujuan_id' => $gudangTujuanId,
+                    'pic_user_id'      => $request->user()->id,
+                    'status'           => 'COMPLETED',
+                ]);
+
+                $detail = TransaksiDetail::create([
+                    'transaksi_id' => $transaksi->id,
+                    'barang_id'    => $barangId,
+                    'qty'          => $qty,
+                    'harga'        => 0,
+                    'kondisi'      => '-',
+                ]);
+
+                // 1. Kurangi Gudang Asal
+                $stokAsal->decrement('jumlah', $qty);
+                $stokAsal->refresh();
+                StockLog::create([
+                    'barang_id'     => $barangId,
+                    'gudang_id'     => $gudangAsalId,
+                    'transaksi_id'  => $transaksi->id,
+                    'user_id'       => $request->user()->id,
+                    'qty_perubahan' => -$qty,
+                    'qty_akhir'     => $stokAsal->jumlah,
+                    'keterangan'    => "Transfer Keluar ke Gudang #{$gudangTujuanId}",
+                ]);
+
+                // 2. Tambah Gudang Tujuan
                 $stokTujuan = Stok::firstOrCreate(
-                    ['barang_id' => $barangId, 'gudang_id' => $transaksi->gudang_tujuan_id],
+                    ['barang_id' => $barangId, 'gudang_id' => $gudangTujuanId],
                     ['jumlah' => 0]
                 );
                 $stokTujuan->increment('jumlah', $qty);
                 $stokTujuan->refresh();
-
                 StockLog::create([
                     'barang_id'     => $barangId,
-                    'gudang_id'     => $transaksi->gudang_tujuan_id,
+                    'gudang_id'     => $gudangTujuanId,
                     'transaksi_id'  => $transaksi->id,
                     'user_id'       => $request->user()->id,
                     'qty_perubahan' => +$qty,
                     'qty_akhir'     => $stokTujuan->jumlah,
-                    'keterangan'    => "Penerimaan Stok Masuk ({$transaksi->sub_jenis})",
+                    'keterangan'    => "Penerimaan Transfer dari Gudang #{$gudangAsalId}",
                 ]);
+
+                // 3. Pindahkan Gudang ID Serial Number
+                if (!empty($serials)) {
+                    foreach ($serials as $sn) {
+                        $serialRecord = BarangSerial::where('barang_id', $barangId)
+                            ->where('serial_number', trim($sn))
+                            ->first();
+
+                        if ($serialRecord) {
+                            $serialRecord->update([
+                                'gudang_id' => $gudangTujuanId,
+                                'status'    => 'IN_WAREHOUSE',
+                            ]);
+
+                            DB::table('transaksi_detail_serials')->insert([
+                                'transaksi_detail_id' => $detail->id,
+                                'barang_serial_id'    => $serialRecord->id,
+                                'created_at'          => now(),
+                                'updated_at'          => now(),
+                            ]);
+                        }
+                    }
+                }
             }
         });
 
-        return redirect()->back()->with('success', 'Transaksi stok masuk berhasil dicatat.');
+        return redirect()->back()->with('success', 'Transfer antar-gudang berhasil dicatat.');
     }
 
     public function update(Request $request, int $id)
@@ -371,12 +362,12 @@ class TransaksiController extends Controller
             'nomor_omc'        => 'nullable|string|max:100',
             'pihak_asal'       => 'nullable|string|max:255',
             'gudang_tujuan_id' => 'nullable|exists:gudangs,id',
-            'qty'              => 'nullable|integer|min:1|max:50', // Menerima perubahan Qty saat edit
-            'harga'            => 'nullable|numeric|min:0',        // Menerima perubahan Harga Satuan saat edit
+            'qty'              => 'nullable|integer|min:1|max:50',
+            'harga'            => 'nullable|numeric|min:0',
             'keterangan'       => 'nullable|string|max:500',
         ]);
 
-        $kondisiFix = $transaksi->sub_jenis === 'TRANSFER_GUDANG' ? '-' : ucfirst(strtolower($validated['kondisi'] ?? 'Baru'));
+        $kondisiFix = ucfirst(strtolower($validated['kondisi'] ?? 'Baru'));
         $hargaFix   = $transaksi->sub_jenis === 'PEMBELIAN' ? (float) ($validated['harga'] ?? 0) : 0;
         $newQty     = isset($validated['qty']) ? (int) $validated['qty'] : null;
 
@@ -388,53 +379,20 @@ class TransaksiController extends Controller
                 $oldQty   = (int) $detail->qty;
                 $finalQty = $newQty !== null ? $newQty : $oldQty;
 
-                // 1. Update harga, kondisi, dan qty pada tabel transaksi_details
                 $detail->update([
                     'kondisi' => $kondisiFix,
                     'harga'   => $hargaFix,
                     'qty'     => $finalQty,
                 ]);
 
-                // 2. Sinkronisasi stok gudang
                 if ($newGudangTujuanId && $newGudangTujuanId !== $oldGudangTujuanId) {
                     $barangId = $detail->barang_id;
-
-                    $stokLama = Stok::where('barang_id', $barangId)
-                        ->where('gudang_id', $oldGudangTujuanId)
-                        ->lockForUpdate()
-                        ->first();
-
+                    $stokLama = Stok::where('barang_id', $barangId)->where('gudang_id', $oldGudangTujuanId)->first();
                     if ($stokLama) {
                         $stokLama->decrement('jumlah', min($stokLama->jumlah, $oldQty));
-                        $stokLama->refresh();
-
-                        StockLog::create([
-                            'barang_id'     => $barangId,
-                            'gudang_id'     => $oldGudangTujuanId,
-                            'transaksi_id'  => $transaksi->id,
-                            'user_id'       => $request->user()->id,
-                            'qty_perubahan' => -$oldQty,
-                            'qty_akhir'     => $stokLama->jumlah,
-                            'keterangan'    => "Penyesuaian Edit Transaksi: Pindah ke Gudang #{$newGudangTujuanId}",
-                        ]);
                     }
-
-                    $stokBaru = Stok::firstOrCreate(
-                        ['barang_id' => $barangId, 'gudang_id' => $newGudangTujuanId],
-                        ['jumlah' => 0]
-                    );
+                    $stokBaru = Stok::firstOrCreate(['barang_id' => $barangId, 'gudang_id' => $newGudangTujuanId], ['jumlah' => 0]);
                     $stokBaru->increment('jumlah', $finalQty);
-                    $stokBaru->refresh();
-
-                    StockLog::create([
-                        'barang_id'     => $barangId,
-                        'gudang_id'     => $newGudangTujuanId,
-                        'transaksi_id'  => $transaksi->id,
-                        'user_id'       => $request->user()->id,
-                        'qty_perubahan' => +$finalQty,
-                        'qty_akhir'     => $stokBaru->jumlah,
-                        'keterangan'    => "Penyesuaian Edit Transaksi: Masuk dari Gudang #{$oldGudangTujuanId}",
-                    ]);
 
                     foreach ($detail->serials as $serial) {
                         $serial->update([
@@ -442,35 +400,9 @@ class TransaksiController extends Controller
                             'nomer_imc' => $validated['nomor_imc'] ?? $serial->nomer_imc,
                         ]);
                     }
-                } else if ($finalQty !== $oldQty) {
-                    $diff = $finalQty - $oldQty;
-                    $stok = Stok::firstOrCreate(['barang_id' => $detail->barang_id, 'gudang_id' => $oldGudangTujuanId], ['jumlah' => 0]);
-                    if ($diff > 0) {
-                        $stok->increment('jumlah', $diff);
-                    } else {
-                        $stok->decrement('jumlah', min($stok->jumlah, abs($diff)));
-                    }
-                    $stok->refresh();
-
-                    StockLog::create([
-                        'barang_id'     => $detail->barang_id,
-                        'gudang_id'     => $oldGudangTujuanId,
-                        'transaksi_id'  => $transaksi->id,
-                        'user_id'       => $request->user()->id,
-                        'qty_perubahan' => $diff,
-                        'qty_akhir'     => $stok->jumlah,
-                        'keterangan'    => "Penyesuaian Qty Edit Transaksi",
-                    ]);
-                }
-
-                if ($transaksi->sub_jenis !== 'TRANSFER_GUDANG') {
-                    foreach ($detail->serials as $serial) {
-                        $serial->update(['kondisi' => $kondisiFix]);
-                    }
                 }
             }
 
-            // 3. Update header transaksi utama
             $transaksi->update([
                 'tanggal'          => $validated['tanggal'],
                 'kondisi'          => $kondisiFix,
@@ -482,7 +414,7 @@ class TransaksiController extends Controller
             ]);
         });
 
-        return redirect()->back()->with('success', 'Data transaksi, kuantitas, dan harga berhasil diperbarui.');
+        return redirect()->back()->with('success', 'Data transaksi berhasil diperbarui.');
     }
 
     public function destroy(int $id)
@@ -509,8 +441,15 @@ class TransaksiController extends Controller
         $order    = in_array($rawOrder, ['asc', 'desc'], true) ? $rawOrder : 'desc';
 
         $query = Transaksi::with(['gudangAsal', 'gudangTujuan', 'details.barang', 'details.serials'])
-            ->where('jenis_transaksi', $jenis)
             ->orderBy('tanggal', $order);
+
+        if ($jenis === 'TRANSFER') {
+            $query->where(fn($q) => $q->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'));
+        } elseif ($jenis === 'KELUAR') {
+            $query->where('jenis_transaksi', 'KELUAR')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+        } else {
+            $query->where('jenis_transaksi', 'MASUK')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+        }
 
         $transaksis = $query->get();
         $csvFileName = 'Transaksi_' . $jenis . '_' . date('Y-m-d_His') . '.csv';
@@ -521,9 +460,10 @@ class TransaksiController extends Controller
             'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
             'Expires'             => '0',
         ];
+
         $columns = [
             'No Transaksi', 
-            'Jenis Penerimaan', 
+            'Jenis Transaksi', 
             'Kode PPL', 
             'Nama Barang', 
             'Part Number', 
@@ -535,8 +475,8 @@ class TransaksiController extends Controller
             'Kondisi', 
             'Nomor IMC', 
             'Nomor OMC', 
-            'Asal / Pengirim', 
-            'Gudang Tujuan', 
+            'Gudang Asal / Pihak Asal', 
+            'Gudang Tujuan / Site', 
             'Serial Numbers'
         ];
 
@@ -547,7 +487,7 @@ class TransaksiController extends Controller
             foreach ($transaksis as $t) {
                 $detail = $t->details->first();
                 $barang = $detail?->barang;
-                $snList = $detail ? $detail->serials->pluck('serial_number')->implode(', ') : '-';
+                $snList = $detail ? $detail->serials->map(fn($s) => "{$s->serial_number} ({$s->kondisi})")->implode(', ') : '-';
                 $namaLengkap = $barang ? trim("{$barang->brand} {$barang->tipe} {$barang->kategori}") : '-';
                 $hargaSatuan = $detail?->harga ?? 0;
                 $totalNilai = ($detail?->qty ?? 0) * $hargaSatuan;
@@ -566,8 +506,8 @@ class TransaksiController extends Controller
                     $t->kondisi ?? '-',
                     $t->nomor_imc ?? '-',
                     $t->nomor_omc ?? '-',
-                    $t->pihak_asal ?? $t->gudangAsal?->nama_gudang ?? '-',
-                    $t->gudangTujuan?->nama_gudang ?? '-',
+                    $t->gudangAsal?->nama_gudang ?? ($t->pihak_asal ?? '-'),
+                    $t->gudangTujuan?->nama_gudang ?? ($t->pihak_asal ?? '-'),
                     $snList ?: '-',
                 ], ';');
             }

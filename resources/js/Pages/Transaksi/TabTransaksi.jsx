@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import Toolbar from '@/components/Toolbar';
 import CrudTable from './CrudTable';
 import ModalBarangMasuk from './ModalBarangMasuk';
+import ModalBarangKeluar from './ModalBarangKeluar';
+import ModalTransferGudang from './ModalTransferGudang';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -11,7 +13,8 @@ import {
     ChevronLeft, 
     ChevronRight, 
     ArrowDownCircle, 
-    ArrowUpCircle 
+    ArrowUpCircle,
+    ArrowRightLeft
 } from 'lucide-react';
 import { router, usePage } from '@inertiajs/react';
 import { useConfirm } from '@/Layouts/AuthenticatedLayout';
@@ -29,7 +32,6 @@ export default function TabTransaksi({
     const isAdmin = userRole === 'admin';
     const confirm = useConfirm();
 
-    // State Filter, Sorting, dan Zoom Level
     const [mainTab, setMainTab] = useState(filters?.jenis_transaksi || 'MASUK');
     const [searchTerm, setSearchTerm] = useState(filters?.search || '');
     const [sortOrder, setSortOrder] = useState(filters?.order || 'desc');
@@ -37,24 +39,23 @@ export default function TabTransaksi({
     const [perPageInput, setPerPageInput] = useState(filters?.per_page || 10);
     const [isProcessing, setIsProcessing] = useState(false);
     
-    // State Zoom Tabel
     const [zoomLevel, setZoomLevel] = useState(100);
-
-    // State Checkbox Selection & Modal
     const [selectedIds, setSelectedIds] = useState([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    // Modal State
+    const [isModalMasukOpen, setIsModalMasukOpen] = useState(false);
+    const [isModalKeluarOpen, setIsModalKeluarOpen] = useState(false);
+    const [isModalTransferOpen, setIsModalTransferOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
 
     const dataList = transaksis?.data || [];
 
-    // Logika Handler Zoom
     const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 10, 120));
     const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev - 10, 50));
     const handleResetZoom = () => setZoomLevel(100);
     const handleFitZoom = () => setZoomLevel(75);
 
-    // Debounce Filter Pencarian
     const isMounted = useRef(false);
     useEffect(() => {
         if (!isMounted.current) {
@@ -171,13 +172,23 @@ export default function TabTransaksi({
     const handleOpenAdd = () => {
         setIsEditMode(false);
         setSelectedItem(null);
-        setIsModalOpen(true);
+        if (mainTab === 'MASUK') {
+            setIsModalMasukOpen(true);
+        } else if (mainTab === 'KELUAR') {
+            setIsModalKeluarOpen(true);
+        } else if (mainTab === 'TRANSFER') {
+            setIsModalTransferOpen(true);
+        }
     };
 
     const handleOpenEdit = (item) => {
         setIsEditMode(true);
         setSelectedItem(item);
-        setIsModalOpen(true);
+        if (item.jenis_transaksi === 'KELUAR') {
+            setIsModalKeluarOpen(true);
+        } else {
+            setIsModalMasukOpen(true);
+        }
     };
 
     const getRowNumber = (index) => {
@@ -187,9 +198,15 @@ export default function TabTransaksi({
         return (currentPage - 1) * limit + index + 1;
     };
 
+    const tabTitles = {
+        MASUK: 'Daftar Transaksi Barang Masuk (Inbound)',
+        KELUAR: 'Daftar Transaksi Barang Keluar (Outbound)',
+        TRANSFER: 'Daftar Mutasi & Transfer Antar-Gudang',
+    };
+
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-            {/* 1. TOOLBAR ATAS: TAB, ZOOM, SORT, RESET, EXPORT */}
+            {/* 1. Toolbar Atas: 3 Tab Switcher */}
             <Toolbar
                 sortOrder={sortOrder}
                 onToggleSort={toggleSort}
@@ -229,16 +246,27 @@ export default function TabTransaksi({
                             <ArrowUpCircle className="w-3.5 h-3.5" />
                             <span>Barang Keluar</span>
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => handleMainTabChange('TRANSFER')}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                mainTab === 'TRANSFER'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                            }`}
+                        >
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                            <span>Transfer Gudang</span>
+                        </button>
                     </div>
                 }
             />
 
-            {/* 2. SUB-HEADER: JUDUL TABEL + INPUT SEARCH + TOMBOL TAMBAH DATA */}
+            {/* 2. Sub-Header: Title, Search, Action Button */}
             <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    {mainTab === 'MASUK' ? 'Daftar Transaksi Barang Masuk (Inbound)' : 'Daftar Transaksi Barang Keluar (Outbound)'}
+                    {tabTitles[mainTab] || tabTitles.MASUK}
                 </span>
-
                 <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                     <div className="relative w-full sm:w-56">
                         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -259,35 +287,43 @@ export default function TabTransaksi({
                             </button>
                         )}
                     </div>
-
-                    {canWrite && mainTab === 'MASUK' && (
+                    {canWrite && (
                         <Button
                             type="button"
                             size="sm"
                             onClick={handleOpenAdd}
-                            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs shadow-emerald-600/20 shrink-0 cursor-pointer"
+                            className={`h-8 text-xs gap-1.5 text-white font-medium shadow-xs shrink-0 cursor-pointer ${
+                                mainTab === 'MASUK' 
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' 
+                                    : mainTab === 'KELUAR'
+                                    ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
+                                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
+                            }`}
                         >
                             <Plus className="w-3.5 h-3.5" />
-                            <span>Tambah Data Masuk</span>
+                            <span>
+                                {mainTab === 'MASUK' ? 'Tambah Data Masuk' : mainTab === 'KELUAR' ? 'Tambah Data Keluar' : 'Tambah Transfer'}
+                            </span>
                         </Button>
                     )}
                 </div>
             </div>
 
-            {/* 3. TABEL DATA */}
+            {/* 3. Tabel Data Dinamis */}
             <div className="w-full overflow-x-auto relative border-b border-slate-200 dark:border-slate-800">
                 <CrudTable
                     dataList={dataList}
                     selectedIds={selectedIds}
                     onSelectAll={handleSelectAll}
                     onSelectRow={handleSelectRow}
-                    onEditRow={canWrite ? handleOpenEdit : undefined}
+                    onEditRow={mainTab !== 'TRANSFER' && canWrite ? handleOpenEdit : undefined}
                     getRowNumber={getRowNumber}
                     zoomLevel={zoomLevel}
+                    mainTab={mainTab}
                 />
             </div>
 
-            {/* 4. PAGINATION FOOTER */}
+            {/* 4. Pagination Footer */}
             {transaksis && (
                 <div className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="flex items-center gap-2">
@@ -342,17 +378,40 @@ export default function TabTransaksi({
                 </div>
             )}
 
-            {/* 5. MODAL TRANSAKSI BARANG MASUK */}
+            {/* Modal Form Inbound */}
             <ModalBarangMasuk
-                isOpen={isModalOpen}
+                isOpen={isModalMasukOpen}
                 onClose={() => {
-                    setIsModalOpen(false);
+                    setIsModalMasukOpen(false);
                     setSelectedItem(null);
                 }}
                 isEditMode={isEditMode}
                 selectedItem={selectedItem}
                 gudangs={gudangs}
                 suppliers={suppliers}
+                barangs={barangs}
+            />
+
+            {/* Modal Form Outbound */}
+            <ModalBarangKeluar
+                isOpen={isModalKeluarOpen}
+                onClose={() => {
+                    setIsModalKeluarOpen(false);
+                    setSelectedItem(null);
+                }}
+                isEditMode={isEditMode}
+                selectedItem={selectedItem}
+                gudangs={gudangs}
+                barangs={barangs}
+            />
+
+            {/* Modal Form Transfer */}
+            <ModalTransferGudang
+                isOpen={isModalTransferOpen}
+                onClose={() => {
+                    setIsModalTransferOpen(false);
+                }}
+                gudangs={gudangs}
                 barangs={barangs}
             />
         </div>
