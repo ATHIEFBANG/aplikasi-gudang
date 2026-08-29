@@ -14,7 +14,8 @@ class TransaksiDetail extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'qty' => 'integer',
+        'qty'   => 'integer',
+        'harga' => 'float',
     ];
 
     public function transaksi(): BelongsTo

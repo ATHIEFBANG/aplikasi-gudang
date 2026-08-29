@@ -11,6 +11,8 @@ const TABLE_COLUMNS = [
     { key: 'satuan', label: 'SATUAN' },
     { key: 'tanggal', label: 'TANGGAL' },
     { key: 'qty', label: 'QTY' },
+    { key: 'harga', label: 'HARGA SATUAN' },
+    { key: 'total_harga', label: 'TOTAL NILAI' },
     { key: 'kondisi', label: 'KONDISI' },
     { key: 'nomor_imc', label: 'NOMOR IMC' },
     { key: 'nomor_omc', label: 'NOMOR OMC' },
@@ -26,7 +28,7 @@ export default function CrudTable({
     onSelectRow, 
     onEditRow, 
     getRowNumber,
-    zoomLevel = 100 // <-- Teruskan Zoom Level
+    zoomLevel = 100
 }) {
     const getItemId = (item) => item?.id;
 
@@ -36,6 +38,8 @@ export default function CrudTable({
             render: (item) => {
                 const detail = item.details?.[0] || {};
                 const barang = detail.barang || {};
+                const hargaSatuan = parseFloat(detail.harga) || 0;
+                const totalNilai = (detail.qty || 0) * hargaSatuan;
                 
                 switch (col.key) {
                     case 'no_transaksi':
@@ -133,6 +137,24 @@ export default function CrudTable({
                             <Badge variant="outline" className="font-mono font-bold text-xs bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700">
                                 {detail.qty || 0}
                             </Badge>
+                        );
+
+                    case 'harga':
+                        return hargaSatuan > 0 ? (
+                            <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                Rp {hargaSatuan.toLocaleString('id-ID')}
+                            </span>
+                        ) : (
+                            <span className="text-slate-400 text-xs">-</span>
+                        );
+
+                    case 'total_harga':
+                        return totalNilai > 0 ? (
+                            <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                Rp {totalNilai.toLocaleString('id-ID')}
+                            </span>
+                        ) : (
+                            <span className="text-slate-400 text-xs">-</span>
                         );
 
                     case 'kondisi': {

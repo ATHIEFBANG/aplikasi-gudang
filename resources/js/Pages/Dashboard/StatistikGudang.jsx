@@ -1,10 +1,10 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, Layers, ArrowLeftRight, ArrowUpRight, Building2 } from 'lucide-react';
+import { Package, ArrowDownCircle, ArrowLeftRight, ArrowUpRight, Building2 } from 'lucide-react';
 
 export default function StatistikGudang({ kpi = {} }) {
     const totalBarang = kpi.totalBarang ?? 0;
-    const totalStokFisik = kpi.totalStokFisik ?? 0;
+    const totalBarangMasuk = kpi.totalBarangMasuk ?? 0;
     const totalTransfer = kpi.totalTransfer ?? 0;
     const totalBarangKeluar = kpi.totalBarangKeluar ?? 0;
     const totalGudang = kpi.totalGudang ?? 0;
@@ -19,10 +19,10 @@ export default function StatistikGudang({ kpi = {} }) {
             valColor: 'text-slate-900 dark:text-white',
         },
         {
-            title: 'TOTAL STOK FISIK',
-            value: totalStokFisik.toLocaleString('id-ID'),
-            desc: 'Unit fisik di semua gudang',
-            icon: Layers,
+            title: 'TOTAL BARANG MASUK',
+            value: totalBarangMasuk.toLocaleString('id-ID'),
+            desc: 'Unit masuk operasional',
+            icon: ArrowDownCircle,
             iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
             valColor: 'text-emerald-600 dark:text-emerald-400',
         },

@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Toolbar from '@/components/Toolbar';
 import CrudTable from './CrudTable';
-import ModalTransaksi from './ModalTransaksi';
+import ModalBarangMasuk from './ModalBarangMasuk';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
     Plus, 
-    Search,
-    X,
+    Search, 
+    X, 
     ChevronLeft, 
-    ChevronRight,
-    ArrowDownCircle,
-    ArrowUpCircle
+    ChevronRight, 
+    ArrowDownCircle, 
+    ArrowUpCircle 
 } from 'lucide-react';
 import { router, usePage } from '@inertiajs/react';
 import { useConfirm } from '@/Layouts/AuthenticatedLayout';
@@ -233,14 +233,13 @@ export default function TabTransaksi({
                 }
             />
 
-            {/* 2. SUB-HEADER: JUDUL TABEL + INPUT SEARCH + TOMBOL TAMBAH DATA (BERDAMPINGAN) */}
+            {/* 2. SUB-HEADER: JUDUL TABEL + INPUT SEARCH + TOMBOL TAMBAH DATA */}
             <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     {mainTab === 'MASUK' ? 'Daftar Transaksi Barang Masuk (Inbound)' : 'Daftar Transaksi Barang Keluar (Outbound)'}
                 </span>
 
                 <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                    {/* INPUT PENCARIAN DATA DI SEBELAH TOMBOL TAMBAH */}
                     <div className="relative w-full sm:w-56">
                         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <Input
@@ -261,7 +260,6 @@ export default function TabTransaksi({
                         )}
                     </div>
 
-                    {/* TOMBOL TAMBAH DATA MASUK */}
                     {canWrite && mainTab === 'MASUK' && (
                         <Button
                             type="button"
@@ -344,8 +342,8 @@ export default function TabTransaksi({
                 </div>
             )}
 
-            {/* 5. MODAL TRANSAKSI */}
-            <ModalTransaksi
+            {/* 5. MODAL TRANSAKSI BARANG MASUK */}
+            <ModalBarangMasuk
                 isOpen={isModalOpen}
                 onClose={() => {
                     setIsModalOpen(false);

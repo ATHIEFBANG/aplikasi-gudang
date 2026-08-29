@@ -3,7 +3,7 @@ import GrafikBatangLogistik from './GrafikBatang';
 import GrafikDonutDistribusi from './GrafikDonut';
 import GrafikLineKondisi from './GrafikLine';
 
-export default function GrafikTransaksi({ chartData = [], kondisiChartData = [] }) {
+export default function GrafikTransaksi({ chartData = [], kondisiChartData = [], donutPenerimaan = {} }) {
     const formattedBarData = useMemo(() => {
         return chartData.map((item) => ({
             ...item,
@@ -15,7 +15,7 @@ export default function GrafikTransaksi({ chartData = [], kondisiChartData = [] 
         <div className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <GrafikBatangLogistik data={formattedBarData} />
-                <GrafikDonutDistribusi chartData={chartData} />
+                <GrafikDonutDistribusi donutPenerimaan={donutPenerimaan} />
             </div>
             <GrafikLineKondisi data={kondisiChartData} />
         </div>

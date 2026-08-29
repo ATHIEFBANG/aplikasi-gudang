@@ -13,12 +13,12 @@ return new class extends Migration
             $table->id();
             $table->string('no_transaksi', 50)->unique();
             $table->enum('jenis_transaksi', ['MASUK', 'KELUAR', 'TRANSFER', 'PINJAM', 'KEMBALI']);
-            $table->string('sub_jenis')->nullable()->index(); // <-- Tambahkan
+            $table->string('sub_jenis')->nullable()->index();
             $table->date('tanggal')->index();
-            $table->string('kondisi')->nullable()->default('Baru'); // <-- Tambahkan
-            $table->string('nomor_imc')->nullable()->index(); // <-- Tambahkan
-            $table->string('nomor_omc')->nullable()->index(); // <-- Tambahkan
-            $table->string('pihak_asal')->nullable(); // <-- Tambahkan
+            $table->string('kondisi')->nullable()->default('Baru');
+            $table->string('nomor_imc')->nullable()->index();
+            $table->string('nomor_omc')->nullable()->index();
+            $table->string('pihak_asal')->nullable();
             
             // Relasi Gudang, Supplier, PIC
             $table->foreignId('gudang_asal_id')->nullable()->constrained('gudangs')->nullOnDelete();
@@ -39,6 +39,7 @@ return new class extends Migration
             $table->foreignId('transaksi_id')->constrained('transaksis')->cascadeOnDelete();
             $table->foreignId('barang_id')->constrained('barangs')->cascadeOnDelete();
             $table->integer('qty');
+            $table->decimal('harga', 15, 2)->nullable()->default(0); // <-- Kolom Harga Satuan
             $table->enum('kondisi', ['BAIK', 'RUSAK'])->default('BAIK');
             $table->timestamps();
         });
