@@ -15,6 +15,7 @@ export default function ModalBarangMasukRow({
     barangs,
     gudangs,
     gudangOptions,
+    supplierOptions,
     pplOptions,
     namaOptions,
     onRemoveRow,
@@ -36,10 +37,20 @@ export default function ModalBarangMasukRow({
         : 'Standar';
 
     const kondisiOptions = (row.sub_jenis === 'PEMBELIAN' || row.sub_jenis === 'PEMINJAMAN')
-        ? ['Baru', 'Bekas']
-        : ['Baru', 'Bekas', 'Rusak'];
+        ? [
+            { value: 'Baru', label: 'Baru' },
+            { value: 'Bekas', label: 'Bekas' }
+          ]
+        : [
+            { value: 'Baru', label: 'Baru' },
+            { value: 'Bekas', label: 'Bekas' },
+            { value: 'Rusak', label: 'Rusak' }
+          ];
 
-    const displayKondisi = row.kondisi && row.kondisi.toUpperCase() === 'BAIK' ? 'Baru' : (row.kondisi || 'Baru');
+    // Izinkan kondisi kosong jika tombol X diklik, fallback hanya untuk tampilan jika belum diset
+    const displayKondisi = row.kondisi !== undefined && row.kondisi !== null 
+        ? (row.kondisi.toUpperCase() === 'BAIK' ? 'Baru' : row.kondisi) 
+        : 'Baru';
 
     const pihakAsalLabel = row.sub_jenis === 'PEMBELIAN' 
         ? 'Supplier / Vendor Asal *' 
@@ -56,6 +67,10 @@ export default function ModalBarangMasukRow({
     const hargaSatuanNum = parseFloat(row.harga) || 0;
     const qtyNum = parseInt(row.qty, 10) || 1;
     const subtotalBeli = row.sub_jenis === 'PEMBELIAN' ? hargaSatuanNum * qtyNum : 0;
+
+    const currentNamaBarang = targetBarang 
+        ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
+        : '';
 
     return (
         <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 relative group space-y-3 transition-all">
@@ -111,9 +126,8 @@ export default function ModalBarangMasukRow({
                 </div>
             )}
 
-            {/* 2. Pengirim (Kotak Isian Biasa) & Gudang Tujuan + Nomor IMC di Bawahnya */}
+            {/* 2. Pengirim & Gudang Tujuan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
-                {/* Kolom Kiri: Input Teks Biasa untuk Pengirim / Supplier / Vendor */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{pihakAsalLabel}</Label>
                     <Input
@@ -126,7 +140,6 @@ export default function ModalBarangMasukRow({
                     />
                 </div>
 
-                {/* Kolom Kanan: Gudang Tujuan (Atas) & Nomor IMC (Bawah) */}
                 <div className="space-y-2.5">
                     <div className="space-y-1">
                         <Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
@@ -135,9 +148,9 @@ export default function ModalBarangMasukRow({
                         <HybridDropdown
                             value={gudangs.find(g => String(g.id) === String(row.gudang_tujuan_id))?.nama_gudang || ''}
                             options={gudangOptions}
-                            onChange={(val) => {
-                                const found = gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase());
-                                onFieldChange(rowIdx, 'gudang_tujuan_id', found ? String(found.id) : '');
+                            onChange={(val, selectedOpt) => {
+                                const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase())?.id;
+                                onFieldChange(rowIdx, 'gudang_tujuan_id', targetId ? String(targetId) : '');
                             }}
                             placeholder="Pilih Gudang Penerima..."
                             searchPlaceholder="Cari Gudang..."
@@ -145,7 +158,6 @@ export default function ModalBarangMasukRow({
                             inputClassName="h-8 text-xs border-emerald-500/50 text-emerald-600 dark:text-emerald-400 font-bold"
                         />
                     </div>
-
                     <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                             Nomor IMC (Inbound Material Control) *
@@ -181,6 +193,7 @@ export default function ModalBarangMasukRow({
                     />
                 </div>
 
+                {/* Dropdown Kode PPL */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                         Kode PPL *
@@ -188,8 +201,12 @@ export default function ModalBarangMasukRow({
                     <HybridDropdown
                         value={targetBarang?.kode_barang || ''}
                         options={pplOptions}
-                        onChange={(val) => {
-                            const found = barangs.find(b => b.kode_barang.toLowerCase() === val.split(' ')[0].toLowerCase());
+                        onChange={(val, selectedOpt) => {
+                            if (!val) {
+                                onBarangChange(rowIdx, '');
+                                return;
+                            }
+                            const found = barangs.find(b => b.id === selectedOpt?.id || b.kode_barang.toLowerCase() === val.trim().toLowerCase());
                             if (found) onBarangChange(rowIdx, found.id);
                         }}
                         placeholder="Pilih PPL..."
@@ -199,16 +216,21 @@ export default function ModalBarangMasukRow({
                     />
                 </div>
 
+                {/* Dropdown Nama Barang */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
                     <HybridDropdown
-                        value={targetBarang ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang) : ''}
+                        value={currentNamaBarang}
                         options={namaOptions}
-                        onChange={(val) => {
-                            const cleanVal = val.split(' (Stok:')[0].trim().toLowerCase();
+                        onChange={(val, selectedOpt) => {
+                            if (!val) {
+                                onBarangChange(rowIdx, '');
+                                return;
+                            }
                             const found = barangs.find(b => {
+                                if (b.id === selectedOpt?.id) return true;
                                 const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
-                                return fullName.toLowerCase() === cleanVal || b.kode_barang.toLowerCase() === cleanVal;
+                                return fullName.toLowerCase() === val.trim().toLowerCase() || b.kode_barang.toLowerCase() === val.trim().toLowerCase();
                             });
                             if (found) onBarangChange(rowIdx, found.id);
                         }}
@@ -304,13 +326,16 @@ export default function ModalBarangMasukRow({
                     </div>
                 )}
 
-                {/* Kondisi Fisik */}
-                <div className={`space-y-1 ${row.sub_jenis === 'PEMBELIAN' ? 'sm:col-span-2 lg:col-span-4' : 'sm:col-span-2'}`}>
+                {/* Kondisi Fisik (Kompak, tombol X berfungsi membersihkan pilihan) */}
+                <div className="space-y-1 sm:col-span-1 lg:col-span-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kondisi Fisik *</Label>
                     <HybridDropdown
-                        value={displayKondisi}
+                        value={row.kondisi || ''}
                         options={kondisiOptions}
-                        onChange={(val) => onFieldChange(rowIdx, 'kondisi', val)}
+                        onChange={(val, selectedOpt) => {
+                            const resVal = selectedOpt?.value !== undefined ? selectedOpt.value : (val ?? '');
+                            onFieldChange(rowIdx, 'kondisi', resVal);
+                        }}
                         placeholder="Pilih Kondisi..."
                         searchPlaceholder="Cari Kondisi..."
                         disabled={isProcessing}

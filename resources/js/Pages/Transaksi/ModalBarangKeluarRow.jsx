@@ -50,6 +50,10 @@ export default function ModalBarangKeluarRow({
         ? 'Contoh: Site Jambi 01 / Teknisi Budi'
         : 'Contoh: Maintenance Kantor / Tim IT Operasional';
 
+    const currentNamaBarang = targetBarang 
+        ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
+        : '';
+
     return (
         <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 relative group space-y-3 transition-all">
             {/* Header Baris */}
@@ -104,9 +108,8 @@ export default function ModalBarangKeluarRow({
                 </div>
             )}
 
-            {/* 2. Gudang Asal (Atas) & Nomor OMC (Bawah) di Kolom Kiri, Site Tujuan di Kolom Kanan */}
+            {/* 2. Gudang Asal & Site Tujuan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
-                {/* Kolom Kiri: Gudang Asal & Nomor OMC Tepat di Bawahnya */}
                 <div className="space-y-2.5">
                     <div className="space-y-1">
                         <Label className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
@@ -115,9 +118,9 @@ export default function ModalBarangKeluarRow({
                         <HybridDropdown
                             value={gudangs.find(g => String(g.id) === String(row.gudang_asal_id))?.nama_gudang || ''}
                             options={gudangOptions}
-                            onChange={(val) => {
-                                const found = gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase());
-                                onFieldChange(rowIdx, 'gudang_asal_id', found ? String(found.id) : '');
+                            onChange={(val, selectedOpt) => {
+                                const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase())?.id;
+                                onFieldChange(rowIdx, 'gudang_asal_id', targetId ? String(targetId) : '');
                             }}
                             placeholder="Pilih Gudang Asal..."
                             searchPlaceholder="Cari Gudang Asal..."
@@ -125,7 +128,6 @@ export default function ModalBarangKeluarRow({
                             inputClassName="h-8 text-xs font-semibold border-rose-300 dark:border-rose-900"
                         />
                     </div>
-
                     <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                             Nomor OMC (Surat Jalan) *
@@ -141,7 +143,6 @@ export default function ModalBarangKeluarRow({
                     </div>
                 </div>
 
-                {/* Kolom Kanan: Site Tujuan / PIC Pemakai */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
                         {pihakTujuanLabel}
@@ -176,6 +177,7 @@ export default function ModalBarangKeluarRow({
                     />
                 </div>
 
+                {/* Dropdown Kode PPL */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                         Kode PPL *
@@ -183,9 +185,9 @@ export default function ModalBarangKeluarRow({
                     <HybridDropdown
                         value={targetBarang?.kode_barang || ''}
                         options={pplOptions}
-                        onChange={(val) => {
-                            const found = barangs.find(b => b.kode_barang.toLowerCase() === val.split(' ')[0].toLowerCase());
-                            if (found) onBarangChange(rowIdx, found.id);
+                        onChange={(val, selectedOpt) => {
+                            const foundId = selectedOpt?.id || barangs.find(b => b.kode_barang.toLowerCase() === val.split(' ')[0].trim().toLowerCase())?.id;
+                            if (foundId) onBarangChange(rowIdx, foundId);
                         }}
                         placeholder={
                             !row.gudang_asal_id
@@ -198,18 +200,18 @@ export default function ModalBarangKeluarRow({
                     />
                 </div>
 
+                {/* Dropdown Nama Barang */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
                     <HybridDropdown
-                        value={targetBarang ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang) : ''}
+                        value={currentNamaBarang}
                         options={namaOptions}
-                        onChange={(val) => {
-                            const cleanVal = val.split(' (Stok:')[0].trim().toLowerCase();
-                            const found = barangs.find(b => {
+                        onChange={(val, selectedOpt) => {
+                            const foundId = selectedOpt?.id || barangs.find(b => {
                                 const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
-                                return fullName.toLowerCase() === cleanVal || b.kode_barang.toLowerCase() === cleanVal;
-                            });
-                            if (found) onBarangChange(rowIdx, found.id);
+                                return fullName.toLowerCase() === val.split(' (Stok:')[0].trim().toLowerCase();
+                            })?.id;
+                            if (foundId) onBarangChange(rowIdx, foundId);
                         }}
                         placeholder={
                             !row.gudang_asal_id
@@ -283,7 +285,7 @@ export default function ModalBarangKeluarRow({
                 </div>
             </div>
 
-            {/* 4. Pemilih Serial Number Aktif dari Gudang Asal */}
+            {/* 4. Pemilih Serial Number */}
             {isWajibSn && !isEditMode && (
                 <ModalSerialSelector
                     rowIdx={rowIdx}

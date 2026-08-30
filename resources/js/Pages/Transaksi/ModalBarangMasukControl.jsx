@@ -3,7 +3,6 @@ import { router } from '@inertiajs/react';
 import { ShoppingBag, Layers, RotateCcw } from 'lucide-react';
 
 export const MAX_ROWS_LIMIT = 50;
-
 export const CATEGORIES_MASUK = [
     { id: 'PEMBELIAN', label: 'Pembelian', icon: ShoppingBag },
     { id: 'PEMINJAMAN', label: 'Peminjaman', icon: Layers },
@@ -48,10 +47,16 @@ export function useModalBarangMasukControl({
         return (suppliers || []).map(s => s.nama_supplier || s);
     }, [suppliers]);
 
+    // Opsi Kode PPL untuk HybridDropdown (value dan label diset ke kode_barang agar seragam)
     const getBarangPplOptionsForRow = useCallback(() => {
-        return barangs.map(b => ({ value: b.kode_barang, label: b.kode_barang, id: b.id }));
+        return barangs.map(b => ({
+            value: b.kode_barang,
+            label: b.kode_barang,
+            id: b.id
+        }));
     }, [barangs]);
 
+    // Opsi Nama Barang untuk HybridDropdown
     const getBarangNamaOptionsForRow = useCallback(() => {
         return barangs.map(b => {
             const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
@@ -70,7 +75,6 @@ export function useModalBarangMasukControl({
                 const targetBarang = barangs.find(b => String(b.id) === String(detail.barang_id));
                 const isSn = Boolean(targetBarang?.is_wajib_sn);
                 const existingSns = detail.serials ? detail.serials.map(s => s.serial_number || s) : [];
-
                 let cleanKondisi = selectedItem.kondisi || detail.kondisi || 'Baru';
                 if (cleanKondisi.toUpperCase() === 'BAIK') cleanKondisi = 'Baru';
 
@@ -115,38 +119,48 @@ export function useModalBarangMasukControl({
             const updated = [...prev];
             const currentRow = updated[rowIdx];
             let newKondisi = field === 'kondisi' ? value : currentRow.kondisi;
-
+            
             if (newKondisi && newKondisi.toUpperCase() === 'BAIK') {
                 newKondisi = 'Baru';
             }
-
             if (field === 'sub_jenis') {
                 if ((value === 'PEMBELIAN' || value === 'PEMINJAMAN') && newKondisi === 'Rusak') {
                     newKondisi = 'Baru';
                 }
             }
-
             updated[rowIdx] = { 
                 ...currentRow, 
-                [field]: value, 
+                [field]: value,
                 kondisi: newKondisi
             };
             return updated;
         });
     };
 
+    // Handler Utama Pemilihan Barang (Mengatasi bug tombol X / clear dan pemilihan fleksibel)
     const handleBarangChange = (rowIdx, newBarangId) => {
-        const targetBarang = barangs.find(b => String(b.id) === String(newBarangId));
-        const isSn = Boolean(targetBarang?.is_wajib_sn);
-        
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
+
+            if (!newBarangId) {
+                // Jika tombol X diklik / dikosongkan
+                updated[rowIdx] = {
+                    ...currentRow,
+                    barang_id: '',
+                    serials: []
+                };
+                return updated;
+            }
+
+            const targetBarang = barangs.find(b => String(b.id) === String(newBarangId) || b.kode_barang.toLowerCase() === String(newBarangId).toLowerCase());
+            const realId = targetBarang ? String(targetBarang.id) : '';
+            const isSn = Boolean(targetBarang?.is_wajib_sn);
             const currentQty = currentRow.qty || 1;
 
             updated[rowIdx] = {
                 ...currentRow,
-                barang_id: String(newBarangId),
+                barang_id: realId,
                 qty: currentQty,
                 serials: isSn ? Array(currentQty).fill('') : []
             };
@@ -216,6 +230,7 @@ export function useModalBarangMasukControl({
 
             const targetBarang = barangs.find(b => String(b.id) === String(r.barang_id));
             const isSn = Boolean(targetBarang?.is_wajib_sn);
+
             if (isSn && !isEditMode) {
                 if (r.serials.length !== r.qty) {
                     alert(`Baris #${rowNum}: Jumlah Serial Number (${r.serials.length}) harus sesuai dengan Quantity (${r.qty} unit).`);
@@ -226,11 +241,6 @@ export function useModalBarangMasukControl({
                     alert(`Baris #${rowNum}: Serial Number unit ke-${emptySnIndex + 1} wajib terisi.`);
                     return;
                 }
-                const uniqueSnCount = new Set(r.serials.map(s => s.trim())).size;
-                if (uniqueSnCount !== r.serials.length) {
-                    alert(`Baris #${rowNum}: Terdapat Serial Number duplikat.`);
-                    return;
-                }
             }
         }
 
@@ -238,7 +248,7 @@ export function useModalBarangMasukControl({
         const payload = isEditMode
             ? {
                 tanggal: rows[0].tanggal,
-                kondisi: rows[0].kondisi || 'Baru',
+                kondisi: rows[0].kondisi ? (rows[0].kondisi.toUpperCase() === 'BAIK' ? 'Baru' : rows[0].kondisi) : 'Baru',
                 nomor_imc: rows[0].nomor_imc.trim(),
                 pihak_asal: rows[0].pihak_asal.trim(),
                 gudang_tujuan_id: parseInt(rows[0].gudang_tujuan_id, 10),
@@ -249,7 +259,7 @@ export function useModalBarangMasukControl({
                 items: rows.map(r => ({
                     sub_jenis: r.sub_jenis,
                     tanggal: r.tanggal,
-                    kondisi: r.kondisi || 'Baru',
+                    kondisi: r.kondisi ? (r.kondisi.toUpperCase() === 'BAIK' ? 'Baru' : r.kondisi) : 'Baru',
                     nomor_imc: r.nomor_imc.trim(),
                     pihak_asal: r.pihak_asal.trim(),
                     gudang_tujuan_id: parseInt(r.gudang_tujuan_id, 10),
@@ -262,6 +272,7 @@ export function useModalBarangMasukControl({
 
         const targetUrl = isEditMode ? `/transaksi/${selectedItem.id}` : '/transaksi';
         const method = isEditMode ? 'put' : 'post';
+
         router[method](targetUrl, payload, {
             preserveScroll: true,
             onSuccess: () => {

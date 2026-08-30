@@ -27,8 +27,8 @@ export default function TabelJurnal({
                 switch (col.key) {
                     case 'tanggal':
                         return (
-                            <span className="font-mono text-xs text-slate-500 whitespace-nowrap">
-                                {item.tanggal}
+                            <span className="font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                {item.tanggal || '-'}
                             </span>
                         );
 
@@ -50,7 +50,7 @@ export default function TabelJurnal({
                                         ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                                         : isKeluar
                                         ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                                        : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                                        : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
                                 }`}
                             >
                                 {item.sub_jenis?.replace(/_/g, ' ') || item.jenis}
@@ -60,14 +60,26 @@ export default function TabelJurnal({
 
                     case 'nomor_dokumen':
                         return (
-                            <span className="font-mono font-bold text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                                {item.nomor_dokumen || '-'}
-                            </span>
+                            <div className="flex flex-col gap-0.5 font-mono text-xs">
+                                {item.nomor_omc && item.nomor_omc !== '-' && (
+                                    <span className="font-bold text-rose-600 dark:text-rose-400">
+                                        OMC: {item.nomor_omc}
+                                    </span>
+                                )}
+                                {item.nomor_imc && item.nomor_imc !== '-' && (
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                        IMC: {item.nomor_imc}
+                                    </span>
+                                )}
+                                {(!item.nomor_omc || item.nomor_omc === '-') && (!item.nomor_imc || item.nomor_imc === '-') && (
+                                    <span className="text-slate-400 font-semibold">{item.nomor_dokumen || '-'}</span>
+                                )}
+                            </div>
                         );
 
                     case 'asal':
                         return (
-                            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 truncate max-w-[140px] block" title={item.asal}>
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate max-w-[140px] block" title={item.asal}>
                                 {item.asal || '-'}
                             </span>
                         );
@@ -81,12 +93,12 @@ export default function TabelJurnal({
 
                     case 'nama_barang':
                         return (
-                            <div className="flex flex-col justify-center max-w-[200px] leading-tight">
-                                <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
-                                    {item.nama_barang}
+                            <div className="flex flex-col justify-center max-w-[210px] leading-tight">
+                                <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate" title={item.nama_barang}>
+                                    {item.nama_barang || '-'}
                                 </span>
-                                <span className="font-mono text-[10px] text-slate-400 mt-0.5">
-                                    {item.kode_barang}
+                                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                    {item.kode_barang || '-'}
                                 </span>
                             </div>
                         );
@@ -103,18 +115,28 @@ export default function TabelJurnal({
                         return (
                             <div className="flex flex-wrap gap-1 max-w-[260px] max-h-20 overflow-y-auto py-1">
                                 {listSn.length > 0 ? (
-                                    listSn.map((s, idx) => (
-                                        <Badge
-                                            key={idx}
-                                            variant="outline"
-                                            className="text-[9px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.5 gap-1 shrink-0"
-                                        >
-                                            <span>{s.serial_number || s}</span>
-                                            {s.kondisi && (
-                                                <span className="text-[8px] font-sans font-bold text-slate-400">({s.kondisi})</span>
-                                            )}
-                                        </Badge>
-                                    ))
+                                    listSn.map((s, idx) => {
+                                        const snVal = s.serial_number || s;
+                                        const rawKondisi = String(s.kondisi || '').toUpperCase().trim();
+                                        let kondisiStyle = 'bg-emerald-500/20 text-emerald-600';
+                                        if (rawKondisi === 'RUSAK') kondisiStyle = 'bg-rose-500/20 text-rose-600';
+                                        else if (rawKondisi.includes('BEKAS') || rawKondisi.includes('SECOND')) kondisiStyle = 'bg-amber-500/20 text-amber-600';
+
+                                        return (
+                                            <Badge
+                                                key={idx}
+                                                variant="outline"
+                                                className="text-[9px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.5 gap-1 shrink-0"
+                                            >
+                                                <span>{snVal}</span>
+                                                {s.kondisi && (
+                                                    <span className={`text-[8px] px-1 py-0.2 rounded font-sans font-bold uppercase ${kondisiStyle}`}>
+                                                        {s.kondisi}
+                                                    </span>
+                                                )}
+                                            </Badge>
+                                        );
+                                    })
                                 ) : (
                                     <span className="text-slate-400 font-mono text-xs">-</span>
                                 )}
@@ -130,13 +152,15 @@ export default function TabelJurnal({
     }, []);
 
     return (
-        <Tabel
-            data={dataList}
-            columns={formattedColumns}
-            getItemId={getItemId}
-            getRowNumber={(idx) => idx + 1}
-            zoomLevel={zoomLevel}
-            emptyMessage="Belum ada catatan mutasi transaksi pada periode ini."
-        />
+        <div className="w-full flex flex-col">
+            <Tabel
+                data={dataList}
+                columns={formattedColumns}
+                getItemId={getItemId}
+                getRowNumber={(idx) => idx + 1}
+                zoomLevel={zoomLevel}
+                emptyMessage="Belum ada catatan mutasi transaksi pada periode ini."
+            />
+        </div>
     );
 }
