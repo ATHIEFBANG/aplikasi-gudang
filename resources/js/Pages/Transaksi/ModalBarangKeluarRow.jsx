@@ -44,9 +44,7 @@ export default function ModalBarangKeluarRow({
 
     const pihakTujuanLabel = row.sub_jenis === 'BARANG_KE_SITE'
         ? 'Site Tujuan / Nama Site / Teknisi *'
-        : row.sub_jenis === 'PEMAKAIAN_INTERNAL'
-        ? 'Keperluan / Departemen / PIC Pemakai *'
-        : 'Tujuan Pengiriman *';
+        : 'Keperluan / Departemen / PIC Pemakai *';
 
     const pihakTujuanPlaceholder = row.sub_jenis === 'BARANG_KE_SITE'
         ? 'Contoh: Site Jambi 01 / Teknisi Budi'
@@ -90,7 +88,7 @@ export default function ModalBarangKeluarRow({
                                     key={cat.id}
                                     type="button"
                                     onClick={() => onFieldChange(rowIdx, 'sub_jenis', cat.id)}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer border ${
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all cursor-pointer border ${
                                         isSelected
                                             ? 'bg-rose-600 text-white border-rose-500 shadow-sm'
                                             : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-rose-400'
@@ -106,12 +104,13 @@ export default function ModalBarangKeluarRow({
                 </div>
             )}
 
-            {/* 2. Dokumen & Rute Gudang / Site */}
+            {/* 2. Gudang Asal (Atas) & Nomor OMC (Bawah) di Kolom Kiri, Site Tujuan di Kolom Kanan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                {/* Kolom Kiri: Gudang Asal & Nomor OMC Tepat di Bawahnya */}
                 <div className="space-y-2.5">
                     <div className="space-y-1">
                         <Label className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
-                            Gudang Asal (Tempat Ambil Stok) *
+                            Gudang Asal (Ambil Stok) *
                         </Label>
                         <HybridDropdown
                             value={gudangs.find(g => String(g.id) === String(row.gudang_asal_id))?.nama_gudang || ''}
@@ -129,7 +128,7 @@ export default function ModalBarangKeluarRow({
 
                     <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                            Nomor OMC (Surat Jalan Keluar) *
+                            Nomor OMC (Surat Jalan) *
                         </Label>
                         <Input
                             placeholder="Contoh: OMC-2026-089"
@@ -142,54 +141,19 @@ export default function ModalBarangKeluarRow({
                     </div>
                 </div>
 
-                <div className="space-y-2.5">
-                    {row.sub_jenis === 'TRANSFER_GUDANG' ? (
-                        <>
-                            <div className="space-y-1">
-                                <Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                                    Gudang Tujuan (Penerima) *
-                                </Label>
-                                <HybridDropdown
-                                    value={gudangs.find(g => String(g.id) === String(row.gudang_tujuan_id))?.nama_gudang || ''}
-                                    options={gudangOptions}
-                                    onChange={(val) => {
-                                        const found = gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase());
-                                        onFieldChange(rowIdx, 'gudang_tujuan_id', found ? String(found.id) : '');
-                                    }}
-                                    placeholder="Pilih Gudang Penerima..."
-                                    searchPlaceholder="Cari Gudang Penerima..."
-                                    disabled={isProcessing}
-                                    inputClassName="h-8 text-xs font-semibold border-emerald-500/50 text-emerald-600 dark:text-emerald-400"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                                    Nomor IMC (Opsional)
-                                </Label>
-                                <Input
-                                    placeholder="Contoh: IMC-00123"
-                                    disabled={isProcessing}
-                                    value={row.nomor_imc}
-                                    onChange={(e) => onFieldChange(rowIdx, 'nomor_imc', e.target.value)}
-                                    className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                                />
-                            </div>
-                        </>
-                    ) : (
-                        <div className="space-y-1">
-                            <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                {pihakTujuanLabel}
-                            </Label>
-                            <Input
-                                placeholder={pihakTujuanPlaceholder}
-                                disabled={isProcessing}
-                                value={row.pihak_asal}
-                                onChange={(e) => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
-                                className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                                required
-                            />
-                        </div>
-                    )}
+                {/* Kolom Kanan: Site Tujuan / PIC Pemakai */}
+                <div className="space-y-1">
+                    <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                        {pihakTujuanLabel}
+                    </Label>
+                    <Input
+                        placeholder={pihakTujuanPlaceholder}
+                        disabled={isProcessing}
+                        value={row.pihak_asal}
+                        onChange={(e) => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
+                        className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
+                        required
+                    />
                 </div>
             </div>
 

@@ -1,12 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { router } from '@inertiajs/react';
-import { Truck, ArrowRightLeft, Wrench } from 'lucide-react';
+import { Truck, Wrench } from 'lucide-react';
 
 export const MAX_ROWS_LIMIT = 50;
 
 export const CATEGORIES_KELUAR = [
     { id: 'BARANG_KE_SITE', label: 'Barang ke Site', icon: Truck },
-    { id: 'TRANSFER_GUDANG', label: 'Transfer Gudang', icon: ArrowRightLeft },
     { id: 'PEMAKAIAN_INTERNAL', label: 'Pemakaian Internal', icon: Wrench },
 ];
 
@@ -37,10 +36,8 @@ export function useModalBarangKeluarControl({
             sub_jenis: 'BARANG_KE_SITE',
             tanggal: new Date().toISOString().slice(0, 10),
             nomor_omc: '',
-            nomor_imc: '',
-            pihak_asal: '',
+            pihak_asal: '', // Site Tujuan / PIC Pemakai
             gudang_asal_id: gudangs[0]?.id ? String(gudangs[0].id) : '',
-            gudang_tujuan_id: '',
             barang_id: '',
             qty: 1,
             harga: '',
@@ -100,10 +97,8 @@ export function useModalBarangKeluarControl({
                     sub_jenis: selectedItem.sub_jenis || 'BARANG_KE_SITE',
                     tanggal: selectedItem.tanggal ? String(selectedItem.tanggal).split('T')[0] : new Date().toISOString().slice(0, 10),
                     nomor_omc: selectedItem.nomor_omc || '',
-                    nomor_imc: selectedItem.nomor_imc || '',
                     pihak_asal: selectedItem.pihak_asal || '',
                     gudang_asal_id: selectedItem.gudang_asal_id ? String(selectedItem.gudang_asal_id) : '',
-                    gudang_tujuan_id: selectedItem.gudang_tujuan_id ? String(selectedItem.gudang_tujuan_id) : '',
                     barang_id: detail.barang_id ? String(detail.barang_id) : '',
                     qty: detail.qty || 1,
                     kondisi: '-',
@@ -287,21 +282,11 @@ export function useModalBarangKeluarControl({
                 alert(`Baris #${rowNum}: Nomor OMC (Surat Jalan Keluar) wajib diisi.`);
                 return;
             }
-            if (r.sub_jenis === 'TRANSFER_GUDANG') {
-                if (!r.gudang_tujuan_id) {
-                    alert(`Baris #${rowNum}: Gudang Tujuan penerima wajib dipilih.`);
-                    return;
-                }
-                if (String(r.gudang_asal_id) === String(r.gudang_tujuan_id)) {
-                    alert(`Baris #${rowNum}: Gudang Asal dan Tujuan tidak boleh sama.`);
-                    return;
-                }
-            } else if (!r.pihak_asal.trim()) {
+            if (!r.pihak_asal.trim()) {
                 const labelTarget = r.sub_jenis === 'BARANG_KE_SITE' ? 'Site Tujuan / Teknisi' : 'Keperluan / PIC Pemakai';
                 alert(`Baris #${rowNum}: ${labelTarget} wajib diisi.`);
                 return;
             }
-
             if (!r.barang_id) {
                 alert(`Baris #${rowNum}: Harap pilih barang terlebih dahulu.`);
                 return;
@@ -335,9 +320,7 @@ export function useModalBarangKeluarControl({
                 tanggal: rows[0].tanggal,
                 kondisi: '-',
                 nomor_omc: rows[0].nomor_omc.trim(),
-                nomor_imc: rows[0].nomor_imc ? rows[0].nomor_imc.trim() : null,
                 pihak_asal: rows[0].pihak_asal.trim(),
-                gudang_tujuan_id: rows[0].sub_jenis === 'TRANSFER_GUDANG' ? parseInt(rows[0].gudang_tujuan_id, 10) : null,
             }
             : {
                 items: rows.map(r => ({
@@ -345,10 +328,8 @@ export function useModalBarangKeluarControl({
                     tanggal: r.tanggal,
                     kondisi: '-',
                     nomor_omc: r.nomor_omc.trim(),
-                    nomor_imc: r.nomor_imc ? r.nomor_imc.trim() : null,
                     pihak_asal: r.pihak_asal.trim(),
                     gudang_asal_id: parseInt(r.gudang_asal_id, 10),
-                    gudang_tujuan_id: r.sub_jenis === 'TRANSFER_GUDANG' ? parseInt(r.gudang_tujuan_id, 10) : null,
                     barang_id: parseInt(r.barang_id, 10),
                     qty: parseInt(r.qty, 10),
                     serials: r.serials || []
