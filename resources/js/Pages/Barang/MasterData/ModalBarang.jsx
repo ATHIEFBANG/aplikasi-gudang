@@ -69,8 +69,8 @@ export default function ModalBarang({
                             variant="secondary" 
                             className={`text-[11px] font-mono font-bold ${
                                 addItems.length >= MAX_ROWS_LIMIT
-                                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                                    : 'bg-slate-800 text-slate-200 border border-slate-700'
+                                    ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/40'
+                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700'
                             }`}
                         >
                             {addItems.length} / {MAX_ROWS_LIMIT} Baris
@@ -79,10 +79,11 @@ export default function ModalBarang({
                 )
             }
         >
+            {/* Alert Card Info dengan perbaikan warna mode terang & gelap */}
             {!isEditMode && (
-                <Alert className="shrink-0 mb-3 bg-blue-950/40 border-blue-800/60 text-blue-300 p-2.5 flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                    <AlertDescription className="text-[11px] leading-relaxed">
+                <Alert className="shrink-0 mb-3 bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-900 dark:text-blue-300 p-3 rounded-xl flex items-start gap-2.5 shadow-xs">
+                    <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                    <AlertDescription className="text-xs leading-relaxed">
                         <strong>Smart Paste (Maks {MAX_ROWS_LIMIT} Baris):</strong> Tekan <strong>Ctrl + V</strong> untuk menempelkan data dari Excel.
                     </AlertDescription>
                 </Alert>

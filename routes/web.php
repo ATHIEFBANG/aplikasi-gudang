@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\BarangController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\TransaksiBarangKeluarController;
@@ -51,6 +52,12 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{id}', 'update')->name('update');
     });
 
+    // LAPORAN BULANAN (REKONSILIASI STOK & BUKU JURNAL MUTASI)
+    Route::prefix('laporan')->name('laporan.')->controller(LaporanController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/export', 'export')->name('export');
+    });
+
     // PROFILE
     Route::prefix('profile')->name('profile.')->controller(ProfileController::class)->group(function () {
         Route::get('/', 'edit')->name('edit');
@@ -68,4 +75,4 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__ . '/auth.php'; //[cite: 4]
