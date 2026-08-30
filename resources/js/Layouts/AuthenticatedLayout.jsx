@@ -19,6 +19,7 @@ import {
     LayoutDashboard,
     Package,
     ArrowLeftRight,
+    FileSpreadsheet,
     User as UserIcon,
     LogOut,
     Sun,
@@ -38,6 +39,7 @@ const ROUTE_FALLBACKS = {
     'home': '/dashboard',
     'barang.index': '/barang',
     'transaksi.index': '/transaksi',
+    'laporan.index': '/laporan',
     'admin.users.index': '/admin/users',
     'profile.edit': '/profile',
     'logout': '/logout',
@@ -161,7 +163,6 @@ export default function AuthenticatedLayout({ header, children }) {
         }
     }, [isDark]);
 
-    // Helper Badge Role
     const getRoleBadgeStyle = (role) => {
         switch (role) {
             case 'admin':
@@ -178,7 +179,7 @@ export default function AuthenticatedLayout({ header, children }) {
             <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50/40 to-amber-50/20 dark:from-[#080d24] dark:via-[#0c1538] dark:to-[#060a1c] text-slate-900 dark:text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300 relative overflow-x-hidden">
                 
                 {/* BACKGROUND ANIMASI LOGISTIK */}
-                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-20 dark:opacity-25">
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-20 dark:opacity-25 print:hidden">
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,#3b82f615_1px,transparent_1px),linear-gradient(to_bottom,#3b82f615_1px,transparent_1px)] bg-[size:48px_48px]" />
                     
                     <div className="absolute inset-x-0 bottom-36 h-48 flex items-end">
@@ -220,13 +221,13 @@ export default function AuthenticatedLayout({ header, children }) {
                     </div>
                 </div>
 
-                <div className="absolute top-10 left-1/4 w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/15 rounded-full blur-[180px] pointer-events-none animate-pulse duration-1000" />
-                <div className="absolute top-1/3 right-10 w-[550px] h-[550px] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[190px] pointer-events-none" />
+                <div className="absolute top-10 left-1/4 w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/15 rounded-full blur-[180px] pointer-events-none animate-pulse duration-1000 print:hidden" />
+                <div className="absolute top-1/3 right-10 w-[550px] h-[550px] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[190px] pointer-events-none print:hidden" />
 
                 {isPageLoading && <Loading message="Memproses Data Gudang..." />}
 
                 {/* NAVBAR & HEADER */}
-                <header className="sticky top-0 z-50 w-full flex flex-col shadow-lg transition-all duration-300 relative group">
+                <header className="sticky top-0 z-50 w-full flex flex-col shadow-lg transition-all duration-300 relative group print:hidden">
                     
                     {/* TIER 1: Top Header Bar */}
                     <div className="relative z-50 h-16 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-white/10 flex justify-center w-full">
@@ -239,7 +240,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                     className="focus:outline-none transition-transform active:scale-95"
                                     title="Panca Pilar Laksana"
                                 >
-                                    {/* ApplicationLogo Component */}
                                     <ApplicationLogo />
                                 </Link>
 
@@ -335,7 +335,7 @@ export default function AuthenticatedLayout({ header, children }) {
                         </div>
                     </div>
 
-                    {/* TIER 2: Main Navigation Menu */}
+                    {/* TIER 2: Main Navigation Menu (Dashboard, Master Barang, Transaksi Stok, Laporan Bulanan) */}
                     <div 
                         className={`hidden md:flex justify-center w-full transition-all duration-300 ease-in-out z-40 bg-gradient-to-r from-blue-700 via-blue-600 to-blue-700 dark:from-slate-900 dark:via-blue-950 dark:to-slate-900 border-b border-blue-800/80 dark:border-blue-900/60 shadow-md ${
                             isNavOpen ? 'max-h-14 opacity-100 overflow-visible' : 'max-h-0 opacity-0 overflow-hidden'
@@ -380,6 +380,19 @@ export default function AuthenticatedLayout({ header, children }) {
                             >
                                 <ArrowLeftRight className="w-4 h-4" />
                                 <span>Transaksi Stok</span>
+                            </Link>
+
+                            {/* 4. LAPORAN BULANAN */}
+                            <Link
+                                href={getRoute('laporan.index')}
+                                className={`flex items-center gap-2 px-1 h-full font-medium text-sm transition-all duration-200 outline-none border-b-[3px] ${
+                                    checkActive('laporan.index')
+                                        ? 'border-amber-400 text-amber-300 font-bold'
+                                        : 'border-transparent text-white/80 hover:text-white hover:border-white/50'
+                                }`}
+                            >
+                                <FileSpreadsheet className="w-4 h-4" />
+                                <span>Laporan Bulanan</span>
                             </Link>
 
                         </nav>
@@ -427,6 +440,16 @@ export default function AuthenticatedLayout({ header, children }) {
                                 }`}
                             >
                                 <ArrowLeftRight className="w-4 h-4" /> Transaksi Stok
+                            </Link>
+                            <Link 
+                                href={getRoute('laporan.index')} 
+                                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                                    checkActive('laporan.index') 
+                                        ? 'bg-blue-600 text-white shadow-sm' 
+                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                }`}
+                            >
+                                <FileSpreadsheet className="w-4 h-4" /> Laporan Bulanan
                             </Link>
 
                             {user?.role === 'admin' && (

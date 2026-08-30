@@ -137,7 +137,7 @@ class LaporanController extends Controller
                           ->whereBetween('tanggal', [$startDate, $endDate]);
                     })->sum('qty');
 
-                $trfOut      = $trfIn; // Di level global, mutasi transfer masuk = transfer keluar
+                $trfOut      = $trfIn;
                 $transferNet = 0;
                 $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan);
             }
@@ -152,7 +152,6 @@ class LaporanController extends Controller
             $kondisiBekas = $serialsQuery->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
             $kondisiRusak = $serialsQuery->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
 
-            // Fallback jika barang non-SN
             if (!$b->is_wajib_sn) {
                 $kondisiBaru = $stokAkhir;
             }
@@ -179,7 +178,7 @@ class LaporanController extends Controller
             ];
         });
 
-        // 2. BUKU JURNAL MUTASI DETAIL (AUDIT LEDGER BULAN TERPILIH)
+        // 2. BUKU JURNAL MUTASI DETAIL (AUDIT LEDGER)
         $ledgerQuery = Transaksi::with([
             'gudangAsal:id,nama_gudang',
             'gudangTujuan:id,nama_gudang',
@@ -216,7 +215,7 @@ class LaporanController extends Controller
                 'no_transaksi'  => $t->no_transaksi,
                 'jenis'         => $t->jenis_transaksi,
                 'sub_jenis'     => $t->sub_jenis,
-                'tanggal'       => $t->tanggal ? String($t->tanggal)->split('T')[0] : '-',
+                'tanggal'       => $t->tanggal ? date('Y-m-d', strtotime($t->tanggal)) : '-',
                 'nomor_dokumen' => $t->nomor_omc ?: ($t->nomor_imc ?: '-'),
                 'nomor_imc'     => $t->nomor_imc ?: '-',
                 'nomor_omc'     => $t->nomor_omc ?: '-',
@@ -278,16 +277,14 @@ class LaporanController extends Controller
 
         $callback = function () use ($barangs, $startDate, $endDate, $gudangId, $bulan, $tahun, $gudangName, $monthNames) {
             $file = fopen('php://output', 'w');
-            fputs($file, "\xEF\xBB\xBF"); // UTF-8 BOM untuk Excel
+            fputs($file, "\xEF\xBB\xBF");
 
-            // Judul Header Dokumen
             fputcsv($file, ["LAPORAN REKONSILIASI MUTASI STOK BULANAN"], ';');
             fputcsv($file, ["Periode", "{$monthNames[$bulan]} {$tahun}"], ';');
             fputcsv($file, ["Lokasi Gudang", $gudangName], ';');
             fputcsv($file, ["Tanggal Cetak", date('Y-m-d H:i:s')], ';');
             fputcsv($file, [], ';');
 
-            // Header Tabel
             fputcsv($file, [
                 'No',
                 'Kode PPL',
