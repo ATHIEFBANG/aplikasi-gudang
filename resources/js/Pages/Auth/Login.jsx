@@ -62,7 +62,7 @@ export default function Login({ status, canResetPassword }) {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
+        <div className="min-h-screen w-full bg-slate-950 flex flex-col justify-between p-4 sm:p-6 md:p-8 relative overflow-x-hidden font-sans selection:bg-blue-600 selection:text-white">
             <Head title="Login - System Gudang" />
 
             {/* ANIMASI CSS TERORGANISIR */}
@@ -92,21 +92,23 @@ export default function Login({ status, canResetPassword }) {
                 }
             `}</style>
 
-            {/* LOGO UTAMA (PANCA PILAR LAKSANA) */}
-            <Link 
-                href="/" 
-                className="absolute top-6 left-6 sm:top-8 sm:left-8 z-50 flex items-center gap-3 transition-transform duration-200 hover:scale-105"
-                title="Kembali ke Halaman Utama"
-            >
-                <ApplicationLogo className="h-10 sm:h-12 w-auto text-sky-300 fill-current drop-shadow-[0_0_18px_rgba(56,189,248,0.85)]" />
-            </Link>
+            {/* 1. TOP HEADER BAR: LOGO AMAN TANPA RAWAN TABRAKAN */}
+            <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-30 shrink-0 pb-2 sm:pb-4">
+                <Link 
+                    href="/" 
+                    className="flex items-center gap-3 transition-transform duration-200 hover:scale-102 cursor-pointer select-none"
+                    title="Kembali ke Halaman Utama"
+                >
+                    <ApplicationLogo className="h-9 sm:h-10 w-auto" />
+                </Link>
+            </header>
 
-            {/* AMBIENT LIGHTING */}
+            {/* AMBIENT LIGHTING BACKGROUND */}
             <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/15 blur-[140px] rounded-full pointer-events-none animate-pulse duration-[5000ms]" />
             <div className="absolute bottom-1/3 right-1/3 translate-x-1/2 translate-y-1/2 w-[450px] h-[450px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none" />
 
-            {/* LAPTOP MOCKUP CONTAINER */}
-            <div className="w-full max-w-4xl relative z-10 my-auto pt-12 sm:pt-0">
+            {/* 2. LAPTOP MOCKUP CONTAINER (TERPUSAT DI TENGAH DENGAN JARAK AMAN) */}
+            <main className="w-full max-w-4xl mx-auto relative z-10 my-auto py-4 sm:py-6">
                 <div className="bg-slate-900 border border-slate-700/80 rounded-t-2xl p-2.5 sm:p-3.5 shadow-2xl relative z-20">
                     
                     {/* Webcam Notch */}
@@ -288,8 +290,9 @@ export default function Login({ status, canResetPassword }) {
                                 {[0, 1, 2].map((idx) => (
                                     <button
                                         key={idx}
+                                        type="button"
                                         onClick={() => setBgIndex(idx)}
-                                        className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                                        className={`w-2 h-2 rounded-full transition-all duration-300 cursor-pointer ${
                                             bgIndex === idx 
                                                 ? (idx === 0 ? 'bg-blue-500 w-4' : idx === 1 ? 'bg-amber-400 w-4' : 'bg-sky-400 w-4')
                                                 : 'bg-slate-700 hover:bg-slate-500'
@@ -357,7 +360,7 @@ export default function Login({ status, canResetPassword }) {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors z-10"
+                                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors z-10 cursor-pointer"
                                             >
                                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                             </button>
@@ -391,7 +394,7 @@ export default function Login({ status, canResetPassword }) {
                                     <Button 
                                         type="submit" 
                                         disabled={processing}
-                                        className="w-full h-10 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-blue-600/30 transition-all duration-200 active:scale-[0.99] mt-2"
+                                        className="w-full h-10 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-blue-600/30 transition-all duration-200 active:scale-[0.99] mt-2 cursor-pointer"
                                     >
                                         {processing ? 'Memproses...' : 'Masuk ke Dashboard'}
                                     </Button>
@@ -439,29 +442,27 @@ export default function Login({ status, canResetPassword }) {
                                     <span className="text-slate-500 text-[9px]">{currentDate || '01/01/2026'}</span>
                                 </div>
                             </div>
-
                         </div>
+
                     </div>
                 </div>
 
-                {/* KAKI & DASAR CHASSIS LAPTOP (LEBAR MELEBIHI WIDE DISPLAY BEZEL) */}
+                {/* KAKI & DASAR CHASSIS LAPTOP */}
                 <div className="relative mx-auto w-[108%] -ml-[4%] select-none pointer-events-none z-10">
-                    {/* Flat Wide Base Lip / Deck */}
                     <div className="h-4 sm:h-5 bg-slate-900 rounded-b-lg border-x border-b border-slate-800/90 shadow-[0_20px_50px_rgba(0,0,0,0.95)] relative flex justify-center items-center overflow-hidden">
-                        {/* Highlights Edge Line */}
                         <div className="absolute top-0 inset-x-0 h-[1px] bg-slate-700/60" />
-                        
-                        {/* Center Notch Slot */}
                         <div className="w-32 sm:w-40 h-1.5 bg-slate-950 rounded-full border border-slate-800/90 shadow-inner flex justify-center items-center">
                             <div className="w-12 h-[1px] bg-slate-700/50" />
                         </div>
                     </div>
-
-                    {/* Full-width Bottom Rubber Stand Strip */}
                     <div className="w-full h-1 bg-slate-950 rounded-b-sm border-b border-slate-800/80 shadow-md mx-auto -mt-[1px]" />
                 </div>
+            </main>
 
-            </div>
+            {/* 3. FOOTER */}
+            <footer className="w-full text-center py-2 text-[11px] text-slate-600 relative z-10">
+                &copy; {new Date().getFullYear()} PT Panca Pilar Laksana. All rights reserved.
+            </footer>
         </div>
     );
 }
