@@ -1,19 +1,22 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, Check, X } from 'lucide-react';
+import { ChevronDown, Check, X, Search } from 'lucide-react';
 
 export default function HybridDropdown({
     value = '',
     options = [],
     onChange,
     placeholder = 'Ketik atau pilih...',
+    searchPlaceholder = 'Cari opsi...',
     disabled = false,
     inputClassName = '',
     className = '',
     direction = 'down'
 }) {
     const [isOpen, setIsOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const containerRef = useRef(null);
     const inputRef = useRef(null);
+    const searchInputRef = useRef(null);
 
     // Normalisasi opsi (mendukung array string maupun array object)
     const normalizedOptions = useMemo(() => {
@@ -22,50 +25,67 @@ export default function HybridDropdown({
                 return {
                     value: String(opt.value ?? opt.id ?? opt.label ?? ''),
                     label: String(opt.label ?? opt.name ?? opt.value ?? ''),
+                    raw: opt
                 };
             }
             return {
                 value: String(opt),
                 label: String(opt),
+                raw: opt
             };
         });
     }, [options]);
 
-    // Filter daftar saran berdasarkan teks yang diketik pengguna
+    // Filter daftar saran berdasarkan search query di pop-up
     const filteredOptions = useMemo(() => {
-        const query = String(value || '').toLowerCase().trim();
+        const query = searchQuery.toLowerCase().trim();
         if (!query) return normalizedOptions;
         return normalizedOptions.filter((opt) =>
             opt.label.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query)
         );
-    }, [normalizedOptions, value]);
+    }, [normalizedOptions, searchQuery]);
 
     // Menutup dropdown ketika pengguna klik di luar elemen
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (containerRef.current && !containerRef.current.contains(e.target)) {
                 setIsOpen(false);
+                setSearchQuery('');
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // Auto-focus ke input search saat popover terbuka jika opsi > 3
+    useEffect(() => {
+        if (isOpen && normalizedOptions.length > 3) {
+            const timer = setTimeout(() => {
+                searchInputRef.current?.focus();
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen, normalizedOptions.length]);
+
     const handleInputChange = (e) => {
         if (onChange) onChange(e.target.value);
         if (!isOpen) setIsOpen(true);
     };
 
-    const handleSelectOption = (optVal) => {
-        if (onChange) onChange(optVal);
+    const handleSelectOption = (opt) => {
+        if (onChange) onChange(opt.value, opt.raw || opt);
         setIsOpen(false);
+        setSearchQuery('');
     };
 
     const handleClear = (e) => {
         e.stopPropagation();
         if (onChange) onChange('');
+        setSearchQuery('');
         inputRef.current?.focus();
     };
+
+    const showSearch = normalizedOptions.length > 3;
 
     return (
         <div ref={containerRef} className={`relative w-full ${className}`}>
@@ -104,7 +124,9 @@ export default function HybridDropdown({
                         onClick={() => {
                             if (!disabled) {
                                 setIsOpen((prev) => !prev);
-                                inputRef.current?.focus();
+                                if (!isOpen) {
+                                    setSearchQuery('');
+                                }
                             }
                         }}
                         className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
@@ -121,11 +143,42 @@ export default function HybridDropdown({
                         direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
                     }`}
                 >
-                    {/* Scrollbar otomatis muncul jika opsi > 3 (max-h-36) */}
+                    {/* Kotak Search otomatis jika data > 3 */}
+                    {showSearch && (
+                        <div className="p-1.5 border-b border-slate-100 dark:border-slate-800 mb-1">
+                            <div className="relative flex items-center">
+                                <Search className="w-3.5 h-3.5 absolute left-2 text-slate-400 pointer-events-none" />
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder={searchPlaceholder}
+                                    className="w-full h-7 pl-7 pr-6 text-[11px] rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSearchQuery('');
+                                            searchInputRef.current?.focus();
+                                        }}
+                                        className="absolute right-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Scrollbar otomatis muncul (max-h-36) */}
                     <div className="overflow-y-auto max-h-36 py-0.5 space-y-0.5">
                         {filteredOptions.length === 0 ? (
                             <div className="py-2.5 px-3 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                                Tekan simpan untuk menggunakan: <strong>"{value}"</strong>
+                                Tekan simpan untuk menggunakan: <strong>"{searchQuery || value}"</strong>
                             </div>
                         ) : (
                             filteredOptions.map((opt) => {
@@ -134,7 +187,7 @@ export default function HybridDropdown({
                                     <button
                                         key={opt.value}
                                         type="button"
-                                        onClick={() => handleSelectOption(opt.value)}
+                                        onClick={() => handleSelectOption(opt)}
                                         className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-left transition-colors cursor-pointer ${
                                             isSelected
                                                 ? 'bg-blue-600 text-white font-semibold'

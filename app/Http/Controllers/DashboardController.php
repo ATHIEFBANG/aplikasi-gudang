@@ -71,12 +71,13 @@ class DashboardController extends Controller
             (clone $trxQuery)->where('sub_jenis', 'PEMBELIAN')->pluck('id')
         )->selectRaw('SUM(qty * COALESCE(harga, 0)) as total_beli')->value('total_beli') ?? 0;
 
-        // Distribusi Jenis Penerimaan untuk Donut Chart
+        // Distribusi Kategori Mutasi untuk Donut Chart (Transfer diganti Barang ke Site & Pemakaian Internal)
         $donutPenerimaan = [
-            'Pembelian'       => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PEMBELIAN')->pluck('id'))->sum('qty'),
-            'Peminjaman'      => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PEMINJAMAN')->pluck('id'))->sum('qty'),
-            'Pengembalian'    => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PENGEMBALIAN')->pluck('id'))->sum('qty'),
-            'Transfer Gudang' => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where(fn($q) => $q->where('sub_jenis', 'TRANSFER_GUDANG')->orWhere('jenis_transaksi', 'TRANSFER'))->pluck('id'))->sum('qty'),
+            'Pembelian'          => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PEMBELIAN')->pluck('id'))->sum('qty'),
+            'Peminjaman'         => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PEMINJAMAN')->pluck('id'))->sum('qty'),
+            'Pengembalian'       => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PENGEMBALIAN')->pluck('id'))->sum('qty'),
+            'Barang ke Site'     => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'BARANG_KE_SITE')->pluck('id'))->sum('qty'),
+            'Pemakaian Internal' => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PEMAKAIAN_INTERNAL')->pluck('id'))->sum('qty'),
         ];
 
         // 2. DATA PETA & RINCIAN STOK PER GUDANG (BARU, BEKAS, RUSAK, TOTAL STOK FISIK)
@@ -123,9 +124,6 @@ class DashboardController extends Controller
                     $q->where('status', 'COMPLETED')->where('gudang_asal_id', $g->id);
                 })->sum('qty');
 
-                $trxTotal = max(0, ($masukBaru + $masukBekas + $masukRusak) - $keluarQty);
-
-                // Gunakan nilai terbesar yang valid antara serial fisik atau agregasi transaksi
                 if ($snTotal > 0) {
                     $qtyBaru   = $snBaru;
                     $qtyBekas  = $snBekas;
