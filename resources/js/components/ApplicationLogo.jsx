@@ -1,9 +1,13 @@
+import React from 'react';
 import { cn } from '@/lib/utils';
 import { Boxes } from 'lucide-react';
 
+// Import asset langsung dari resources/images agar diproses & di-hash oleh Vite
+import defaultLogo from '../../images/ppl.png';
+
 export function AppLogo({ 
     className, 
-    imageSrc = '/images/ppl.png', // Default universal logo
+    imageSrc = defaultLogo, 
     showTextOnMobile = false, 
     ...props 
 }) {
