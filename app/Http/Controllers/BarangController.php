@@ -18,8 +18,8 @@ class BarangController extends Controller
         $search   = $request->input('search');
         $perPage  = (int) $request->input('per_page', 10);
         
-        $rawOrder = strtolower((string) $request->input('order', 'desc'));
-        $order    = in_array($rawOrder, ['asc', 'desc'], true) ? $rawOrder : 'desc';
+        $rawOrder = strtolower((string) $request->input('order', 'asc'));
+        $order    = in_array($rawOrder, ['asc', 'desc'], true) ? $rawOrder : 'asc';
 
         $query = Barang::with(['stoks.gudang', 'serials'])
             ->withSum('stoks', 'jumlah');
@@ -36,7 +36,10 @@ class BarangController extends Controller
             });
         }
 
-        $barangs = $query->orderBy('id', $order)
+        // 1. Dikelompokkan & diurutkan berdasarkan Brand (A-Z)
+        // 2. Jika Brand sama, barang yang diinput duluan tetap di atas (ID ASC)
+        $barangs = $query->orderBy('brand', $order)
+            ->orderBy('id', 'asc')
             ->paginate($perPage)
             ->withQueryString();
 
@@ -66,7 +69,6 @@ class BarangController extends Controller
                 'items.*.kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang',
                 'items.*.brand'       => 'required|string|max:255',
                 'items.*.tipe'        => 'required|string|max:255',
-                // UBAH BATAS MAKSIMAL KATEGORI DI SINI (Contoh: max:255 atau max:500)
                 'items.*.kategori'    => 'required|string|max:255',
                 'items.*.part_number' => 'nullable|string|max:255',
                 'items.*.nama_barang' => 'nullable|string|max:255',
@@ -110,7 +112,6 @@ class BarangController extends Controller
             'kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang',
             'brand'       => 'required|string|max:255',
             'tipe'        => 'required|string|max:255',
-            // UBAH BATAS MAKSIMAL KATEGORI DI SINI (Single Store)
             'kategori'    => 'required|string|max:255',
             'part_number' => 'nullable|string|max:255',
             'nama_barang' => 'nullable|string|max:255',
@@ -153,7 +154,6 @@ class BarangController extends Controller
             'kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang,' . $barang->id,
             'brand'       => 'required|string|max:255',
             'tipe'        => 'required|string|max:255',
-            // UBAH BATAS MAKSIMAL KATEGORI DI SINI (Update Mode)
             'kategori'    => 'required|string|max:255',
             'part_number' => 'nullable|string|max:255',
             'nama_barang' => 'nullable|string|max:255',
@@ -209,7 +209,7 @@ class BarangController extends Controller
 
     public function export(): StreamedResponse
     {
-        $barangs = Barang::orderBy('id', 'asc')->get();
+        $barangs = Barang::orderBy('brand', 'asc')->orderBy('id', 'asc')->get();
         $csvFileName = 'Master_Barang_PPL_' . date('Y-m-d_His') . '.csv';
         $headers = [
             'Content-Type'        => 'text/csv; charset=UTF-8',
