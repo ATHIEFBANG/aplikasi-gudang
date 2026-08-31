@@ -40,7 +40,6 @@ class BarangController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        // Mengambil seluruh data unik dari database (100% Real Database, Tanpa Dummy)
         $existingOptions = [
             'brandList'    => Barang::whereNotNull('brand')->where('brand', '!=', '')->distinct()->pluck('brand')->values(),
             'tipeList'     => Barang::whereNotNull('tipe')->where('tipe', '!=', '')->distinct()->pluck('tipe')->values(),
@@ -65,13 +64,14 @@ class BarangController extends Controller
             $validated = $request->validate([
                 'items'               => 'required|array|min:1',
                 'items.*.kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang',
-                'items.*.brand'       => 'required|string|max:100',
-                'items.*.tipe'        => 'required|string|max:100',
-                'items.*.kategori'    => 'required|string|max:100',
+                'items.*.brand'       => 'required|string|max:255',
+                'items.*.tipe'        => 'required|string|max:255',
+                // UBAH BATAS MAKSIMAL KATEGORI DI SINI (Contoh: max:255 atau max:500)
+                'items.*.kategori'    => 'required|string|max:255',
                 'items.*.part_number' => 'nullable|string|max:255',
                 'items.*.nama_barang' => 'nullable|string|max:255',
-                'items.*.satuan'      => 'nullable|string|max:100',
-                'items.*.deskripsi'   => 'nullable|string|max:100',
+                'items.*.satuan'      => 'nullable|string|max:255',
+                'items.*.deskripsi'   => 'nullable|string|max:255',
                 'items.*.min_stock'   => 'nullable|integer|min:0',
                 'items.*.is_wajib_sn' => 'boolean',
                 'items.*.is_wajib_pn' => 'boolean',
@@ -108,13 +108,14 @@ class BarangController extends Controller
 
         $validated = $request->validate([
             'kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang',
-            'brand'       => 'required|string|max:100',
-            'tipe'        => 'required|string|max:100',
-            'kategori'    => 'required|string|max:100',
+            'brand'       => 'required|string|max:255',
+            'tipe'        => 'required|string|max:255',
+            // UBAH BATAS MAKSIMAL KATEGORI DI SINI (Single Store)
+            'kategori'    => 'required|string|max:255',
             'part_number' => 'nullable|string|max:255',
             'nama_barang' => 'nullable|string|max:255',
-            'satuan'      => 'nullable|string|max:100',
-            'deskripsi'   => 'nullable|string|max:100',
+            'satuan'      => 'nullable|string|max:255',
+            'deskripsi'   => 'nullable|string|max:255',
             'min_stock'   => 'nullable|integer|min:0',
             'is_wajib_sn' => 'boolean',
             'is_wajib_pn' => 'boolean',
@@ -150,13 +151,14 @@ class BarangController extends Controller
         $barang = Barang::findOrFail($id);
         $validated = $request->validate([
             'kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang,' . $barang->id,
-            'brand'       => 'required|string|max:100',
-            'tipe'        => 'required|string|max:100',
-            'kategori'    => 'required|string|max:100',
+            'brand'       => 'required|string|max:255',
+            'tipe'        => 'required|string|max:255',
+            // UBAH BATAS MAKSIMAL KATEGORI DI SINI (Update Mode)
+            'kategori'    => 'required|string|max:255',
             'part_number' => 'nullable|string|max:255',
             'nama_barang' => 'nullable|string|max:255',
-            'satuan'      => 'nullable|string|max:100',
-            'deskripsi'   => 'nullable|string|max:100',
+            'satuan'      => 'nullable|string|max:255',
+            'deskripsi'   => 'nullable|string|max:255',
             'min_stock'   => 'nullable|integer|min:0',
             'is_wajib_sn' => 'boolean',
             'is_wajib_pn' => 'boolean',
@@ -200,6 +202,7 @@ class BarangController extends Controller
             'ids'   => 'required|array',
             'ids.*' => 'exists:barangs,id',
         ]);
+
         Barang::destroy($request->ids);
         return redirect()->back()->with('success', count($request->ids) . ' barang terpilih berhasil dihapus.');
     }
@@ -215,12 +218,14 @@ class BarangController extends Controller
             'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
             'Expires'             => '0',
         ];
+
         $columns = ['Kode PPL', 'Brand / Merk', 'Tipe / Jenis', 'Kategori', 'Part Number', 'Satuan', 'Wajib SN', 'Wajib PN'];
 
         $callback = function () use ($barangs, $columns) {
             $file = fopen('php://output', 'w');
             fputs($file, "\xEF\xBB\xBF");
             fputcsv($file, $columns, ';');
+
             foreach ($barangs as $b) {
                 fputcsv($file, [
                     $b->kode_barang,
@@ -233,6 +238,7 @@ class BarangController extends Controller
                     $b->is_wajib_pn ? 'Ya' : 'Tidak',
                 ], ';');
             }
+
             fclose($file);
         };
 
