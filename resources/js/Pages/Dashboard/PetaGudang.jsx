@@ -22,9 +22,6 @@ const TABLE_COLUMNS = [
     { key: 'nama_gudang', altKeys: ['nama_gudang', 'name', 'nama'], label: 'Nama Gudang' },
     { key: 'lokasi', altKeys: ['lokasi', 'alamat', 'address'], label: 'Alamat / Lokasi' },
     { key: 'koordinat', label: 'Koordinat (Lat, Lng)' },
-    { key: 'qty_baru', label: 'Stok Baru' },
-    { key: 'qty_bekas', label: 'Stok Bekas' },
-    { key: 'qty_rusak', label: 'Stok Rusak' },
     { key: 'total_qty', label: 'Total Stok Fisik' },
 ];
 
@@ -157,27 +154,6 @@ export default function PetaGudang({ mapData = [] }) {
                             </span>
                         );
 
-                    case 'qty_baru':
-                        return (
-                            <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                {(item.qty_baru || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-400">Unit</span>
-                            </span>
-                        );
-
-                    case 'qty_bekas':
-                        return (
-                            <span className="font-mono text-xs font-bold text-amber-600 dark:text-amber-400">
-                                {(item.qty_bekas || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-400">Unit</span>
-                            </span>
-                        );
-
-                    case 'qty_rusak':
-                        return (
-                            <span className="font-mono text-xs font-bold text-rose-600 dark:text-rose-400">
-                                {(item.qty_rusak || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal text-slate-400">Unit</span>
-                            </span>
-                        );
-
                     case 'total_qty':
                         return (
                             <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
@@ -224,9 +200,6 @@ export default function PetaGudang({ mapData = [] }) {
                             details: [
                                 { label: 'Kode Gudang', value: item.kode_gudang || '-' },
                                 { label: 'Lokasi Area', value: item.lokasi || '-' },
-                                { label: 'Stok Baru', value: `${(item.qty_baru || 0).toLocaleString('id-ID')} Unit` },
-                                { label: 'Stok Bekas', value: `${(item.qty_bekas || 0).toLocaleString('id-ID')} Unit` },
-                                { label: 'Stok Rusak', value: `${(item.qty_rusak || 0).toLocaleString('id-ID')} Unit` },
                                 { label: 'Total Stok Fisik', value: `${(item.total_qty || 0).toLocaleString('id-ID')} Unit` },
                                 { label: 'Koordinat', value: `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`, isMonospace: true }
                             ],
