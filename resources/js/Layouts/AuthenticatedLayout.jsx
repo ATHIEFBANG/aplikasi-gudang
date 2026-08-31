@@ -473,26 +473,32 @@ export default function AuthenticatedLayout({ header, children }) {
                     {children}
                 </main>
 
-                <Toast 
-                    key={toastState.key} 
-                    isOpen={toastState.isOpen} 
-                    type={toastState.type} 
-                    title={toastState.title} 
-                    message={toastState.message} 
-                    duration={4000} 
-                    onClose={() => setToastState(prev => ({ ...prev, isOpen: false }))} 
-                />
+                {/* CONTAINER NOTIFIKASI TOAST (Ditinggikan ke z-[99999] agar di atas modal) */}
+                <div className="relative z-[99999]">
+                    <Toast 
+                        key={toastState.key} 
+                        isOpen={toastState.isOpen} 
+                        type={toastState.type} 
+                        title={toastState.title} 
+                        message={toastState.message} 
+                        duration={4000} 
+                        onClose={() => setToastState(prev => ({ ...prev, isOpen: false }))} 
+                    />
+                </div>
                 
-                <ConfirmModal 
-                    isOpen={confirmState.isOpen} 
-                    title={confirmState.title} 
-                    message={confirmState.message} 
-                    variant={confirmState.variant} 
-                    confirmText={confirmState.confirmText} 
-                    cancelText={confirmState.cancelText} 
-                    onConfirm={confirmState.onConfirm} 
-                    onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))} 
-                />
+                {/* CONTAINER CONFIRM MODAL (Ditinggikan ke z-[99999] agar di atas modal) */}
+                <div className="relative z-[99999]">
+                    <ConfirmModal 
+                        isOpen={confirmState.isOpen} 
+                        title={confirmState.title} 
+                        message={confirmState.message} 
+                        variant={confirmState.variant} 
+                        confirmText={confirmState.confirmText} 
+                        cancelText={confirmState.cancelText} 
+                        onConfirm={confirmState.onConfirm} 
+                        onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))} 
+                    />
+                </div>
             </div>
         </ConfirmContext.Provider>
     );
