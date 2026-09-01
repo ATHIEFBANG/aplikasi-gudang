@@ -43,6 +43,16 @@ export default function ModalBarang({
         handleSubmitForm
     } = useModalBarangControl({ isOpen, isEditMode, selectedItem, existingOptions, onClose });
 
+    // Filter agar paste di dalam input form tidak terblokir oleh paste Excel
+    const handleFilteredPaste = (e) => {
+        const targetTag = e.target?.tagName;
+        if (targetTag === 'INPUT' || targetTag === 'TEXTAREA') {
+            // Biarkan browser menempelkan teks ke dalam kolom input
+            return;
+        }
+        handleContainerPaste?.(e);
+    };
+
     return (
         <Modal
             isOpen={isOpen}
@@ -51,7 +61,7 @@ export default function ModalBarang({
             onSubmit={handleSubmitForm}
             submitLabel={isEditMode ? 'Simpan Perubahan' : 'Simpan Semua Data'}
             isProcessing={isProcessing}
-            onPaste={handleContainerPaste}
+            onPaste={!isEditMode ? handleFilteredPaste : undefined}
             headerExtra={
                 !isEditMode && (
                     <div className="flex items-center gap-2">
@@ -79,12 +89,12 @@ export default function ModalBarang({
                 )
             }
         >
-            {/* Alert Card Info dengan perbaikan warna mode terang & gelap */}
+            {/* Alert Card Info */}
             {!isEditMode && (
                 <Alert className="shrink-0 mb-3 bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-900 dark:text-blue-300 p-3 rounded-xl flex items-start gap-2.5 shadow-xs">
                     <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                     <AlertDescription className="text-xs leading-relaxed">
-                        <strong>Smart Paste (Maks {MAX_ROWS_LIMIT} Baris):</strong> Tekan <strong>Ctrl + V</strong> untuk menempelkan data dari Excel.
+                        <strong>Smart Input (Maks {MAX_ROWS_LIMIT} Baris):</strong> Anda dapat mengetik manual, menempelkan teks per kolom, atau menggunakan tombol <strong>Paste dari Excel</strong> di pojok kanan atas.
                     </AlertDescription>
                 </Alert>
             )}

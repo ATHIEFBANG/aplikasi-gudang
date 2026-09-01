@@ -53,10 +53,10 @@ export default function ModalBarangMasukRow({
         : 'Baru';
 
     const pihakAsalLabel = row.sub_jenis === 'PEMBELIAN' 
-        ? 'Supplier / Vendor Asal *' 
+        ? 'Asal Barang *' 
         : row.sub_jenis === 'PEMINJAMAN' 
-        ? 'Peminjam / Vendor Terkait *' 
-        : 'Dikembalikan Oleh *';
+        ? 'Asal Barang *' 
+        : 'Asal Barang *';
 
     const pihakAsalPlaceholder = row.sub_jenis === 'PEMBELIAN'
         ? 'Contoh: PT Sumber Logistik / Toko Jaya'

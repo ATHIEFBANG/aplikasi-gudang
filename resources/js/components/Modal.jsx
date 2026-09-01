@@ -28,13 +28,17 @@ export default function Modal({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && !isProcessing && onClose?.()}>
             <DialogContent 
-                /* DIUBAH: Menggunakan max-h-[85vh] h-auto agar tidak melar kebawah */
-                className={`${maxWidth} max-h-[85vh] h-auto flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50`}
+                /* Menambahkan select-text dan mengaktifkan penanganan paste bebas */
+                className={`${maxWidth} max-h-[85vh] h-auto flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 select-text`}
                 onPaste={onPaste}
+                onOpenAutoFocus={(e) => {
+                    // Mencegah focus trap mengunci event clipboard saat modal terbuka
+                    e.preventDefault();
+                }}
             >
                 {/* FIXED HEADER */}
                 {(title || description || headerExtra) && (
-                    <DialogHeader className="shrink-0 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <DialogHeader className="shrink-0 pb-3 border-b border-slate-100 dark:border-slate-800 select-none">
                         <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between pr-6">
                             <span>{title}</span>
                             {headerExtra && <div>{headerExtra}</div>}
@@ -52,19 +56,19 @@ export default function Modal({
                 )}
 
                 {/* SCROLLABLE BODY / ISI FORM */}
-                <div className="flex-1 overflow-y-auto py-3 pr-1">
+                <div className="flex-1 overflow-y-auto py-3 pr-1 select-text">
                     {children}
                 </div>
 
                 {/* FIXED FOOTER */}
                 {showFooter && (
-                    <DialogFooter className="shrink-0 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2 bg-white dark:bg-slate-900">
+                    <DialogFooter className="shrink-0 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2 bg-white dark:bg-slate-900 select-none">
                         <Button
                             type="button"
                             variant="outline"
                             onClick={onClose}
                             disabled={isProcessing}
-                            className="h-9 text-xs"
+                            className="h-9 text-xs cursor-pointer"
                         >
                             {cancelLabel}
                         </Button>
@@ -74,7 +78,7 @@ export default function Modal({
                                 type="button"
                                 onClick={onSubmit}
                                 disabled={isProcessing}
-                                className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors"
+                                className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors cursor-pointer"
                             >
                                 {isProcessing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                                 <span>{submitLabel}</span>
