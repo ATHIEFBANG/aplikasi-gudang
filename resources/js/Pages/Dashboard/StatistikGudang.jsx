@@ -1,13 +1,13 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, ArrowDownCircle, ArrowLeftRight, ArrowUpRight, Building2 } from 'lucide-react';
+import { Package, ArrowDownCircle, ArrowLeftRight, ArrowUpRight, Coins } from 'lucide-react';
 
 export default function StatistikGudang({ kpi = {} }) {
     const totalBarang = kpi.totalBarang ?? 0;
     const totalBarangMasuk = kpi.totalBarangMasuk ?? 0;
     const totalTransfer = kpi.totalTransfer ?? 0;
     const totalBarangKeluar = kpi.totalBarangKeluar ?? 0;
-    const totalGudang = kpi.totalGudang ?? 0;
+    const totalNilaiAset = kpi.totalNilaiPembelian ?? kpi.totalNilaiAset ?? 0;
 
     const cards = [
         {
@@ -43,10 +43,10 @@ export default function StatistikGudang({ kpi = {} }) {
             valColor: 'text-rose-600 dark:text-rose-400',
         },
         {
-            title: 'GUDANG OPERASIONAL',
-            value: totalGudang.toLocaleString('id-ID'),
-            desc: 'Titik hub logistik aktif',
-            icon: Building2,
+            title: 'TOTAL NILAI ASET GUDANG',
+            value: `Rp ${Number(totalNilaiAset).toLocaleString('id-ID')}`,
+            desc: 'Akumulasi nilai beli aset fisik',
+            icon: Coins,
             iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
             valColor: 'text-amber-600 dark:text-amber-400',
         },
@@ -59,7 +59,9 @@ export default function StatistikGudang({ kpi = {} }) {
                 return (
                     <Card 
                         key={idx} 
-                        className="bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 rounded-xl shadow-xs flex flex-col justify-between"
+                        className={`bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 rounded-xl shadow-xs flex flex-col justify-between ${
+                            idx === cards.length - 1 ? 'col-span-2 md:col-span-1' : ''
+                        }`}
                     >
                         <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3.5 px-4">
                             <CardTitle className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
@@ -70,7 +72,10 @@ export default function StatistikGudang({ kpi = {} }) {
                             </div>
                         </CardHeader>
                         <CardContent className="px-4 pb-3.5">
-                            <div className={`text-2xl font-black font-mono tracking-tight ${card.valColor}`}>
+                            <div 
+                                className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${card.valColor} truncate`}
+                                title={card.value}
+                            >
                                 {card.value}
                             </div>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 truncate">
