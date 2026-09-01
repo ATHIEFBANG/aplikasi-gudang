@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Boxes } from 'lucide-react';
 
 // Import asset langsung dari resources/images agar dibundle oleh Vite
-import defaultLogo from '../../images/ppl.png';
+import defaultLogo from '../../images/ppll.png';
 
 export function AppLogo({ 
     className, 
