@@ -85,16 +85,18 @@ export default function TabelRekonsiliasi({
                         );
                     case 'kondisi_rincian':
                         return (
-                            <div className="flex items-center gap-1.5 text-[11px] font-mono whitespace-nowrap">
-                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px] px-1.5 py-0">
-                                    {item.kondisi_baru || 0} Baru
-                                </Badge>
-                                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[10px] px-1.5 py-0">
-                                    {item.kondisi_bekas || 0} Bekas
-                                </Badge>
-                                <Badge variant="outline" className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 text-[10px] px-1.5 py-0">
-                                    {item.kondisi_rusak || 0} Rusak
-                                </Badge>
+                            <div className="flex items-center gap-2 text-xs font-mono whitespace-nowrap">
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                    {item.kondisi_baru || 0} <span className="font-sans font-medium text-[11px] text-slate-400">Baru</span>
+                                </span>
+                                <span className="text-slate-300 dark:text-slate-700 font-sans">•</span>
+                                <span className="font-bold text-amber-600 dark:text-amber-400">
+                                    {item.kondisi_bekas || 0} <span className="font-sans font-medium text-[11px] text-slate-400">Bekas</span>
+                                </span>
+                                <span className="text-slate-300 dark:text-slate-700 font-sans">•</span>
+                                <span className="font-bold text-rose-600 dark:text-rose-400">
+                                    {item.kondisi_rusak || 0} <span className="font-sans font-medium text-[11px] text-slate-400">Rusak</span>
+                                </span>
                             </div>
                         );
                     default:

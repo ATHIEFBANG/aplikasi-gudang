@@ -41,6 +41,11 @@ export default function TabelJurnal({
                     case 'jenis': {
                         const isMasuk = item.jenis === 'MASUK';
                         const isKeluar = item.jenis === 'KELUAR';
+                        
+                        let displayLabel = item.sub_jenis?.replace(/_/g, ' ') || item.jenis;
+                        if (item.sub_jenis === 'BARANG_KE_SITE') displayLabel = 'PROYEK';
+                        else if (item.sub_jenis === 'PEMAKAIAN_INTERNAL') displayLabel = 'NON PROYEK';
+
                         return (
                             <Badge 
                                 variant="outline"
@@ -52,7 +57,7 @@ export default function TabelJurnal({
                                         : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
                                 }`}
                             >
-                                {item.sub_jenis?.replace(/_/g, ' ') || item.jenis}
+                                {displayLabel}
                             </Badge>
                         );
                     }
@@ -115,7 +120,7 @@ export default function TabelJurnal({
                                         if (rawKondisi === 'RUSAK') kondisiStyle = 'bg-rose-500/20 text-rose-600';
                                         else if (rawKondisi.includes('BEKAS') || rawKondisi.includes('SECOND')) kondisiStyle = 'bg-amber-500/20 text-amber-600';
                                         return (
-                                            <Badge
+                                            <Badge 
                                                 key={idx}
                                                 variant="outline"
                                                 className="text-[9px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.5 gap-1 shrink-0"

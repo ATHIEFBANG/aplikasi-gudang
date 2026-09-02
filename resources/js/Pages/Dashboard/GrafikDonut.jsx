@@ -6,12 +6,50 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 export default function GrafikDonutDistribusi({ donutPenerimaan = {} }) {
     const { donutData, totalAll } = useMemo(() => {
         const raw = [
-            { name: 'Pembelian', value: Number(donutPenerimaan['Pembelian'] || 0), color: '#10b981', badgeClass: 'bg-emerald-500' },
-            { name: 'Peminjaman', value: Number(donutPenerimaan['Peminjaman'] || 0), color: '#3b82f6', badgeClass: 'bg-blue-500' },
-            { name: 'Pengembalian', value: Number(donutPenerimaan['Pengembalian'] || 0), color: '#f59e0b', badgeClass: 'bg-amber-500' },
-            { name: 'Barang ke Site', value: Number(donutPenerimaan['Barang ke Site'] || 0), color: '#f43f5e', badgeClass: 'bg-rose-500' },
-            { name: 'Pemakaian Internal', value: Number(donutPenerimaan['Pemakaian Internal'] || 0), color: '#8b5cf6', badgeClass: 'bg-purple-500' },
+            { 
+                name: 'Pembelian', 
+                value: Number(donutPenerimaan['Pembelian'] || donutPenerimaan['PEMBELIAN'] || 0), 
+                color: '#10b981', 
+                badgeClass: 'bg-emerald-500' 
+            },
+            { 
+                name: 'Peminjaman', 
+                value: Number(donutPenerimaan['Peminjaman'] || donutPenerimaan['PEMINJAMAN'] || 0), 
+                color: '#3b82f6', 
+                badgeClass: 'bg-blue-500' 
+            },
+            { 
+                name: 'Pengembalian', 
+                value: Number(donutPenerimaan['Pengembalian'] || donutPenerimaan['PENGEMBALIAN'] || 0), 
+                color: '#f59e0b', 
+                badgeClass: 'bg-amber-500' 
+            },
+            { 
+                name: 'Proyek', 
+                value: Number(
+                    donutPenerimaan['Proyek'] || 
+                    donutPenerimaan['PROYEK'] || 
+                    donutPenerimaan['Barang ke Site'] || 
+                    donutPenerimaan['BARANG_KE_SITE'] || 
+                    0
+                ), 
+                color: '#f43f5e', 
+                badgeClass: 'bg-rose-500' 
+            },
+            { 
+                name: 'Non Proyek', 
+                value: Number(
+                    donutPenerimaan['Non Proyek'] || 
+                    donutPenerimaan['NON_PROYEK'] || 
+                    donutPenerimaan['Pemakaian Internal'] || 
+                    donutPenerimaan['PEMAKAIAN_INTERNAL'] || 
+                    0
+                ), 
+                color: '#8b5cf6', 
+                badgeClass: 'bg-purple-500' 
+            },
         ];
+
         const total = raw.reduce((acc, curr) => acc + curr.value, 0);
         return {
             totalAll: total,
@@ -45,13 +83,13 @@ export default function GrafikDonutDistribusi({ donutPenerimaan = {} }) {
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie 
-                                data={totalAll === 0 ? [{ name: 'Belum Ada Transaksi', value: 1, color: '#334155' }] : donutData} 
-                                cx="50%" 
-                                cy="50%" 
-                                innerRadius={58} 
-                                outerRadius={78} 
-                                paddingAngle={3} 
-                                dataKey="value" 
+                                data={totalAll === 0 ? [{ name: 'Belum Ada Transaksi', value: 1, color: '#334155' }] : donutData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={58}
+                                outerRadius={78}
+                                paddingAngle={3}
+                                dataKey="value"
                                 stroke="none"
                             >
                                 {(totalAll === 0 ? [{ color: '#334155' }] : donutData).map((entry, idx) => (

@@ -5,9 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Barang;
 use App\Models\BarangSerial;
 use App\Models\Gudang;
-use App\Models\Stok;
 use App\Models\Transaksi;
-use App\Models\TransaksiDetail;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,171 +25,190 @@ class DashboardController extends Controller
             ? "CAST(strftime('%m', transaksis.tanggal) AS INTEGER)" 
             : "EXTRACT(MONTH FROM transaksis.tanggal)";
 
-        // 1. STATISTIK KPI
+        // 1. STATISTIK KPI & TOTAL UNIT (Agregasi Cepat dalam 1 Query)
         $totalBarang = Barang::count();
         $totalGudang = Gudang::where('is_active', true)->count();
 
         // Base Query Transaksi Sesuai Filter
-        $trxQuery = Transaksi::where('status', 'COMPLETED');
-        if ($selectedGudang && $selectedGudang !== 'ALL') {
-            $trxQuery->where(function ($qb) use ($selectedGudang) {
-                $qb->where('gudang_asal_id', $selectedGudang)
-                   ->orWhere('gudang_tujuan_id', $selectedGudang);
-            });
-        }
-        if ($selectedKondisi && $selectedKondisi !== 'ALL') {
-            if (strtoupper($selectedKondisi) === 'BARU') {
-                $trxQuery->where(fn($q) => $q->where('kondisi', 'Baru')->orWhere('kondisi', 'BAIK'));
-            } else {
-                $trxQuery->where('kondisi', 'like', "%{$selectedKondisi}%");
-            }
-        }
-
-        // Total Barang Masuk: Akumulasi seluruh unit dari transaksi Masuk (Inbound)
-        $totalBarangMasuk = (int) TransaksiDetail::whereIn(
-            'transaksi_id', 
-            (clone $trxQuery)->where('jenis_transaksi', 'MASUK')->pluck('id')
-        )->sum('qty');
-
-        // Total Barang Keluar
-        $totalBarangKeluar = (int) TransaksiDetail::whereIn(
-            'transaksi_id', 
-            (clone $trxQuery)->where('jenis_transaksi', 'KELUAR')->pluck('id')
-        )->sum('qty');
-
-        // Total Transfer Gudang
-        $totalTransfer = (int) TransaksiDetail::whereIn(
-            'transaksi_id', 
-            (clone $trxQuery)->where(fn($q) => $q->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'))->pluck('id')
-        )->sum('qty');
-
-        // Total Nilai Pembelian (Rp)
-        $totalNilaiPembelian = (float) TransaksiDetail::whereIn(
-            'transaksi_id', 
-            (clone $trxQuery)->where('sub_jenis', 'PEMBELIAN')->pluck('id')
-        )->selectRaw('SUM(qty * COALESCE(harga, 0)) as total_beli')->value('total_beli') ?? 0;
-
-        // Distribusi Kategori Mutasi untuk Donut Chart (Transfer diganti Barang ke Site & Pemakaian Internal)
-        $donutPenerimaan = [
-            'Pembelian'          => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PEMBELIAN')->pluck('id'))->sum('qty'),
-            'Peminjaman'         => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PEMINJAMAN')->pluck('id'))->sum('qty'),
-            'Pengembalian'       => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PENGEMBALIAN')->pluck('id'))->sum('qty'),
-            'Barang ke Site'     => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'BARANG_KE_SITE')->pluck('id'))->sum('qty'),
-            'Pemakaian Internal' => (int) TransaksiDetail::whereIn('transaksi_id', (clone $trxQuery)->where('sub_jenis', 'PEMAKAIAN_INTERNAL')->pluck('id'))->sum('qty'),
-        ];
-
-        // 2. DATA PETA & RINCIAN STOK PER GUDANG (BARU, BEKAS, RUSAK, TOTAL STOK FISIK)
-        $warehouseMapData = Gudang::where('is_active', true)
-            ->whereNotNull('lat_long')
-            ->where('lat_long', '!=', '')
-            ->get()
-            ->map(function ($g) {
-                $raw = trim($g->lat_long);
-                $parts = preg_split('/[\s,;\/]+/', $raw);
-                if (count($parts) < 2) return null;
-                $v1 = (float) str_replace(',', '.', $parts[0]);
-                $v2 = (float) str_replace(',', '.', $parts[1]);
-                if ($v1 == 0 && $v2 == 0) return null;
-                $lat = abs($v1) <= 90 ? $v1 : $v2;
-                $lng = abs($v1) <= 90 ? $v2 : $v1;
-
-                // 1. Ambil Serial Number fisik aktif di gudang
-                $serialsInWh = BarangSerial::where('gudang_id', $g->id)
-                    ->where('status', 'IN_WAREHOUSE')
-                    ->get();
-
-                $snBaru  = $serialsInWh->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK']))->count();
-                $snBekas = $serialsInWh->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
-                $snRusak = $serialsInWh->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
-                $snTotal = $serialsInWh->count();
-
-                // 2. Hitung dari riwayat transaksi
-                $masukBaru = (int) TransaksiDetail::whereHas('transaksi', function ($q) use ($g) {
-                    $q->where('status', 'COMPLETED')->where('gudang_tujuan_id', $g->id);
-                })->where(function($q) {
-                    $q->where('kondisi', 'Baru')->orWhere('kondisi', 'BAIK');
-                })->sum('qty');
-
-                $masukBekas = (int) TransaksiDetail::whereHas('transaksi', function ($q) use ($g) {
-                    $q->where('status', 'COMPLETED')->where('gudang_tujuan_id', $g->id);
-                })->where('kondisi', 'like', '%Bekas%')->sum('qty');
-
-                $masukRusak = (int) TransaksiDetail::whereHas('transaksi', function ($q) use ($g) {
-                    $q->where('status', 'COMPLETED')->where('gudang_tujuan_id', $g->id);
-                })->where('kondisi', 'like', '%Rusak%')->sum('qty');
-
-                $keluarQty = (int) TransaksiDetail::whereHas('transaksi', function ($q) use ($g) {
-                    $q->where('status', 'COMPLETED')->where('gudang_asal_id', $g->id);
-                })->sum('qty');
-
-                if ($snTotal > 0) {
-                    $qtyBaru   = $snBaru;
-                    $qtyBekas  = $snBekas;
-                    $qtyRusak  = $snRusak;
-                    $qtyAktual = $qtyBaru + $qtyBekas + $qtyRusak;
-                } else {
-                    $qtyBaru   = $masukBaru;
-                    $qtyBekas  = $masukBekas;
-                    $qtyRusak  = $masukRusak;
-                    $qtyAktual = max(0, ($qtyBaru + $qtyBekas + $qtyRusak) - $keluarQty);
-                }
-
-                return [
-                    'id'          => $g->id,
-                    'kode_gudang' => $g->kode_gudang,
-                    'nama_gudang' => $g->nama_gudang,
-                    'lokasi'      => $g->lokasi ?? '-',
-                    'latitude'    => $lat,
-                    'longitude'   => $lng,
-                    'total_item'  => $qtyAktual > 0 ? 1 : 0,
-                    'total_qty'   => $qtyAktual,
-                    'qty_baru'    => $qtyBaru,
-                    'qty_bekas'   => $qtyBekas,
-                    'qty_rusak'   => $qtyRusak,
-                    'status'      => 'ACTIVE'
-                ];
-            })
-            ->filter()
-            ->values();
-
-        // 3. GRAFIK BULANAN LOGISTIK
-        $monthlyQuery = DB::table('transaksi_details')
+        $baseDetailQuery = DB::table('transaksi_details')
             ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
-            ->where('transaksis.status', 'COMPLETED');
+            ->where(function ($q) {
+                $q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
+                  ->orWhereNull('transaksis.status');
+            });
 
         if ($selectedGudang && $selectedGudang !== 'ALL') {
-            $monthlyQuery->where(function ($qb) use ($selectedGudang) {
+            $baseDetailQuery->where(function ($qb) use ($selectedGudang) {
                 $qb->where('transaksis.gudang_asal_id', $selectedGudang)
                    ->orWhere('transaksis.gudang_tujuan_id', $selectedGudang);
             });
         }
 
         if ($selectedKondisi && $selectedKondisi !== 'ALL') {
-            $kondisiUpper = strtoupper($selectedKondisi);
-            if ($kondisiUpper === 'BARU') {
-                $monthlyQuery->where(function ($qb) {
-                    $qb->where('transaksis.kondisi', 'Baru')
-                       ->orWhere('transaksis.kondisi', 'BAIK');
-                });
+            if (strtoupper($selectedKondisi) === 'BARU') {
+                $baseDetailQuery->where(fn($q) => $q->where('transaksis.kondisi', 'Baru')->orWhere('transaksis.kondisi', 'BAIK'));
             } else {
-                $monthlyQuery->where('transaksis.kondisi', 'like', "%{$selectedKondisi}%");
+                $baseDetailQuery->where('transaksis.kondisi', 'like', "%{$selectedKondisi}%");
             }
         }
 
-        $monthlyRaw = (clone $monthlyQuery)
+        $kpiTotals = (clone $baseDetailQuery)
+            ->selectRaw("
+                SUM(CASE WHEN transaksis.jenis_transaksi = 'MASUK' THEN transaksi_details.qty ELSE 0 END) as total_masuk,
+                SUM(CASE WHEN transaksis.jenis_transaksi = 'KELUAR' THEN transaksi_details.qty ELSE 0 END) as total_keluar,
+                SUM(CASE WHEN (transaksis.jenis_transaksi = 'TRANSFER' OR transaksis.sub_jenis = 'TRANSFER_GUDANG') THEN transaksi_details.qty ELSE 0 END) as total_transfer,
+                SUM(CASE WHEN transaksis.sub_jenis = 'PEMBELIAN' THEN transaksi_details.qty * COALESCE(transaksi_details.harga, 0) ELSE 0 END) as total_beli
+            ")
+            ->first();
+
+        $totalBarangMasuk    = (int) ($kpiTotals->total_masuk ?? 0);
+        $totalBarangKeluar   = (int) ($kpiTotals->total_keluar ?? 0);
+        $totalTransfer       = (int) ($kpiTotals->total_transfer ?? 0);
+        $totalNilaiPembelian = (float) ($kpiTotals->total_beli ?? 0);
+
+        // Distribusi Kategori Donut Chart (Mendukung Proyek & Non Proyek)
+        $donutRaw = (clone $baseDetailQuery)
+            ->selectRaw("
+                transaksis.sub_jenis,
+                SUM(transaksi_details.qty) as total_qty
+            ")
+            ->groupBy('transaksis.sub_jenis')
+            ->pluck('total_qty', 'sub_jenis');
+
+        $proyekQty = (int) (
+            $donutRaw['BARANG_KE_SITE'] ?? 
+            $donutRaw['PROYEK'] ?? 
+            $donutRaw['Proyek'] ?? 
+            0
+        );
+
+        $nonProyekQty = (int) (
+            $donutRaw['PEMAKAIAN_INTERNAL'] ?? 
+            $donutRaw['NON_PROYEK'] ?? 
+            $donutRaw['Non Proyek'] ?? 
+            0
+        );
+
+        $donutPenerimaan = [
+            'Pembelian'          => (int) ($donutRaw['PEMBELIAN'] ?? $donutRaw['Pembelian'] ?? 0),
+            'Peminjaman'         => (int) ($donutRaw['PEMINJAMAN'] ?? $donutRaw['Peminjaman'] ?? 0),
+            'Pengembalian'       => (int) ($donutRaw['PENGEMBALIAN'] ?? $donutRaw['Pengembalian'] ?? 0),
+            'Proyek'             => $proyekQty,
+            'Non Proyek'         => $nonProyekQty,
+            'Barang ke Site'     => $proyekQty,
+            'Pemakaian Internal' => $nonProyekQty,
+        ];
+
+        // 2. DATA PETA GUDANG (Diambil dengan Agregasi Massal di Luar Perulangan)
+        $gudangsAktif = Gudang::where('is_active', true)
+            ->whereNotNull('lat_long')
+            ->where('lat_long', '!=', '')
+            ->get();
+
+        // Agregasi SN per gudang (1 query)
+        $serialStatsByGudang = BarangSerial::where('status', 'IN_WAREHOUSE')
+            ->selectRaw("
+                gudang_id,
+                COUNT(*) as total_sn,
+                SUM(CASE WHEN UPPER(COALESCE(kondisi, '')) IN ('BARU', 'BAIK') THEN 1 ELSE 0 END) as sn_baru,
+                SUM(CASE WHEN UPPER(COALESCE(kondisi, '')) LIKE '%BEKAS%' OR UPPER(COALESCE(kondisi, '')) LIKE '%SECOND%' THEN 1 ELSE 0 END) as sn_bekas,
+                SUM(CASE WHEN UPPER(COALESCE(kondisi, '')) LIKE '%RUSAK%' THEN 1 ELSE 0 END) as sn_rusak
+            ")
+            ->groupBy('gudang_id')
+            ->get()
+            ->keyBy('gudang_id');
+
+        // Agregasi barang masuk per gudang_tujuan_id (1 query)
+        $masukStatsByGudang = DB::table('transaksi_details')
+            ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
+            ->where(function ($q) {
+                $q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
+                  ->orWhereNull('transaksis.status');
+            })
+            ->whereNotNull('transaksis.gudang_tujuan_id')
+            ->selectRaw("
+                transaksis.gudang_tujuan_id,
+                SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BARU' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BAIK') THEN transaksi_details.qty ELSE 0 END) as baru,
+                SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%SECOND%') THEN transaksi_details.qty ELSE 0 END) as bekas,
+                SUM(CASE WHEN UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%RUSAK%' THEN transaksi_details.qty ELSE 0 END) as rusak
+            ")
+            ->groupBy('transaksis.gudang_tujuan_id')
+            ->get()
+            ->keyBy('gudang_tujuan_id');
+
+        // Agregasi barang keluar per gudang_asal_id (1 query)
+        $keluarStatsByGudang = DB::table('transaksi_details')
+            ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
+            ->where(function ($q) {
+                $q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
+                  ->orWhereNull('transaksis.status');
+            })
+            ->whereNotNull('transaksis.gudang_asal_id')
+            ->selectRaw("
+                transaksis.gudang_asal_id,
+                SUM(transaksi_details.qty) as total_keluar
+            ")
+            ->groupBy('transaksis.gudang_asal_id')
+            ->pluck('total_keluar', 'gudang_asal_id');
+
+        $warehouseMapData = $gudangsAktif->map(function ($g) use ($serialStatsByGudang, $masukStatsByGudang, $keluarStatsByGudang) {
+            $raw = trim($g->lat_long ?? '');
+            $parts = preg_split('/[\s,;\/]+/', $raw);
+            if (count($parts) < 2) return null;
+            $v1 = (float) str_replace(',', '.', $parts[0]);
+            $v2 = (float) str_replace(',', '.', $parts[1]);
+            if ($v1 == 0 && $v2 == 0) return null;
+            $lat = abs($v1) <= 90 ? $v1 : $v2;
+            $lng = abs($v1) <= 90 ? $v2 : $v1;
+
+            $sn = $serialStatsByGudang->get($g->id);
+            $snTotal = (int) ($sn->total_sn ?? 0);
+            $snBaru  = (int) ($sn->sn_baru ?? 0);
+            $snBekas = (int) ($sn->sn_bekas ?? 0);
+            $snRusak = (int) ($sn->sn_rusak ?? 0);
+
+            $masuk = $masukStatsByGudang->get($g->id);
+            $masukBaru  = (int) ($masuk->baru ?? 0);
+            $masukBekas = (int) ($masuk->bekas ?? 0);
+            $masukRusak = (int) ($masuk->rusak ?? 0);
+
+            $keluarQty = (int) ($keluarStatsByGudang[$g->id] ?? 0);
+
+            if ($snTotal > 0) {
+                $qtyBaru   = $snBaru;
+                $qtyBekas  = $snBekas;
+                $qtyRusak  = $snRusak;
+                $qtyAktual = $qtyBaru + $qtyBekas + $qtyRusak;
+            } else {
+                $qtyBaru   = $masukBaru;
+                $qtyBekas  = $masukBekas;
+                $qtyRusak  = $masukRusak;
+                $qtyAktual = max(0, ($qtyBaru + $qtyBekas + $qtyRusak) - $keluarQty);
+            }
+
+            return [
+                'id'          => $g->id,
+                'kode_gudang' => $g->kode_gudang,
+                'nama_gudang' => $g->nama_gudang,
+                'lokasi'      => $g->lokasi ?? '-',
+                'latitude'    => $lat,
+                'longitude'   => $lng,
+                'total_item'  => $qtyAktual > 0 ? 1 : 0,
+                'total_qty'   => $qtyAktual,
+                'qty_baru'    => $qtyBaru,
+                'qty_bekas'   => $qtyBekas,
+                'qty_rusak'   => $qtyRusak,
+                'status'      => 'ACTIVE'
+            ];
+        })->filter()->values();
+
+        // 3. GRAFIK BULANAN LOGISTIK & KONDISI (1 Tarikan Query Gabungan)
+        $monthlyCombined = (clone $baseDetailQuery)
             ->selectRaw("
                 {$monthField} as bulan,
                 SUM(CASE WHEN transaksis.jenis_transaksi = 'MASUK' THEN transaksi_details.qty ELSE 0 END) as masuk,
                 SUM(CASE WHEN transaksis.jenis_transaksi = 'KELUAR' THEN transaksi_details.qty ELSE 0 END) as keluar,
-                SUM(CASE WHEN (transaksis.jenis_transaksi = 'TRANSFER' OR transaksis.sub_jenis = 'TRANSFER_GUDANG') THEN transaksi_details.qty ELSE 0 END) as transfer
-            ")
-            ->groupBy(DB::raw($monthField))
-            ->get()
-            ->keyBy(fn($item) => (int) $item->bulan);
-
-        $kondisiMonthlyRaw = (clone $monthlyQuery)
-            ->selectRaw("
-                {$monthField} as bulan,
+                SUM(CASE WHEN (transaksis.jenis_transaksi = 'TRANSFER' OR transaksis.sub_jenis = 'TRANSFER_GUDANG') THEN transaksi_details.qty ELSE 0 END) as transfer,
                 SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BARU' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BAIK') THEN transaksi_details.qty ELSE 0 END) as baru,
                 SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%SECOND%') THEN transaksi_details.qty ELSE 0 END) as bekas,
                 SUM(CASE WHEN UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%RUSAK%' THEN transaksi_details.qty ELSE 0 END) as rusak
@@ -209,19 +226,23 @@ class DashboardController extends Controller
         $chartData = [];
         $kondisiChartData = [];
         for ($m = 1; $m <= 12; $m++) {
-            $rowLogistik = $monthlyRaw->get($m);
+            $row = $monthlyCombined->get($m);
+
+            $masuk    = (int) ($row->masuk ?? 0);
+            $keluar   = (int) ($row->keluar ?? 0);
+            $transfer = (int) ($row->transfer ?? 0);
+
             $chartData[] = [
                 'name'     => $monthNames[$m - 1],
                 'fullName' => $monthFullNames[$m - 1],
-                'MASUK'    => (int) ($rowLogistik->masuk ?? 0),
-                'KELUAR'   => (int) ($rowLogistik->keluar ?? 0),
-                'TRANSFER' => (int) ($rowLogistik->transfer ?? 0),
+                'MASUK'    => $masuk,
+                'KELUAR'   => $keluar,
+                'TRANSFER' => $transfer,
             ];
 
-            $rowKondisi = $kondisiMonthlyRaw->get($m);
-            $baru  = (int) ($rowKondisi->baru ?? 0);
-            $bekas = (int) ($rowKondisi->bekas ?? 0);
-            $rusak = (int) ($rowKondisi->rusak ?? 0);
+            $baru         = (int) ($row->baru ?? 0);
+            $bekas        = (int) ($row->bekas ?? 0);
+            $rusak        = (int) ($row->rusak ?? 0);
             $totalKondisi = $baru + $bekas + $rusak;
 
             $kondisiChartData[] = [
@@ -238,6 +259,7 @@ class DashboardController extends Controller
             ];
         }
 
+        // 4. RIWAYAT TRANSAKSI TERAKHIR (Dibatasi 6 baris)
         $recentTransactions = Transaksi::with(['gudangAsal', 'gudangTujuan', 'supplier', 'picUser', 'details.barang'])
             ->latest('tanggal')
             ->latest('id')

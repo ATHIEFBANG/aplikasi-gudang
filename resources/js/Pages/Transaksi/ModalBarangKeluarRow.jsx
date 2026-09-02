@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2, Check, Minus, Plus } from 'lucide-react';
 import HybridDropdown from '@/components/HybridDropdown';
 import ModalSerialSelector from './ModalSerialSelector';
-import { CATEGORIES_KELUAR } from './ModalBarangKeluarControl';
+import { CATEGORIES_KELUAR, LIST_KEPERLUAN_PATEN } from './ModalBarangKeluarControl';
 
 export default function ModalBarangKeluarRow({
     row,
@@ -33,7 +33,6 @@ export default function ModalBarangKeluarRow({
     const targetBarang = barangs.find(b => String(b.id) === String(row.barang_id));
     const isWajibSn = Boolean(targetBarang?.is_wajib_sn);
     const isWajibPn = Boolean(targetBarang?.is_wajib_pn);
-
     const statusText = isWajibSn && isWajibPn 
         ? 'Wajib SN & PN' 
         : isWajibSn 
@@ -42,13 +41,10 @@ export default function ModalBarangKeluarRow({
         ? 'Wajib PN' 
         : 'Standar';
 
-    const pihakTujuanLabel = row.sub_jenis === 'BARANG_KE_SITE'
+    const isProyek = row.sub_jenis === 'BARANG_KE_SITE';
+    const pihakTujuanLabel = isProyek
         ? 'Site Tujuan / Nama Site / Teknisi *'
-        : 'Keperluan / Departemen / PIC Pemakai *';
-
-    const pihakTujuanPlaceholder = row.sub_jenis === 'BARANG_KE_SITE'
-        ? 'Ketik nama site/teknisi...'
-        : 'Ketik keperluan/PIC pemakai...';
+        : 'Keperluan / Divisi *';
 
     const currentNamaBarang = targetBarang 
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
@@ -79,7 +75,7 @@ export default function ModalBarangKeluarRow({
                 )}
             </div>
 
-            {/* 1. Kategori Jenis Pengeluaran */}
+            {/* 1. Kategori Jenis Pengeluaran (Proyek vs Non Proyek) */}
             {!isEditMode && (
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kategori Pengeluaran *</Label>
@@ -108,7 +104,7 @@ export default function ModalBarangKeluarRow({
                 </div>
             )}
 
-            {/* 2. Gudang Asal & Site Tujuan */}
+            {/* 2. Gudang Asal & Tujuan / Departemen */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="space-y-2.5">
                     <div className="space-y-1">
@@ -143,18 +139,32 @@ export default function ModalBarangKeluarRow({
                     </div>
                 </div>
 
+                {/* Kolom Tujuan: Bebas ketik jika Proyek, Dropdown paten jika Non Proyek */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
                         {pihakTujuanLabel}
                     </Label>
-                    <Input
-                        placeholder={pihakTujuanPlaceholder}
-                        disabled={isProcessing}
-                        value={row.pihak_asal}
-                        onChange={(e) => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
-                        className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                        required
-                    />
+                    {isProyek ? (
+                        <Input
+                            placeholder="Ketik nama site / teknisi..."
+                            disabled={isProcessing}
+                            value={row.pihak_asal}
+                            onChange={(e) => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
+                            className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
+                            required
+                        />
+                    ) : (
+                        <HybridDropdown
+                            value={row.pihak_asal || 'General Affair'}
+                            options={LIST_KEPERLUAN_PATEN}
+                            allowCustom={false}
+                            onChange={(val) => onFieldChange(rowIdx, 'pihak_asal', val)}
+                            placeholder="Pilih Departemen..."
+                            searchPlaceholder="Cari Departemen..."
+                            disabled={isProcessing}
+                            inputClassName="h-8 text-xs font-semibold"
+                        />
+                    )}
                 </div>
             </div>
 

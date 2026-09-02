@@ -32,6 +32,13 @@ const MONTH_NAMES = [
     { value: '12', label: 'Desember' },
 ];
 
+const KONDISI_OPTIONS = [
+    { value: 'ALL', label: 'Semua Kondisi' },
+    { value: 'Baru', label: 'Baru' },
+    { value: 'Bekas', label: 'Bekas' },
+    { value: 'Rusak', label: 'Rusak' },
+];
+
 export default function LaporanIndex({
     laporanStok = [],
     jurnalMutasi = [],
@@ -42,6 +49,7 @@ export default function LaporanIndex({
     const [bulan, setBulan] = useState(String(filters.bulan || new Date().getMonth() + 1));
     const [tahun, setTahun] = useState(String(filters.tahun || 2026));
     const [gudangId, setGudangId] = useState(String(filters.gudang_id || 'ALL'));
+    const [kondisi, setKondisi] = useState(String(filters.kondisi || 'ALL'));
     const [search, setSearch] = useState(filters.search || '');
     const [sortOrder, setSortOrder] = useState('asc');
     const [zoomLevel, setZoomLevel] = useState(100);
@@ -86,9 +94,13 @@ export default function LaporanIndex({
         return found ? found.nama_gudang : 'Gudang Terpilih';
     }, [gudangId, gudangs]);
 
+    const activeKondisiLabel = useMemo(() => {
+        const found = KONDISI_OPTIONS.find(k => k.value === kondisi);
+        return found ? found.label : 'Semua Kondisi';
+    }, [kondisi]);
+
     // Data Aktif & Sorting
     const rawList = subTab === 'rekonsiliasi' ? laporanStok : jurnalMutasi;
-
     const sortedList = useMemo(() => {
         const list = [...rawList];
         list.sort((a, b) => {
@@ -100,29 +112,11 @@ export default function LaporanIndex({
         return list;
     }, [rawList, sortOrder]);
 
-    // Akumulasi Angka Rekapitulasi
-    const totalSummary = useMemo(() => {
-        return laporanStok.reduce((acc, row) => ({
-            stok_awal: acc.stok_awal + (row.stok_awal || 0),
-            masuk: acc.masuk + (row.masuk || 0),
-            keluar: acc.keluar + (row.keluar || 0),
-            transfer_net: acc.transfer_net + (row.transfer_net || 0),
-            stok_akhir: acc.stok_akhir + (row.stok_akhir || 0),
-            kondisi_baru: acc.kondisi_baru + (row.kondisi_baru || 0),
-            kondisi_bekas: acc.kondisi_bekas + (row.kondisi_bekas || 0),
-            kondisi_rusak: acc.kondisi_rusak + (row.kondisi_rusak || 0),
-        }), {
-            stok_awal: 0, masuk: 0, keluar: 0, transfer_net: 0, stok_akhir: 0,
-            kondisi_baru: 0, kondisi_bekas: 0, kondisi_rusak: 0
-        });
-    }, [laporanStok]);
-
     // Client-Side Pagination
     const totalData = sortedList.length;
     const totalPages = Math.ceil(totalData / perPage) || 1;
     const fromIndex = totalData > 0 ? (currentPage - 1) * perPage + 1 : 0;
     const toIndex = Math.min(currentPage * perPage, totalData);
-
     const paginatedData = useMemo(() => {
         const start = (currentPage - 1) * perPage;
         return sortedList.slice(start, start + perPage);
@@ -130,10 +124,9 @@ export default function LaporanIndex({
 
     const getRowNumber = (index) => (currentPage - 1) * perPage + index + 1;
 
-    // Reset pagination ketika ganti tab / filter
     useEffect(() => {
         setCurrentPage(1);
-    }, [subTab, bulan, tahun, gudangId, search]);
+    }, [subTab, bulan, tahun, gudangId, kondisi, search]);
 
     const handlePerPageSubmit = () => {
         let val = parseInt(perPageInput, 10);
@@ -149,12 +142,14 @@ export default function LaporanIndex({
             bulan,
             tahun,
             gudang_id: gudangId,
+            kondisi,
             search,
             [key]: val,
         };
         if (key === 'bulan') setBulan(val);
         if (key === 'tahun') setTahun(val);
         if (key === 'gudang_id') setGudangId(val);
+        if (key === 'kondisi') setKondisi(val);
 
         router.get('/laporan', newParams, {
             preserveState: true,
@@ -172,7 +167,7 @@ export default function LaporanIndex({
             return;
         }
         const timer = setTimeout(() => {
-            router.get('/laporan', { bulan, tahun, gudang_id: gudangId, search }, {
+            router.get('/laporan', { bulan, tahun, gudang_id: gudangId, kondisi, search }, {
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
@@ -184,13 +179,12 @@ export default function LaporanIndex({
     }, [search]);
 
     const handleExportCSV = () => {
-        window.open(`/laporan/export?bulan=${bulan}&tahun=${tahun}&gudang_id=${gudangId}`, '_blank');
+        window.open(`/laporan/export?bulan=${bulan}&tahun=${tahun}&gudang_id=${gudangId}&kondisi=${kondisi}`, '_blank');
     };
 
     return (
         <AuthenticatedLayout header="Laporan Bulanan">
             <Head title={`Laporan Logistik - ${activeBulanLabel} ${tahun}`} />
-
             <div className="space-y-6 max-w-7xl mx-auto">
                 {/* HEADER CAPTION & TITLE */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -207,10 +201,9 @@ export default function LaporanIndex({
                     </div>
                 </div>
 
-                {/* CONTAINER UTAMA (PERSIS SEPERTI TABMASTERDATA) */}
+                {/* CONTAINER UTAMA */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-                    
-                    {/* 1. TOOLBAR ATAS */}
+                    {/* 1. TOOLBAR ATAS (BERSIH & RAPI) */}
                     <Toolbar
                         sortOrder={sortOrder}
                         onToggleSort={toggleSort}
@@ -251,53 +244,76 @@ export default function LaporanIndex({
                         }
                     />
 
-                    {/* 2. SUB-HEADER (TITLE + FILTER SEJAJAR) */}
-                    <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-                        <div>
+                    {/* 2. SUB-HEADER: TITLE, 4 KOTAK FILTER, DAN KOTAK PENCARIAN DIUJUNG KANAN */}
+                    <div className="px-5 py-3 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
+                        <div className="shrink-0">
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                                 {subTab === 'rekonsiliasi' ? 'Daftar Rekonsiliasi Saldo Stok SKU' : 'Daftar Buku Jurnal Mutasi'}
                             </span>
                             <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">
-                                Periode: <strong className="text-slate-700 dark:text-slate-300">{activeBulanLabel} {tahun}</strong> &bull; Lokasi: <strong className="text-slate-700 dark:text-slate-300">{activeGudangLabel}</strong>
+                                Periode: <strong className="text-slate-700 dark:text-slate-300">{activeBulanLabel} {tahun}</strong> &bull; Lokasi: <strong className="text-slate-700 dark:text-slate-300">{activeGudangLabel}</strong> &bull; Kondisi: <strong className="text-slate-700 dark:text-slate-300">{activeKondisiLabel}</strong>
                             </span>
                         </div>
 
-                        {/* Filter Dropdowns & Input Pencarian */}
-                        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
-                            <div className="w-28 sm:w-32">
+                        {/* Deretan Filter & Kotak Search Rapi Sejajar */}
+                        <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-start xl:justify-end">
+                            {/* Filter Bulan */}
+                            <div className="w-36">
                                 <HybridDropdown
                                     value={bulan}
                                     options={MONTH_NAMES}
+                                    allowCustom={false}
                                     onChange={(val) => handleFilterChange('bulan', val)}
                                     placeholder="Pilih Bulan..."
                                     disabled={isProcessing}
                                     inputClassName="h-8 font-semibold text-xs bg-white dark:bg-slate-900"
                                 />
                             </div>
-                            <div className="w-24 sm:w-28">
+
+                            {/* Filter Tahun */}
+                            <div className="w-28">
                                 <HybridDropdown
                                     value={tahun}
                                     options={yearOptions}
+                                    allowCustom={false}
                                     onChange={(val) => handleFilterChange('tahun', val)}
                                     placeholder="Pilih Tahun..."
                                     disabled={isProcessing}
                                     inputClassName="h-8 font-semibold text-xs bg-white dark:bg-slate-900"
                                 />
                             </div>
-                            <div className="w-36 sm:w-44">
+
+                            {/* Filter Gudang */}
+                            <div className="w-48">
                                 <HybridDropdown
                                     value={gudangId}
                                     options={gudangOptions}
+                                    allowCustom={false}
                                     onChange={(val) => handleFilterChange('gudang_id', val)}
                                     placeholder="Semua Gudang..."
                                     disabled={isProcessing}
                                     inputClassName="h-8 font-semibold text-xs bg-white dark:bg-slate-900"
                                 />
                             </div>
+
+                            {/* Filter Kondisi */}
+                            <div className="w-40">
+                                <HybridDropdown
+                                    value={kondisi}
+                                    options={KONDISI_OPTIONS}
+                                    allowCustom={false}
+                                    onChange={(val) => handleFilterChange('kondisi', val)}
+                                    placeholder="Semua Kondisi..."
+                                    disabled={isProcessing}
+                                    inputClassName="h-8 font-semibold text-xs bg-white dark:bg-slate-900"
+                                />
+                            </div>
+
+                            {/* Kotak Pencarian (Search Input) Rapi di Sini */}
                             <div className="relative w-full sm:w-52">
-                                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                 <Input
-                                    placeholder={subTab === 'rekonsiliasi' ? "Cari SKU / Barang..." : "Cari Transaksi / Dokumen..."}
+                                    placeholder={subTab === 'rekonsiliasi' ? "Cari SKU / Barang..." : "Cari Dokumen..."}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     disabled={isProcessing}
@@ -333,7 +349,7 @@ export default function LaporanIndex({
                         )}
                     </div>
 
-                    {/* 4. PAGINATION FOOTER (PERSIS SEPERTI TABMASTERDATA) */}
+                    {/* 4. PAGINATION FOOTER */}
                     <div className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
                         <div className="flex items-center gap-2">
                             <span>Tampilkan</span>
