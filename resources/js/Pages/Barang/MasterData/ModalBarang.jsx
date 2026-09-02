@@ -267,7 +267,7 @@ export default function ModalBarang({
                                     </div>
 
                                     <div className="space-y-1">
-                                        <Label className="text-[11px] font-medium">Tipe / Jenis *</Label>
+                                        <Label className="text-[11px] font-medium">Kategori *</Label>
                                         <HybridDropdown
                                             value={item.tipe}
                                             options={tipeOptions}
