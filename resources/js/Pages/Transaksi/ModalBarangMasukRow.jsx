@@ -47,8 +47,31 @@ export default function ModalBarangMasukRow({
             { value: 'Rusak', label: 'Rusak' }
           ];
 
-    const pihakAsalLabel = 'Asal Barang *';
-    const pihakAsalPlaceholder = 'ketik pihak asal...';
+    // Label & Placeholder dinamis sesuai jenis kategori transaksi
+    const { pihakAsalLabel, pihakAsalPlaceholder } = useMemo(() => {
+        switch (row.sub_jenis) {
+            case 'PEMBELIAN':
+                return {
+                    pihakAsalLabel: 'Asal Barang *',
+                    pihakAsalPlaceholder: 'Ketik asal toko / pembelian...'
+                };
+            case 'PEMINJAMAN':
+                return {
+                    pihakAsalLabel: 'Asal Barang *',
+                    pihakAsalPlaceholder: 'Ketik dari vendor...'
+                };
+            case 'PENGEMBALIAN':
+                return {
+                    pihakAsalLabel: 'Asal Barang *',
+                    pihakAsalPlaceholder: 'Ketik kode proyek, nama site dan customer...'
+                };
+            default:
+                return {
+                    pihakAsalLabel: 'Asal Barang *',
+                    pihakAsalPlaceholder: 'Ketik pihak asal...'
+                };
+        }
+    }, [row.sub_jenis]);
 
     const hargaSatuanNum = parseFloat(row.harga) || 0;
     const qtyNum = parseInt(row.qty, 10) || 1;
@@ -58,7 +81,7 @@ export default function ModalBarangMasukRow({
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
         : '';
 
-    // Opsi Kode PPL dengan teks sub-keterangan murni tanpa card/badge
+    // Opsi Kode PPL: teks sub-keterangan kecil murni tanpa kotak card
     const activePplOptions = useMemo(() => {
         if (!barangs || barangs.length === 0) return pplOptions;
         return barangs.map((b) => {
@@ -72,7 +95,7 @@ export default function ModalBarangMasukRow({
                 is_wajib_sn: isSn,
                 is_wajib_pn: isPn,
                 subLabel: (
-                    <div className="flex items-center gap-1 text-[9px] leading-tight mt-0.5">
+                    <div className="flex items-center gap-1 text-[9px] leading-tight mt-0.5 font-sans">
                         {isSn && (
                             <span className="text-amber-500 dark:text-amber-400 font-semibold">
                                 Wajib SN
@@ -149,7 +172,7 @@ export default function ModalBarangMasukRow({
                 </div>
             )}
 
-            {/* 2. Pengirim & Gudang Tujuan */}
+            {/* 2. Pengirim/Asal & Gudang Tujuan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{pihakAsalLabel}</Label>
@@ -199,7 +222,7 @@ export default function ModalBarangMasukRow({
 
             {/* 3. Detail Barang, Kuantitas, Harga & Kondisi */}
             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                {/* BARIS ATAS: Tanggal Transaksi, Kode PPL, Nama Barang */}
+                {/* BARIS ATAS: Tanggal Transaksi, Kode PPL (4/12), Nama Barang (5/12) */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                     <div className="sm:col-span-3 space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Transaksi *</Label>
@@ -218,7 +241,7 @@ export default function ModalBarangMasukRow({
                         />
                     </div>
 
-                    {/* Dropdown Kode PPL dengan subLabel teks kecil bersih */}
+                    {/* Dropdown Kode PPL */}
                     <div className="sm:col-span-4 space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                             Kode PPL *
@@ -226,36 +249,6 @@ export default function ModalBarangMasukRow({
                         <HybridDropdown
                             value={targetBarang?.kode_barang || ''}
                             options={activePplOptions}
-                            renderOption={(opt) => {
-                                const isSn = Boolean(opt?.is_wajib_sn);
-                                const isPn = Boolean(opt?.is_wajib_pn);
-                                const kode = opt?.kode_barang || opt?.value || '-';
-                                return (
-                                    <div className="flex flex-col items-start min-w-0 pr-2 leading-tight">
-                                        <span className="truncate font-mono font-bold text-xs">
-                                            {kode}
-                                        </span>
-                                        <div className="flex items-center gap-1 text-[7px] leading-none mt-1">
-                                            {isSn && (
-                                                <span className="text-amber-500 dark:text-amber-400 font-semibold">
-                                                    Wajib SN
-                                                </span>
-                                            )}
-                                            {isSn && isPn && <span className="text-slate-400 dark:text-slate-600">&bull;</span>}
-                                            {isPn && (
-                                                <span className="text-cyan-600 dark:text-cyan-400 font-semibold">
-                                                    Wajib PN
-                                                </span>
-                                            )}
-                                            {!isSn && !isPn && (
-                                                <span className="text-slate-400 dark:text-slate-500 font-normal">
-                                                    Standar
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            }}
                             onChange={(val, selectedOpt) => {
                                 if (!val) {
                                     onBarangChange(rowIdx, '');
@@ -375,7 +368,7 @@ export default function ModalBarangMasukRow({
                     </div>
                 </div>
 
-                {/* Form Harga Satuan: Setengah Lebar (sm:w-1/2 max-w-sm) */}
+                {/* Form Harga Satuan: Setengah Lebar */}
                 {row.sub_jenis === 'PEMBELIAN' && (
                     <div className="w-full sm:w-1/2 max-w-sm space-y-1 pt-1">
                         <div className="flex items-center justify-between">

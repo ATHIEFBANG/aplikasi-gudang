@@ -3,16 +3,29 @@ import { router } from '@inertiajs/react';
 
 export const MAX_ROWS_LIMIT = 500;
 
+// DAFTAR SATUAN RESMI PATEN
+export const LIST_SATUAN_PATEN = [
+    'Unit',
+    'Pcs',
+    'Set',
+    'Roll',
+    'Meter',
+    'Box',
+    'Pack',
+    'Batang',
+    'Lot',
+    'Can'
+];
+
 export function useModalBarangControl({ isOpen, isEditMode, selectedItem, existingOptions, onClose }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [editData, setEditData] = useState({});
     const [addItems, setAddItems] = useState([]);
 
-    // MURNI MENGAMBIL DARI DATABASE (TANPA DUMMY)
     const brandOptions = useMemo(() => existingOptions?.brandList || [], [existingOptions?.brandList]);
     const tipeOptions = useMemo(() => existingOptions?.tipeList || [], [existingOptions?.tipeList]);
     const kategoriOptions = useMemo(() => existingOptions?.kategoriList || [], [existingOptions?.kategoriList]);
-    const satuanOptions = useMemo(() => existingOptions?.satuanList || [], [existingOptions?.satuanList]);
+    const satuanOptions = useMemo(() => LIST_SATUAN_PATEN, []);
 
     const formatKodePPL = (input = '') => {
         if (!input) return '';
@@ -29,10 +42,10 @@ export function useModalBarangControl({ isOpen, isEditMode, selectedItem, existi
         kategori: '',
         part_number: '',
         nama_barang: '',
-        satuan: '',
+        satuan: 'Unit',
         is_wajib_sn: false,
         is_wajib_pn: false,
-        deskripsi: ''
+        deskripsi: 'Unit'
     }), []);
 
     useEffect(() => {
@@ -46,7 +59,7 @@ export function useModalBarangControl({ isOpen, isEditMode, selectedItem, existi
                     kategori: selectedItem.kategori || '',
                     part_number: selectedItem.part_number || selectedItem.nama_barang || '',
                     nama_barang: selectedItem.nama_barang || selectedItem.part_number || '',
-                    satuan: selectedItem.satuan || selectedItem.deskripsi || '',
+                    satuan: selectedItem.satuan || selectedItem.deskripsi || 'Unit',
                     min_stock: selectedItem.min_stock ?? 0,
                     is_wajib_sn: Boolean(selectedItem.is_wajib_sn),
                     is_wajib_pn: Boolean(selectedItem.is_wajib_pn),
@@ -81,8 +94,8 @@ export function useModalBarangControl({ isOpen, isEditMode, selectedItem, existi
             rowObj.kategori    = cells[3] ?? '';
             rowObj.part_number = cells[4] ?? '';
             rowObj.nama_barang = cells[4] || cells[0] || 'Barang';
-            rowObj.satuan      = cells[5] ?? '';
-            rowObj.deskripsi   = cells[5] ?? '';
+            rowObj.satuan      = cells[5]?.trim() || 'Unit';
+            rowObj.deskripsi   = cells[5]?.trim() || 'Unit';
             
             if (cells[6]) {
                 const c6 = String(cells[6]).toLowerCase();
@@ -205,7 +218,7 @@ export function useModalBarangControl({ isOpen, isEditMode, selectedItem, existi
                 is_wajib_pn: Boolean(editData.is_wajib_pn),
                 part_number: editData.is_wajib_pn ? editData.part_number : null,
                 nama_barang: editData.is_wajib_pn ? editData.part_number : `${editData.brand} ${editData.tipe}`.trim(),
-                deskripsi: editData.satuan || ''
+                deskripsi: editData.satuan || 'Unit'
             };
 
             router.put(`/barang/${editData.id}`, payload, {
@@ -251,7 +264,7 @@ export function useModalBarangControl({ isOpen, isEditMode, selectedItem, existi
                 nama_barang: item.is_wajib_pn 
                     ? item.part_number 
                     : `${item.brand} ${item.tipe}`.trim(),
-                deskripsi: item.satuan || ''
+                deskripsi: item.satuan || 'Unit'
             }));
 
             router.post('/barang', { items: formattedItems }, {

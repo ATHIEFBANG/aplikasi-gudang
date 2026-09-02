@@ -11,7 +11,8 @@ export default function HybridDropdown({
     inputClassName = '',
     className = '',
     direction = 'down',
-    renderOption = null
+    renderOption = null,
+    allowCustom = true // true: bisa ketik bebas (hybrid), false: wajib pilih dari list (select murni)
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -24,7 +25,6 @@ export default function HybridDropdown({
         return (options || []).map((opt) => {
             if (typeof opt === 'object' && opt !== null) {
                 const val = String(opt.value ?? opt.id ?? '');
-                // Mengambil string teks murni untuk fungsi pencarian & input
                 const labelText = typeof opt.label === 'string' 
                     ? opt.label 
                     : (typeof opt.name === 'string' ? opt.name : val);
@@ -81,6 +81,7 @@ export default function HybridDropdown({
     }, [isOpen, normalizedOptions.length]);
 
     const handleInputChange = (e) => {
+        if (!allowCustom) return; // Mencegah input ketik manual jika allowCustom = false
         if (onChange) onChange(e.target.value);
         if (!isOpen) setIsOpen(true);
     };
@@ -95,13 +96,22 @@ export default function HybridDropdown({
         e.stopPropagation();
         if (onChange) onChange('');
         setSearchQuery('');
-        inputRef.current?.focus();
+        if (allowCustom) {
+            inputRef.current?.focus();
+        }
     };
 
     const showSearch = normalizedOptions.length > 3;
-    const displayValue = typeof value === 'object' && value !== null 
-        ? (value.value || value.label || '') 
-        : (value || '');
+    const displayValue = useMemo(() => {
+        if (typeof value === 'object' && value !== null) {
+            return value.label || value.value || '';
+        }
+        if (!allowCustom) {
+            const found = normalizedOptions.find((o) => o.value.toLowerCase() === String(value).toLowerCase());
+            if (found) return found.labelText;
+        }
+        return value || '';
+    }, [value, allowCustom, normalizedOptions]);
 
     return (
         <div ref={containerRef} className={`relative w-full ${className}`}>
@@ -111,11 +121,22 @@ export default function HybridDropdown({
                     ref={inputRef}
                     type="text"
                     disabled={disabled}
+                    readOnly={!allowCustom}
                     value={displayValue}
                     onChange={handleInputChange}
-                    onFocus={() => !disabled && setIsOpen(true)}
+                    onFocus={() => {
+                        if (!disabled && allowCustom) setIsOpen(true);
+                    }}
+                    onClick={() => {
+                        if (!disabled && !allowCustom) {
+                            setIsOpen((prev) => !prev);
+                            if (isOpen) setSearchQuery('');
+                        }
+                    }}
                     placeholder={placeholder}
                     className={`w-full h-8 pl-3 pr-14 rounded-lg border bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        !allowCustom ? 'cursor-pointer select-none' : ''
+                    } ${
                         isOpen 
                             ? 'border-blue-500 ring-1 ring-blue-500' 
                             : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
@@ -137,7 +158,8 @@ export default function HybridDropdown({
                         type="button"
                         disabled={disabled}
                         tabIndex={-1}
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             if (!disabled) {
                                 setIsOpen((prev) => !prev);
                                 if (!isOpen) setSearchQuery('');
@@ -191,9 +213,15 @@ export default function HybridDropdown({
                     {/* Render Daftar Pilihan */}
                     <div className="overflow-y-auto max-h-56 py-0.5 space-y-0.5">
                         {filteredOptions.length === 0 ? (
-                            <div className="py-2.5 px-3 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                                Tekan simpan untuk menggunakan: <strong>"{searchQuery || displayValue}"</strong>
-                            </div>
+                            allowCustom ? (
+                                <div className="py-2.5 px-3 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+                                    Tekan simpan untuk menggunakan: <strong>"{searchQuery || displayValue}"</strong>
+                                </div>
+                            ) : (
+                                <div className="py-2.5 px-3 text-[11px] text-slate-400 text-center font-medium">
+                                    Tidak ada opsi yang cocok.
+                                </div>
+                            )
                         ) : (
                             filteredOptions.map((opt, idx) => {
                                 const isSelected = String(displayValue).toLowerCase() === opt.value.toLowerCase();
@@ -208,7 +236,6 @@ export default function HybridDropdown({
                                                 : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                                         }`}
                                     >
-                                        {/* Kustom Render atau Default Label + SubLabel */}
                                         {renderOption ? (
                                             renderOption(opt.raw, isSelected)
                                         ) : opt.subLabel ? (

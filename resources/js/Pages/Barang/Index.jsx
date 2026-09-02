@@ -16,7 +16,7 @@ export default function BarangIndex({ barangs, existingOptions = {}, filters = {
                             Master Data Barang PPL
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            Kelola data master barang, kode PPL, klasifikasi merk/tipe, dan konfigurasi wajib SN/PN.
+                            Kelola data master barang, kode PPL, klasifikasi merk/kategori, dan konfigurasi wajib SN/PN.
                         </p>
                     </div>
                 </div>

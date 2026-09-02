@@ -22,7 +22,7 @@ export default function TransaksiIndex({
                             Transaksi & Mutasi Logistik
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            Pusat pencatatan mutasi stok barang masuk, pengeluaran logistik, dan transfer distribusi antar-gudang secara terintegrasi.
+                            Pusat pencatatan stok barang masuk, pengeluaran, dan transfer antar-gudang secara terintegrasi.
                         </p>
                     </div>
                 </div>
