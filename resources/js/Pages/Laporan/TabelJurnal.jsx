@@ -16,7 +16,8 @@ const JURNAL_COLUMNS = [
 
 export default function TabelJurnal({
     dataList = [],
-    zoomLevel = 100
+    zoomLevel = 100,
+    getRowNumber
 }) {
     const getItemId = (item) => item?.id || item?.no_transaksi;
 
@@ -31,14 +32,12 @@ export default function TabelJurnal({
                                 {item.tanggal || '-'}
                             </span>
                         );
-
                     case 'no_transaksi':
                         return (
                             <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">
                                 {item.no_transaksi}
                             </span>
                         );
-
                     case 'jenis': {
                         const isMasuk = item.jenis === 'MASUK';
                         const isKeluar = item.jenis === 'KELUAR';
@@ -57,7 +56,6 @@ export default function TabelJurnal({
                             </Badge>
                         );
                     }
-
                     case 'nomor_dokumen':
                         return (
                             <div className="flex flex-col gap-0.5 font-mono text-xs">
@@ -76,21 +74,18 @@ export default function TabelJurnal({
                                 )}
                             </div>
                         );
-
                     case 'asal':
                         return (
                             <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate max-w-[140px] block" title={item.asal}>
                                 {item.asal || '-'}
                             </span>
                         );
-
                     case 'tujuan':
                         return (
                             <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 truncate max-w-[140px] block" title={item.tujuan}>
                                 {item.tujuan || '-'}
                             </span>
                         );
-
                     case 'nama_barang':
                         return (
                             <div className="flex flex-col justify-center max-w-[210px] leading-tight">
@@ -102,14 +97,12 @@ export default function TabelJurnal({
                                 </span>
                             </div>
                         );
-
                     case 'qty':
                         return (
                             <Badge variant="outline" className="font-mono font-bold text-xs bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700">
                                 {item.qty || 0}
                             </Badge>
                         );
-
                     case 'serials': {
                         const listSn = item.serials || [];
                         return (
@@ -121,7 +114,6 @@ export default function TabelJurnal({
                                         let kondisiStyle = 'bg-emerald-500/20 text-emerald-600';
                                         if (rawKondisi === 'RUSAK') kondisiStyle = 'bg-rose-500/20 text-rose-600';
                                         else if (rawKondisi.includes('BEKAS') || rawKondisi.includes('SECOND')) kondisiStyle = 'bg-amber-500/20 text-amber-600';
-
                                         return (
                                             <Badge
                                                 key={idx}
@@ -143,7 +135,6 @@ export default function TabelJurnal({
                             </div>
                         );
                     }
-
                     default:
                         return '-';
                 }
@@ -152,15 +143,13 @@ export default function TabelJurnal({
     }, []);
 
     return (
-        <div className="w-full flex flex-col">
-            <Tabel
-                data={dataList}
-                columns={formattedColumns}
-                getItemId={getItemId}
-                getRowNumber={(idx) => idx + 1}
-                zoomLevel={zoomLevel}
-                emptyMessage="Belum ada catatan mutasi transaksi pada periode ini."
-            />
-        </div>
+        <Tabel
+            data={dataList}
+            columns={formattedColumns}
+            getItemId={getItemId}
+            getRowNumber={getRowNumber}
+            zoomLevel={zoomLevel}
+            emptyMessage="Belum ada catatan mutasi transaksi pada periode ini."
+        />
     );
 }

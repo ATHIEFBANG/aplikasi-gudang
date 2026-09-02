@@ -10,7 +10,8 @@ export default function HybridDropdown({
     disabled = false,
     inputClassName = '',
     className = '',
-    direction = 'down'
+    direction = 'down',
+    renderOption = null
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -18,34 +19,46 @@ export default function HybridDropdown({
     const inputRef = useRef(null);
     const searchInputRef = useRef(null);
 
-    // Normalisasi opsi (mendukung array string maupun array object)
+    // Normalisasi opsi universal (mendukung string biasa maupun object dengan label/subLabel)
     const normalizedOptions = useMemo(() => {
         return (options || []).map((opt) => {
             if (typeof opt === 'object' && opt !== null) {
+                const val = String(opt.value ?? opt.id ?? '');
+                // Mengambil string teks murni untuk fungsi pencarian & input
+                const labelText = typeof opt.label === 'string' 
+                    ? opt.label 
+                    : (typeof opt.name === 'string' ? opt.name : val);
+
                 return {
-                    value: String(opt.value ?? opt.id ?? opt.label ?? ''),
-                    label: String(opt.label ?? opt.name ?? opt.value ?? ''),
+                    value: val,
+                    label: opt.label ?? opt.name ?? val,
+                    labelText: labelText,
+                    subLabel: opt.subLabel ?? null,
                     raw: opt
                 };
             }
+            const str = String(opt);
             return {
-                value: String(opt),
-                label: String(opt),
+                value: str,
+                label: str,
+                labelText: str,
+                subLabel: null,
                 raw: opt
             };
         });
     }, [options]);
 
-    // Filter daftar saran berdasarkan search query di pop-up
+    // Filter daftar opsi berdasarkan input pencarian
     const filteredOptions = useMemo(() => {
         const query = searchQuery.toLowerCase().trim();
         if (!query) return normalizedOptions;
         return normalizedOptions.filter((opt) =>
-            opt.label.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query)
+            opt.labelText.toLowerCase().includes(query) ||
+            opt.value.toLowerCase().includes(query)
         );
     }, [normalizedOptions, searchQuery]);
 
-    // Menutup dropdown ketika pengguna klik di luar elemen
+    // Tutup dropdown saat klik di luar
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (containerRef.current && !containerRef.current.contains(e.target)) {
@@ -86,16 +99,19 @@ export default function HybridDropdown({
     };
 
     const showSearch = normalizedOptions.length > 3;
+    const displayValue = typeof value === 'object' && value !== null 
+        ? (value.value || value.label || '') 
+        : (value || '');
 
     return (
         <div ref={containerRef} className={`relative w-full ${className}`}>
             <div className="relative flex items-center">
-                {/* Kotak Input Teks (Bisa Diketik Manual Bebas) */}
+                {/* Kotak Input Teks Universal */}
                 <input
                     ref={inputRef}
                     type="text"
                     disabled={disabled}
-                    value={value || ''}
+                    value={displayValue}
                     onChange={handleInputChange}
                     onFocus={() => !disabled && setIsOpen(true)}
                     placeholder={placeholder}
@@ -108,7 +124,7 @@ export default function HybridDropdown({
 
                 {/* Tombol Clear & Chevron Dropdown */}
                 <div className="absolute right-1.5 flex items-center gap-0.5">
-                    {value && !disabled && (
+                    {displayValue && !disabled && (
                         <button
                             type="button"
                             onClick={handleClear}
@@ -124,9 +140,7 @@ export default function HybridDropdown({
                         onClick={() => {
                             if (!disabled) {
                                 setIsOpen((prev) => !prev);
-                                if (!isOpen) {
-                                    setSearchQuery('');
-                                }
+                                if (!isOpen) setSearchQuery('');
                             }
                         }}
                         className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
@@ -136,14 +150,14 @@ export default function HybridDropdown({
                 </div>
             </div>
 
-            {/* Menu Pop-up Saran Dropdown */}
+            {/* Menu Pop-up Dropdown */}
             {isOpen && !disabled && (
                 <div
                     className={`absolute left-0 right-0 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-1 text-xs transition-all ${
                         direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
                     }`}
                 >
-                    {/* Kotak Search otomatis jika data > 3 */}
+                    {/* Kotak Search Otomatis */}
                     {showSearch && (
                         <div className="p-1.5 border-b border-slate-100 dark:border-slate-800 mb-1">
                             <div className="relative flex items-center">
@@ -174,18 +188,18 @@ export default function HybridDropdown({
                         </div>
                     )}
 
-                    {/* Scrollbar otomatis muncul (max-h-36) */}
-                    <div className="overflow-y-auto max-h-36 py-0.5 space-y-0.5">
+                    {/* Render Daftar Pilihan */}
+                    <div className="overflow-y-auto max-h-56 py-0.5 space-y-0.5">
                         {filteredOptions.length === 0 ? (
                             <div className="py-2.5 px-3 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                                Tekan simpan untuk menggunakan: <strong>"{searchQuery || value}"</strong>
+                                Tekan simpan untuk menggunakan: <strong>"{searchQuery || displayValue}"</strong>
                             </div>
                         ) : (
-                            filteredOptions.map((opt) => {
-                                const isSelected = String(value).toLowerCase() === opt.value.toLowerCase();
+                            filteredOptions.map((opt, idx) => {
+                                const isSelected = String(displayValue).toLowerCase() === opt.value.toLowerCase();
                                 return (
                                     <button
-                                        key={opt.value}
+                                        key={`${opt.value}-${idx}`}
                                         type="button"
                                         onClick={() => handleSelectOption(opt)}
                                         className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-left transition-colors cursor-pointer ${
@@ -194,7 +208,17 @@ export default function HybridDropdown({
                                                 : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                                         }`}
                                     >
-                                        <span className="truncate">{opt.label}</span>
+                                        {/* Kustom Render atau Default Label + SubLabel */}
+                                        {renderOption ? (
+                                            renderOption(opt.raw, isSelected)
+                                        ) : opt.subLabel ? (
+                                            <div className="flex flex-col items-start min-w-0 pr-2 leading-tight">
+                                                <span className="truncate font-mono">{opt.label}</span>
+                                                <div className="mt-0.5">{opt.subLabel}</div>
+                                            </div>
+                                        ) : (
+                                            <span className="truncate">{opt.label}</span>
+                                        )}
                                         {isSelected && <Check className="w-3.5 h-3.5 shrink-0 ml-1.5 stroke-[2.5]" />}
                                     </button>
                                 );

@@ -62,7 +62,8 @@ export default function Login({ status, canResetPassword }) {
     };
 
     return (
-        <div className="min-h-screen w-full bg-slate-950 flex flex-col justify-between p-4 sm:p-6 md:p-8 relative overflow-x-hidden font-sans selection:bg-blue-600 selection:text-white">
+        /* Menambahkan class 'dark' agar seluruh tema gelap aktif otomatis */
+        <div className="dark min-h-screen w-full bg-slate-950 flex flex-col justify-between p-4 sm:p-6 md:p-8 relative overflow-x-hidden font-sans selection:bg-blue-600 selection:text-white">
             <Head title="Login - System Gudang" />
 
             {/* ANIMASI CSS TERORGANISIR */}
@@ -92,14 +93,18 @@ export default function Login({ status, canResetPassword }) {
                 }
             `}</style>
 
-            {/* 1. TOP HEADER BAR: LOGO AMAN TANPA RAWAN TABRAKAN */}
+            {/* 1. TOP HEADER BAR (Logo dipaksa text-white) */}
             <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-30 shrink-0 pb-2 sm:pb-4">
                 <Link 
                     href="/" 
                     className="flex items-center gap-3 transition-transform duration-200 hover:scale-102 cursor-pointer select-none"
                     title="Kembali ke Halaman Utama"
                 >
-                    <ApplicationLogo className="h-9 sm:h-10 w-auto" />
+                    <ApplicationLogo 
+                        className="h-9 sm:h-10 w-auto" 
+                        textClassName="text-white"
+                        showTextOnMobile={true}
+                    />
                 </Link>
             </header>
 
@@ -107,7 +112,7 @@ export default function Login({ status, canResetPassword }) {
             <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/15 blur-[140px] rounded-full pointer-events-none animate-pulse duration-[5000ms]" />
             <div className="absolute bottom-1/3 right-1/3 translate-x-1/2 translate-y-1/2 w-[450px] h-[450px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none" />
 
-            {/* 2. LAPTOP MOCKUP CONTAINER (TERPUSAT DI TENGAH DENGAN JARAK AMAN) */}
+            {/* 2. LAPTOP MOCKUP CONTAINER */}
             <main className="w-full max-w-4xl mx-auto relative z-10 my-auto py-4 sm:py-6">
                 <div className="bg-slate-900 border border-slate-700/80 rounded-t-2xl p-2.5 sm:p-3.5 shadow-2xl relative z-20">
                     

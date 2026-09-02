@@ -269,7 +269,7 @@ export default function ModalTransferGudang({
                                     <div className="space-y-1">
                                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nomor OMC (Surat Jalan Asal) *</Label>
                                         <Input
-                                            placeholder="Contoh: OMC-2026-TRF"
+                                            placeholder="Ketik nomor OMC..."
                                             value={row.nomor_omc}
                                             onChange={(e) => handleRowFieldChange(rowIdx, 'nomor_omc', e.target.value)}
                                             className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono"
@@ -295,7 +295,7 @@ export default function ModalTransferGudang({
                                     <div className="space-y-1">
                                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nomor IMC (Opsional)</Label>
                                         <Input
-                                            placeholder="Contoh: IMC-00123"
+                                            placeholder="Ketik nomor IMC..."
                                             value={row.nomor_imc}
                                             onChange={(e) => handleRowFieldChange(rowIdx, 'nomor_imc', e.target.value)}
                                             className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono"

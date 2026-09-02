@@ -37,7 +37,7 @@ export default function CrudTable({
         },
         { 
             key: 'tipe', 
-            label: 'Tipe / Jenis',
+            label: 'Kategori',
             render: (item) => (
                 <div 
                     className="max-w-[200px] whitespace-normal break-words text-xs text-slate-800 dark:text-slate-200 leading-snug"
@@ -50,7 +50,7 @@ export default function CrudTable({
         // KOLOM KATEGORI DENGAN WRAPPING KE BAWAH
         { 
             key: 'kategori', 
-            label: 'Kategori',
+            label: 'Nama Barang',
             render: (item) => (
                 <div 
                     className="max-w-[280px] sm:max-w-[340px] whitespace-normal break-words text-xs text-slate-700 dark:text-slate-300 leading-relaxed py-1"

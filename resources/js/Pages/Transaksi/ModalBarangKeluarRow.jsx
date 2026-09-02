@@ -47,8 +47,8 @@ export default function ModalBarangKeluarRow({
         : 'Keperluan / Departemen / PIC Pemakai *';
 
     const pihakTujuanPlaceholder = row.sub_jenis === 'BARANG_KE_SITE'
-        ? 'Contoh: Site Jambi 01 / Teknisi Budi'
-        : 'Contoh: Maintenance Kantor / Tim IT Operasional';
+        ? 'Ketik nama site/teknisi...'
+        : 'Ketik keperluan/PIC pemakai...';
 
     const currentNamaBarang = targetBarang 
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
@@ -133,7 +133,7 @@ export default function ModalBarangKeluarRow({
                             Nomor OMC (Surat Jalan) *
                         </Label>
                         <Input
-                            placeholder="Contoh: OMC-2026-089"
+                            placeholder="ketik nomor OMC..."
                             disabled={isProcessing}
                             value={row.nomor_omc}
                             onChange={(e) => onFieldChange(rowIdx, 'nomor_omc', e.target.value)}

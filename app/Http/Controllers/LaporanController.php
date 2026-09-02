@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Barang;
-use App\Models\BarangSerial;
 use App\Models\Gudang;
 use App\Models\Transaksi;
 use App\Models\TransaksiDetail;
@@ -18,17 +17,27 @@ class LaporanController extends Controller
 {
     public function index(Request $request): Response
     {
+        // Set waktu eksekusi maksimal jadi 2 menit untuk keamanan data besar
+        set_time_limit(120);
+
         $bulan    = (int) $request->input('bulan', date('n'));
         $tahun    = (int) $request->input('tahun', date('Y'));
         $gudangId = $request->input('gudang_id', 'ALL');
         $search   = $request->input('search', '');
 
-        // Batas rentang tanggal bulan terpilih
         $startDate = Carbon::create($tahun, $bulan, 1)->startOfMonth()->toDateString();
         $endDate   = Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
 
-        // 1. REKONSILIASI SALDO MUTASI STOK PER SKU (BALANCE SHEET)
-        $barangQuery = Barang::with(['serials', 'stoks']);
+        // 1. AMBIL DATA BARANG DENGAN EAGER LOADING SERILS & STOK (CEGAH N+1)
+        $barangQuery = Barang::with([
+            'serials' => function ($q) use ($gudangId) {
+                $q->where('status', 'IN_WAREHOUSE');
+                if ($gudangId && $gudangId !== 'ALL') {
+                    $q->where('gudang_id', (int) $gudangId);
+                }
+            }
+        ]);
+
         if ($search) {
             $barangQuery->where(function ($q) use ($search) {
                 $q->where('kode_barang', 'like', "%{$search}%")
@@ -40,117 +49,60 @@ class LaporanController extends Controller
             });
         }
         $barangs = $barangQuery->orderBy('kode_barang', 'asc')->get();
+        $barangIds = $barangs->pluck('id');
 
-        $laporanStok = $barangs->map(function ($b) use ($startDate, $endDate, $gudangId) {
-            $barangId = $b->id;
+        // 2. QUERY AGREGASI SATU KALI (BATCH QUERY) UNTUK SEMUA BARANG
+        // Mengambil data transaksi lalu (< startDate) dan bulan berjalan (between startDate & endDate)
+        $mutasiLalu = TransaksiDetail::select('barang_id', 
+                DB::raw("SUM(CASE WHEN t.tanggal < '{$startDate}' AND t.gudang_tujuan_id " . ($gudangId !== 'ALL' ? "= {$gudangId}" : "IS NOT NULL") . " THEN qty ELSE 0 END) as masuk_lalu"),
+                DB::raw("SUM(CASE WHEN t.tanggal < '{$startDate}' AND t.gudang_asal_id " . ($gudangId !== 'ALL' ? "= {$gudangId}" : "IS NOT NULL") . " THEN qty ELSE 0 END) as keluar_lalu")
+            )
+            ->from('transaksi_details as td')
+            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+            ->where('t.status', 'COMPLETED')
+            ->whereIn('td.barang_id', $barangIds)
+            ->where('t.tanggal', '<', $startDate)
+            ->groupBy('td.barang_id')
+            ->get()
+            ->keyBy('barang_id');
 
-            // A. STOK AWAL (Sebelum Start Date)
-            if ($gudangId && $gudangId !== 'ALL') {
-                $masukLalu = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $gudangId) {
-                        $q->where('status', 'COMPLETED')
-                          ->where('tanggal', '<', $startDate)
-                          ->where('gudang_tujuan_id', $gudangId);
-                    })->sum('qty');
+        $mutasiBulan = TransaksiDetail::select('barang_id',
+                DB::raw("SUM(CASE WHEN t.jenis_transaksi = 'MASUK' " . ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = {$gudangId}" : "") . " THEN qty ELSE 0 END) as masuk_bulan"),
+                DB::raw("SUM(CASE WHEN t.jenis_transaksi = 'KELUAR' " . ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = {$gudangId}" : "") . " THEN qty ELSE 0 END) as keluar_bulan"),
+                DB::raw("SUM(CASE WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " . ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = {$gudangId}" : "") . " THEN qty ELSE 0 END) as trf_in"),
+                DB::raw("SUM(CASE WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " . ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = {$gudangId}" : "") . " THEN qty ELSE 0 END) as trf_out")
+            )
+            ->from('transaksi_details as td')
+            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+            ->where('t.status', 'COMPLETED')
+            ->whereIn('td.barang_id', $barangIds)
+            ->whereBetween('t.tanggal', [$startDate, $endDate])
+            ->groupBy('td.barang_id')
+            ->get()
+            ->keyBy('barang_id');
 
-                $keluarLalu = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $gudangId) {
-                        $q->where('status', 'COMPLETED')
-                          ->where('tanggal', '<', $startDate)
-                          ->where('gudang_asal_id', $gudangId);
-                    })->sum('qty');
+        // 3. MAPPING DATA KE FORMAT LAPORAN DENGAN PERHITUNGAN BERSIH
+        $laporanStok = $barangs->map(function ($b) use ($mutasiLalu, $mutasiBulan, $gudangId) {
+            $lalu = $mutasiLalu->get($b->id);
+            $bulan = $mutasiBulan->get($b->id);
 
-                $stokAwal = max(0, $masukLalu - $keluarLalu);
-            } else {
-                $masukLalu = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate) {
-                        $q->where('status', 'COMPLETED')
-                          ->where('tanggal', '<', $startDate)
-                          ->where('jenis_transaksi', 'MASUK');
-                    })->sum('qty');
+            $masukLalu  = (int) ($lalu?->masuk_lalu ?? 0);
+            $keluarLalu = (int) ($lalu?->keluar_lalu ?? 0);
+            $stokAwal   = max(0, $masukLalu - $keluarLalu);
 
-                $keluarLalu = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate) {
-                        $q->where('status', 'COMPLETED')
-                          ->where('tanggal', '<', $startDate)
-                          ->where('jenis_transaksi', 'KELUAR');
-                    })->sum('qty');
+            $masukBulan  = (int) ($bulan?->masuk_bulan ?? 0);
+            $keluarBulan = (int) ($bulan?->keluar_bulan ?? 0);
+            $trfIn       = (int) ($bulan?->trf_in ?? 0);
+            $trfOut      = ($gudangId !== 'ALL') ? (int) ($bulan?->trf_out ?? 0) : $trfIn;
+            
+            $transferNet = ($gudangId !== 'ALL') ? ($trfIn - $trfOut) : 0;
+            $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
 
-                $stokAwal = max(0, $masukLalu - $keluarLalu);
-            }
-
-            // B. MUTASI BULAN BERJALAN (Between Start Date & End Date)
-            if ($gudangId && $gudangId !== 'ALL') {
-                $masukBulan = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $endDate, $gudangId) {
-                        $q->where('status', 'COMPLETED')
-                          ->where('jenis_transaksi', 'MASUK')
-                          ->where('gudang_tujuan_id', $gudangId)
-                          ->whereBetween('tanggal', [$startDate, $endDate]);
-                    })->sum('qty');
-
-                $keluarBulan = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $endDate, $gudangId) {
-                        $q->where('status', 'COMPLETED')
-                          ->where('jenis_transaksi', 'KELUAR')
-                          ->where('gudang_asal_id', $gudangId)
-                          ->whereBetween('tanggal', [$startDate, $endDate]);
-                    })->sum('qty');
-
-                $trfIn = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $endDate, $gudangId) {
-                        $q->where('status', 'COMPLETED')
-                          ->where(fn($qb) => $qb->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'))
-                          ->where('gudang_tujuan_id', $gudangId)
-                          ->whereBetween('tanggal', [$startDate, $endDate]);
-                    })->sum('qty');
-
-                $trfOut = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $endDate, $gudangId) {
-                        $q->where('status', 'COMPLETED')
-                          ->where(fn($qb) => $qb->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'))
-                          ->where('gudang_asal_id', $gudangId)
-                          ->whereBetween('tanggal', [$startDate, $endDate]);
-                    })->sum('qty');
-
-                $transferNet = $trfIn - $trfOut;
-                $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
-            } else {
-                $masukBulan = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $endDate) {
-                        $q->where('status', 'COMPLETED')
-                          ->where('jenis_transaksi', 'MASUK')
-                          ->whereBetween('tanggal', [$startDate, $endDate]);
-                    })->sum('qty');
-
-                $keluarBulan = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $endDate) {
-                        $q->where('status', 'COMPLETED')
-                          ->where('jenis_transaksi', 'KELUAR')
-                          ->whereBetween('tanggal', [$startDate, $endDate]);
-                    })->sum('qty');
-
-                $trfIn = (int) TransaksiDetail::where('barang_id', $barangId)
-                    ->whereHas('transaksi', function ($q) use ($startDate, $endDate) {
-                        $q->where('status', 'COMPLETED')
-                          ->where(fn($qb) => $qb->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'))
-                          ->whereBetween('tanggal', [$startDate, $endDate]);
-                    })->sum('qty');
-
-                $trfOut      = $trfIn;
-                $transferNet = 0;
-                $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan);
-            }
-
-            // C. RINCIAN KONDISI FISIK UNIT SAAT INI
-            $serialsQuery = $b->serials->where('status', 'IN_WAREHOUSE');
-            if ($gudangId && $gudangId !== 'ALL') {
-                $serialsQuery = $serialsQuery->where('gudang_id', (int) $gudangId);
-            }
-
-            $kondisiBaru  = $serialsQuery->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK']))->count();
-            $kondisiBekas = $serialsQuery->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
-            $kondisiRusak = $serialsQuery->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
+            // Rincian kondisi fisik dari relasi serials yang sudah di-load
+            $serials = $b->serials;
+            $kondisiBaru  = $serials->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK']))->count();
+            $kondisiBekas = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
+            $kondisiRusak = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
 
             if (!$b->is_wajib_sn) {
                 $kondisiBaru = $stokAkhir;
@@ -178,7 +130,7 @@ class LaporanController extends Controller
             ];
         });
 
-        // 2. BUKU JURNAL MUTASI DETAIL (AUDIT LEDGER)
+        // 4. BUKU JURNAL MUTASI DETAIL (AUDIT LEDGER)
         $ledgerQuery = Transaksi::with([
             'gudangAsal:id,nama_gudang',
             'gudangTujuan:id,nama_gudang',
@@ -203,12 +155,10 @@ class LaporanController extends Controller
             $barang = $detail?->barang;
             $namaLengkap = $barang ? trim("{$barang->brand} {$barang->tipe} {$barang->kategori}") : ($barang?->nama_barang ?? '-');
 
-            $listSn = $detail ? $detail->serials->map(function ($s) {
-                return [
-                    'serial_number' => $s->serial_number,
-                    'kondisi'       => $s->kondisi ?: 'Baru'
-                ];
-            }) : [];
+            $listSn = $detail ? $detail->serials->map(fn($s) => [
+                'serial_number' => $s->serial_number,
+                'kondisi'       => $s->kondisi ?: 'Baru'
+            ]) : [];
 
             return [
                 'id'            => $t->id,
@@ -244,6 +194,8 @@ class LaporanController extends Controller
 
     public function export(Request $request): StreamedResponse
     {
+        set_time_limit(180);
+
         $bulan    = (int) $request->input('bulan', date('n'));
         $tahun    = (int) $request->input('tahun', date('Y'));
         $gudangId = $request->input('gudang_id', 'ALL');
@@ -257,7 +209,44 @@ class LaporanController extends Controller
             if ($g) $gudangName = $g->nama_gudang;
         }
 
-        $barangs = Barang::with(['serials', 'stoks'])->orderBy('kode_barang', 'asc')->get();
+        $barangs = Barang::with([
+            'serials' => function ($q) use ($gudangId) {
+                $q->where('status', 'IN_WAREHOUSE');
+                if ($gudangId && $gudangId !== 'ALL') {
+                    $q->where('gudang_id', (int) $gudangId);
+                }
+            }
+        ])->orderBy('kode_barang', 'asc')->get();
+
+        $barangIds = $barangs->pluck('id');
+
+        $mutasiLalu = TransaksiDetail::select('barang_id', 
+                DB::raw("SUM(CASE WHEN t.tanggal < '{$startDate}' AND t.gudang_tujuan_id " . ($gudangId !== 'ALL' ? "= {$gudangId}" : "IS NOT NULL") . " THEN qty ELSE 0 END) as masuk_lalu"),
+                DB::raw("SUM(CASE WHEN t.tanggal < '{$startDate}' AND t.gudang_asal_id " . ($gudangId !== 'ALL' ? "= {$gudangId}" : "IS NOT NULL") . " THEN qty ELSE 0 END) as keluar_lalu")
+            )
+            ->from('transaksi_details as td')
+            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+            ->where('t.status', 'COMPLETED')
+            ->whereIn('td.barang_id', $barangIds)
+            ->where('t.tanggal', '<', $startDate)
+            ->groupBy('td.barang_id')
+            ->get()
+            ->keyBy('barang_id');
+
+        $mutasiBulan = TransaksiDetail::select('barang_id',
+                DB::raw("SUM(CASE WHEN t.jenis_transaksi = 'MASUK' " . ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = {$gudangId}" : "") . " THEN qty ELSE 0 END) as masuk_bulan"),
+                DB::raw("SUM(CASE WHEN t.jenis_transaksi = 'KELUAR' " . ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = {$gudangId}" : "") . " THEN qty ELSE 0 END) as keluar_bulan"),
+                DB::raw("SUM(CASE WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " . ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = {$gudangId}" : "") . " THEN qty ELSE 0 END) as trf_in"),
+                DB::raw("SUM(CASE WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " . ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = {$gudangId}" : "") . " THEN qty ELSE 0 END) as trf_out")
+            )
+            ->from('transaksi_details as td')
+            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+            ->where('t.status', 'COMPLETED')
+            ->whereIn('td.barang_id', $barangIds)
+            ->whereBetween('t.tanggal', [$startDate, $endDate])
+            ->groupBy('td.barang_id')
+            ->get()
+            ->keyBy('barang_id');
 
         $monthNames = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -275,7 +264,7 @@ class LaporanController extends Controller
             'Expires'             => '0',
         ];
 
-        $callback = function () use ($barangs, $startDate, $endDate, $gudangId, $bulan, $tahun, $gudangName, $monthNames) {
+        $callback = function () use ($barangs, $mutasiLalu, $mutasiBulan, $gudangId, $bulan, $tahun, $gudangName, $monthNames) {
             $file = fopen('php://output', 'w');
             fputs($file, "\xEF\xBB\xBF");
 
@@ -301,50 +290,29 @@ class LaporanController extends Controller
 
             $no = 1;
             foreach ($barangs as $b) {
-                $barangId = $b->id;
+                $lalu = $mutasiLalu->get($b->id);
+                $bulanData = $mutasiBulan->get($b->id);
 
-                if ($gudangId && $gudangId !== 'ALL') {
-                    $masukLalu = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where('tanggal', '<', $startDate)->where('gudang_tujuan_id', $gudangId))->sum('qty');
-                    $keluarLalu = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where('tanggal', '<', $startDate)->where('gudang_asal_id', $gudangId))->sum('qty');
-                    $stokAwal = max(0, $masukLalu - $keluarLalu);
+                $masukLalu  = (int) ($lalu?->masuk_lalu ?? 0);
+                $keluarLalu = (int) ($lalu?->keluar_lalu ?? 0);
+                $stokAwal   = max(0, $masukLalu - $keluarLalu);
 
-                    $masukBulan = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where('jenis_transaksi', 'MASUK')->where('gudang_tujuan_id', $gudangId)->whereBetween('tanggal', [$startDate, $endDate]))->sum('qty');
-                    $keluarBulan = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where('jenis_transaksi', 'KELUAR')->where('gudang_asal_id', $gudangId)->whereBetween('tanggal', [$startDate, $endDate]))->sum('qty');
-                    
-                    $trfIn = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where(fn($qb) => $qb->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'))->where('gudang_tujuan_id', $gudangId)->whereBetween('tanggal', [$startDate, $endDate]))->sum('qty');
-                    $trfOut = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where(fn($qb) => $qb->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'))->where('gudang_asal_id', $gudangId)->whereBetween('tanggal', [$startDate, $endDate]))->sum('qty');
-                    
-                    $transferNet = $trfIn - $trfOut;
-                    $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
-                } else {
-                    $masukLalu = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where('tanggal', '<', $startDate)->where('jenis_transaksi', 'MASUK'))->sum('qty');
-                    $keluarLalu = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where('tanggal', '<', $startDate)->where('jenis_transaksi', 'KELUAR'))->sum('qty');
-                    $stokAwal = max(0, $masukLalu - $keluarLalu);
+                $masukBulan  = (int) ($bulanData?->masuk_bulan ?? 0);
+                $keluarBulan = (int) ($bulanData?->keluar_bulan ?? 0);
+                $trfIn       = (int) ($bulanData?->trf_in ?? 0);
+                $trfOut      = ($gudangId !== 'ALL') ? (int) ($bulanData?->trf_out ?? 0) : $trfIn;
+                
+                $transferNet = ($gudangId !== 'ALL') ? ($trfIn - $trfOut) : 0;
+                $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
 
-                    $masukBulan = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where('jenis_transaksi', 'MASUK')->whereBetween('tanggal', [$startDate, $endDate]))->sum('qty');
-                    $keluarBulan = (int) TransaksiDetail::where('barang_id', $barangId)
-                        ->whereHas('transaksi', fn($q) => $q->where('status', 'COMPLETED')->where('jenis_transaksi', 'KELUAR')->whereBetween('tanggal', [$startDate, $endDate]))->sum('qty');
-                    
-                    $transferNet = 0;
-                    $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan);
+                $serials = $b->serials;
+                $kBaru  = $serials->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK']))->count();
+                $kBekas = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
+                $kRusak = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
+
+                if (!$b->is_wajib_sn) {
+                    $kBaru = $stokAkhir;
                 }
-
-                $serialsQuery = $b->serials->where('status', 'IN_WAREHOUSE');
-                if ($gudangId && $gudangId !== 'ALL') {
-                    $serialsQuery = $serialsQuery->where('gudang_id', (int) $gudangId);
-                }
-                $kBaru  = $serialsQuery->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK']))->count();
-                $kBekas = $serialsQuery->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
-                $kRusak = $serialsQuery->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
 
                 $kondisiRincian = "{$kBaru} Baru • {$kBekas} Bekas • {$kRusak} Rusak";
                 $namaLengkap = trim("{$b->brand} {$b->tipe} {$b->kategori}") ?: $b->nama_barang;

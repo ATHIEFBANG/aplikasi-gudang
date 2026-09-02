@@ -19,10 +19,7 @@ export default function TransaksiIndex({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
-                            <div className="p-2 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-600/20">
-                                <ArrowLeftRight className="w-5 h-5" />
-                            </div>
-                            <span>Transaksi & Mutasi Logistik</span>
+                            Transaksi & Mutasi Logistik
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                             Pusat pencatatan mutasi stok barang masuk, pengeluaran logistik, dan transfer distribusi antar-gudang secara terintegrasi.

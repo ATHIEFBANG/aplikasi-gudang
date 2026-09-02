@@ -109,7 +109,7 @@ export default function ModalBarang({
                                 maxLength={11}
                                 value={editData.kode_barang || ''} 
                                 onChange={(e) => setEditData({ ...editData, kode_barang: formatKodePPL(e.target.value) })} 
-                                placeholder="Contoh: PPL01000701" 
+                                placeholder="Contoh: PPL12345678" 
                                 className="h-8 text-xs font-mono font-bold"
                                 required 
                             />
@@ -129,7 +129,7 @@ export default function ModalBarang({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold">Tipe / Jenis *</Label>
+                            <Label className="text-xs font-semibold">Kategori *</Label>
                             <HybridDropdown
                                 value={editData.tipe || ''}
                                 options={tipeOptions}
@@ -212,7 +212,7 @@ export default function ModalBarang({
                                     disabled={isProcessing} 
                                     value={editData.part_number || ''} 
                                     onChange={(e) => setEditData({ ...editData, part_number: e.target.value })} 
-                                    placeholder="Contoh: 3654312" 
+                                    placeholder="Ketik Part Number..." 
                                     className="h-8 text-xs bg-white dark:bg-slate-900 font-mono mt-1" 
                                     required
                                 />
@@ -279,7 +279,7 @@ export default function ModalBarang({
                                     </div>
 
                                     <div className="space-y-1">
-                                        <Label className="text-[11px] font-medium">Kategori *</Label>
+                                        <Label className="text-[11px] font-medium">Nama Barang *</Label>
                                         <HybridDropdown
                                             value={item.kategori}
                                             options={kategoriOptions}

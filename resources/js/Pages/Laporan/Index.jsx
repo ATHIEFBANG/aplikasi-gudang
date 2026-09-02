@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { Button } from '@/components/ui/button';
 import { Input } from "@/components/ui/input";
 import HybridDropdown from '@/components/HybridDropdown';
 import Toolbar from '@/components/Toolbar';
@@ -9,9 +10,11 @@ import TabelJurnal from './TabelJurnal';
 import { 
     Boxes,
     BookOpen,
-    Search, 
+    FileSpreadsheet,
+    Search,
     X,
-    FileSpreadsheet
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 
 const MONTH_NAMES = [
@@ -43,6 +46,11 @@ export default function LaporanIndex({
     const [sortOrder, setSortOrder] = useState('asc');
     const [zoomLevel, setZoomLevel] = useState(100);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // State Pagination Tabel
+    const [currentPage, setCurrentPage] = useState(1);
+    const [perPage, setPerPage] = useState(10);
+    const [perPageInput, setPerPageInput] = useState(10);
 
     // Zoom Handlers
     const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 10, 120));
@@ -77,6 +85,64 @@ export default function LaporanIndex({
         const found = gudangs.find(g => String(g.id) === String(gudangId));
         return found ? found.nama_gudang : 'Gudang Terpilih';
     }, [gudangId, gudangs]);
+
+    // Data Aktif & Sorting
+    const rawList = subTab === 'rekonsiliasi' ? laporanStok : jurnalMutasi;
+
+    const sortedList = useMemo(() => {
+        const list = [...rawList];
+        list.sort((a, b) => {
+            const keyA = a.kode_barang || a.no_transaksi || a.tanggal || '';
+            const keyB = b.kode_barang || b.no_transaksi || b.tanggal || '';
+            if (sortOrder === 'asc') return String(keyA).localeCompare(String(keyB));
+            return String(keyB).localeCompare(String(keyA));
+        });
+        return list;
+    }, [rawList, sortOrder]);
+
+    // Akumulasi Angka Rekapitulasi
+    const totalSummary = useMemo(() => {
+        return laporanStok.reduce((acc, row) => ({
+            stok_awal: acc.stok_awal + (row.stok_awal || 0),
+            masuk: acc.masuk + (row.masuk || 0),
+            keluar: acc.keluar + (row.keluar || 0),
+            transfer_net: acc.transfer_net + (row.transfer_net || 0),
+            stok_akhir: acc.stok_akhir + (row.stok_akhir || 0),
+            kondisi_baru: acc.kondisi_baru + (row.kondisi_baru || 0),
+            kondisi_bekas: acc.kondisi_bekas + (row.kondisi_bekas || 0),
+            kondisi_rusak: acc.kondisi_rusak + (row.kondisi_rusak || 0),
+        }), {
+            stok_awal: 0, masuk: 0, keluar: 0, transfer_net: 0, stok_akhir: 0,
+            kondisi_baru: 0, kondisi_bekas: 0, kondisi_rusak: 0
+        });
+    }, [laporanStok]);
+
+    // Client-Side Pagination
+    const totalData = sortedList.length;
+    const totalPages = Math.ceil(totalData / perPage) || 1;
+    const fromIndex = totalData > 0 ? (currentPage - 1) * perPage + 1 : 0;
+    const toIndex = Math.min(currentPage * perPage, totalData);
+
+    const paginatedData = useMemo(() => {
+        const start = (currentPage - 1) * perPage;
+        return sortedList.slice(start, start + perPage);
+    }, [sortedList, currentPage, perPage]);
+
+    const getRowNumber = (index) => (currentPage - 1) * perPage + index + 1;
+
+    // Reset pagination ketika ganti tab / filter
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [subTab, bulan, tahun, gudangId, search]);
+
+    const handlePerPageSubmit = () => {
+        let val = parseInt(perPageInput, 10);
+        if (isNaN(val) || val < 1) val = 10;
+        else if (val > 100) val = 100;
+        setPerPageInput(val);
+        setPerPage(val);
+        setCurrentPage(1);
+    };
 
     const handleFilterChange = (key, val) => {
         const newParams = {
@@ -121,23 +187,6 @@ export default function LaporanIndex({
         window.open(`/laporan/export?bulan=${bulan}&tahun=${tahun}&gudang_id=${gudangId}`, '_blank');
     };
 
-    // Perhitungan Total Akumulasi Angka untuk Baris Footer
-    const totalSummary = useMemo(() => {
-        return laporanStok.reduce((acc, row) => ({
-            stok_awal: acc.stok_awal + (row.stok_awal || 0),
-            masuk: acc.masuk + (row.masuk || 0),
-            keluar: acc.keluar + (row.keluar || 0),
-            transfer_net: acc.transfer_net + (row.transfer_net || 0),
-            stok_akhir: acc.stok_akhir + (row.stok_akhir || 0),
-            kondisi_baru: acc.kondisi_baru + (row.kondisi_baru || 0),
-            kondisi_bekas: acc.kondisi_bekas + (row.kondisi_bekas || 0),
-            kondisi_rusak: acc.kondisi_rusak + (row.kondisi_rusak || 0),
-        }), {
-            stok_awal: 0, masuk: 0, keluar: 0, transfer_net: 0, stok_akhir: 0,
-            kondisi_baru: 0, kondisi_bekas: 0, kondisi_rusak: 0
-        });
-    }, [laporanStok]);
-
     return (
         <AuthenticatedLayout header="Laporan Bulanan">
             <Head title={`Laporan Logistik - ${activeBulanLabel} ${tahun}`} />
@@ -158,10 +207,10 @@ export default function LaporanIndex({
                     </div>
                 </div>
 
-                {/* CONTAINER UTAMA (PERSIS SEPERTI TRANSAKSI & MASTER BARANG) */}
+                {/* CONTAINER UTAMA (PERSIS SEPERTI TABMASTERDATA) */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
                     
-                    {/* 1. TOOLBAR ATAS DENGAN TAB SWITCHER & CONTROLS */}
+                    {/* 1. TOOLBAR ATAS */}
                     <Toolbar
                         sortOrder={sortOrder}
                         onToggleSort={toggleSort}
@@ -202,18 +251,18 @@ export default function LaporanIndex({
                         }
                     />
 
-                    {/* 2. SUB-HEADER: TITLE & FILTER INTEGRASI */}
-                    <div className="px-5 py-3 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+                    {/* 2. SUB-HEADER (TITLE + FILTER SEJAJAR) */}
+                    <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
                         <div>
-                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
-                                {subTab === 'rekonsiliasi' ? 'Rekonsiliasi Saldo Stok SKU' : 'Buku Jurnal Mutasi Logistik'}
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                                {subTab === 'rekonsiliasi' ? 'Daftar Rekonsiliasi Saldo Stok SKU' : 'Daftar Buku Jurnal Mutasi'}
                             </span>
                             <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">
-                                Periode: <strong className="text-slate-700 dark:text-slate-300">{activeBulanLabel} {tahun}</strong> • Lokasi: <strong className="text-slate-700 dark:text-slate-300">{activeGudangLabel}</strong>
+                                Periode: <strong className="text-slate-700 dark:text-slate-300">{activeBulanLabel} {tahun}</strong> &bull; Lokasi: <strong className="text-slate-700 dark:text-slate-300">{activeGudangLabel}</strong>
                             </span>
                         </div>
 
-                        {/* Komponen Filter Sejajar */}
+                        {/* Filter Dropdowns & Input Pencarian */}
                         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
                             <div className="w-28 sm:w-32">
                                 <HybridDropdown
@@ -225,7 +274,6 @@ export default function LaporanIndex({
                                     inputClassName="h-8 font-semibold text-xs bg-white dark:bg-slate-900"
                                 />
                             </div>
-
                             <div className="w-24 sm:w-28">
                                 <HybridDropdown
                                     value={tahun}
@@ -236,7 +284,6 @@ export default function LaporanIndex({
                                     inputClassName="h-8 font-semibold text-xs bg-white dark:bg-slate-900"
                                 />
                             </div>
-
                             <div className="w-36 sm:w-44">
                                 <HybridDropdown
                                     value={gudangId}
@@ -247,11 +294,10 @@ export default function LaporanIndex({
                                     inputClassName="h-8 font-semibold text-xs bg-white dark:bg-slate-900"
                                 />
                             </div>
-
                             <div className="relative w-full sm:w-52">
-                                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <Input
-                                    placeholder="Cari Kode PPL / Barang..."
+                                    placeholder={subTab === 'rekonsiliasi' ? "Cari SKU / Barang..." : "Cari Transaksi / Dokumen..."}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     disabled={isProcessing}
@@ -261,9 +307,9 @@ export default function LaporanIndex({
                                     <button
                                         type="button"
                                         onClick={() => setSearch('')}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                                     >
-                                        <X className="w-3 h-3" />
+                                        <X className="w-3.5 h-3.5" />
                                     </button>
                                 )}
                             </div>
@@ -273,33 +319,91 @@ export default function LaporanIndex({
                     {/* 3. TABEL DATA */}
                     <div className="w-full overflow-x-auto relative border-b border-slate-200 dark:border-slate-800">
                         {subTab === 'rekonsiliasi' ? (
-                            <TabelRekonsiliasi dataList={laporanStok} zoomLevel={zoomLevel} />
+                            <TabelRekonsiliasi
+                                dataList={paginatedData}
+                                getRowNumber={getRowNumber}
+                                zoomLevel={zoomLevel}
+                            />
                         ) : (
-                            <TabelJurnal dataList={jurnalMutasi} zoomLevel={zoomLevel} />
+                            <TabelJurnal
+                                dataList={paginatedData}
+                                getRowNumber={getRowNumber}
+                                zoomLevel={zoomLevel}
+                            />
                         )}
                     </div>
 
-                    {/* 4. FOOTER SUMMARY BAR (TOTAL MUTASI & KONDISI FISIK) */}
-                    {subTab === 'rekonsiliasi' && (
-                        <div className="px-5 py-3 bg-slate-50/80 dark:bg-slate-900/80 flex flex-col md:flex-row items-center justify-between gap-3 text-xs border-t border-slate-100 dark:border-slate-800/60">
-                            <div className="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
-                                Total Rekonsiliasi ({laporanStok.length} SKU)
-                            </div>
-                            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-[11px] font-mono">
-                                <div>Awal: <strong className="text-slate-800 dark:text-slate-200 font-bold">{totalSummary.stok_awal}</strong></div>
-                                <div>Masuk: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">+{totalSummary.masuk}</strong></div>
-                                <div>Keluar: <strong className="text-rose-600 dark:text-rose-400 font-bold">-{totalSummary.keluar}</strong></div>
-                                <div>Transfer Net: <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{totalSummary.transfer_net >= 0 ? `+${totalSummary.transfer_net}` : totalSummary.transfer_net}</strong></div>
-                                <div className="px-2.5 py-0.5 rounded-md bg-blue-600/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 font-bold">
-                                    Akhir: {totalSummary.stok_akhir} Unit
-                                </div>
-                                <div className="text-slate-500 dark:text-slate-400 pl-1 border-l border-slate-300 dark:border-slate-700">
-                                    ({totalSummary.kondisi_baru} Baru • {totalSummary.kondisi_bekas} Bekas • {totalSummary.kondisi_rusak} Rusak)
-                                </div>
-                            </div>
+                    {/* 4. PAGINATION FOOTER (PERSIS SEPERTI TABMASTERDATA) */}
+                    <div className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="flex items-center gap-2">
+                            <span>Tampilkan</span>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={perPageInput}
+                                disabled={isProcessing}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val !== '' && Number(val) > 100) setPerPageInput(100);
+                                    else setPerPageInput(val);
+                                }}
+                                onBlur={handlePerPageSubmit}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handlePerPageSubmit();
+                                    }
+                                }}
+                                className="h-8 w-16 text-center text-xs font-bold bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <span>data per halaman</span>
                         </div>
-                    )}
-
+                        <div className="text-slate-500">
+                            Menampilkan <span className="font-semibold text-slate-700 dark:text-slate-300">{fromIndex}</span> - <span className="font-semibold text-slate-700 dark:text-slate-300">{toIndex}</span> dari <span className="font-semibold text-slate-700 dark:text-slate-300">{totalData}</span> data
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={currentPage <= 1 || isProcessing}
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                className="h-8 min-w-[32px] px-2 text-xs font-semibold dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                            </Button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).slice(
+                                Math.max(0, currentPage - 3),
+                                Math.min(totalPages, currentPage + 2)
+                            ).map((pageNum) => (
+                                <Button
+                                    key={`page-${pageNum}`}
+                                    type="button"
+                                    variant={currentPage === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    className={`h-8 min-w-[32px] px-2 text-xs font-semibold dark:border-slate-800 ${
+                                        currentPage === pageNum
+                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                    {pageNum}
+                                </Button>
+                            ))}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={currentPage >= totalPages || isProcessing}
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                className="h-8 min-w-[32px] px-2 text-xs font-semibold dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>

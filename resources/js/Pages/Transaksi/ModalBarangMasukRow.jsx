@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ export default function ModalBarangMasukRow({
     rowsCount,
     isEditMode,
     isProcessing,
-    barangs,
+    barangs = [],
     gudangs,
     gudangOptions,
     supplierOptions,
@@ -47,22 +47,8 @@ export default function ModalBarangMasukRow({
             { value: 'Rusak', label: 'Rusak' }
           ];
 
-    // Izinkan kondisi kosong jika tombol X diklik, fallback hanya untuk tampilan jika belum diset
-    const displayKondisi = row.kondisi !== undefined && row.kondisi !== null 
-        ? (row.kondisi.toUpperCase() === 'BAIK' ? 'Baru' : row.kondisi) 
-        : 'Baru';
-
-    const pihakAsalLabel = row.sub_jenis === 'PEMBELIAN' 
-        ? 'Asal Barang *' 
-        : row.sub_jenis === 'PEMINJAMAN' 
-        ? 'Asal Barang *' 
-        : 'Asal Barang *';
-
-    const pihakAsalPlaceholder = row.sub_jenis === 'PEMBELIAN'
-        ? 'Contoh: PT Sumber Logistik / Toko Jaya'
-        : row.sub_jenis === 'PEMINJAMAN'
-        ? 'Contoh: Tim Proyek Site A / Mitra Telko'
-        : 'Contoh: Teknisi Lapangan / Site Jambi';
+    const pihakAsalLabel = 'Asal Barang *';
+    const pihakAsalPlaceholder = 'ketik pihak asal...';
 
     const hargaSatuanNum = parseFloat(row.harga) || 0;
     const qtyNum = parseInt(row.qty, 10) || 1;
@@ -71,6 +57,43 @@ export default function ModalBarangMasukRow({
     const currentNamaBarang = targetBarang 
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
         : '';
+
+    // Opsi Kode PPL dengan teks sub-keterangan murni tanpa card/badge
+    const activePplOptions = useMemo(() => {
+        if (!barangs || barangs.length === 0) return pplOptions;
+        return barangs.map((b) => {
+            const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
+            const isPn = Boolean(b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1');
+
+            return {
+                value: b.kode_barang,
+                label: b.kode_barang,
+                id: b.id,
+                is_wajib_sn: isSn,
+                is_wajib_pn: isPn,
+                subLabel: (
+                    <div className="flex items-center gap-1 text-[9px] leading-tight mt-0.5">
+                        {isSn && (
+                            <span className="text-amber-500 dark:text-amber-400 font-semibold">
+                                Wajib SN
+                            </span>
+                        )}
+                        {isSn && isPn && <span className="text-slate-400 dark:text-slate-600">&bull;</span>}
+                        {isPn && (
+                            <span className="text-cyan-600 dark:text-cyan-400 font-semibold">
+                                Wajib PN
+                            </span>
+                        )}
+                        {!isSn && !isPn && (
+                            <span className="text-slate-400 dark:text-slate-500 font-normal">
+                                Standar
+                            </span>
+                        )}
+                    </div>
+                )
+            };
+        });
+    }, [barangs, pplOptions]);
 
     return (
         <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 relative group space-y-3 transition-all">
@@ -163,7 +186,7 @@ export default function ModalBarangMasukRow({
                             Nomor IMC (Inbound Material Control) *
                         </Label>
                         <Input
-                            placeholder="Contoh: IMC-00123"
+                            placeholder="ketik nomor IMC..."
                             disabled={isProcessing}
                             value={row.nomor_imc}
                             onChange={(e) => onFieldChange(rowIdx, 'nomor_imc', e.target.value)}
@@ -175,128 +198,186 @@ export default function ModalBarangMasukRow({
             </div>
 
             {/* 3. Detail Barang, Kuantitas, Harga & Kondisi */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Transaksi *</Label>
-                    <Input
-                        type="date"
-                        disabled={isProcessing}
-                        value={row.tanggal}
-                        onClick={(e) => {
-                            try {
-                                if (typeof e.target.showPicker === 'function') e.target.showPicker();
-                            } catch (err) {}
-                        }}
-                        onChange={(e) => onFieldChange(rowIdx, 'tanggal', e.target.value)}
-                        className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
-                        required
-                    />
-                </div>
-
-                {/* Dropdown Kode PPL */}
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                        Kode PPL *
-                    </Label>
-                    <HybridDropdown
-                        value={targetBarang?.kode_barang || ''}
-                        options={pplOptions}
-                        onChange={(val, selectedOpt) => {
-                            if (!val) {
-                                onBarangChange(rowIdx, '');
-                                return;
-                            }
-                            const found = barangs.find(b => b.id === selectedOpt?.id || b.kode_barang.toLowerCase() === val.trim().toLowerCase());
-                            if (found) onBarangChange(rowIdx, found.id);
-                        }}
-                        placeholder="Pilih PPL..."
-                        searchPlaceholder="Cari Kode PPL..."
-                        disabled={isProcessing || isEditMode}
-                        inputClassName="h-8 text-xs font-mono font-bold"
-                    />
-                </div>
-
-                {/* Dropdown Nama Barang */}
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
-                    <HybridDropdown
-                        value={currentNamaBarang}
-                        options={namaOptions}
-                        onChange={(val, selectedOpt) => {
-                            if (!val) {
-                                onBarangChange(rowIdx, '');
-                                return;
-                            }
-                            const found = barangs.find(b => {
-                                if (b.id === selectedOpt?.id) return true;
-                                const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
-                                return fullName.toLowerCase() === val.trim().toLowerCase() || b.kode_barang.toLowerCase() === val.trim().toLowerCase();
-                            });
-                            if (found) onBarangChange(rowIdx, found.id);
-                        }}
-                        placeholder="Pilih Barang..."
-                        searchPlaceholder="Cari Nama Barang..."
-                        disabled={isProcessing || isEditMode}
-                        inputClassName="h-8 text-xs"
-                    />
-                </div>
-
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Part Number</Label>
-                    <Input
-                        disabled
-                        placeholder={isWajibPn ? "Part Number" : "-"}
-                        value={isWajibPn ? (targetBarang?.part_number || '') : '-'}
-                        className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-mono text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
-                    />
-                </div>
-
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Satuan / Unit</Label>
-                    <Input
-                        disabled
-                        value={targetBarang?.deskripsi || targetBarang?.satuan || 'Unit'}
-                        className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-medium text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
-                    />
-                </div>
-
-                {/* Stepper Quantity */}
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Quantity *</Label>
-                    <div className="flex items-center">
-                        <button
-                            type="button"
-                            disabled={isProcessing || row.qty <= 1}
-                            onClick={() => onQtyChange(rowIdx, row.qty - 1)}
-                            className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
-                        >
-                            <Minus className="w-3 h-3" />
-                        </button>
+            <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                {/* BARIS ATAS: Tanggal Transaksi, Kode PPL, Nama Barang */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-3 space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Transaksi *</Label>
                         <Input
-                            type="number"
-                            min={1}
-                            max={50}
+                            type="date"
                             disabled={isProcessing}
-                            value={row.qty}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) => onQtyChange(rowIdx, e.target.value)}
-                            className="h-8 w-full text-center font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                            value={row.tanggal}
+                            onClick={(e) => {
+                                try {
+                                    if (typeof e.target.showPicker === 'function') e.target.showPicker();
+                                } catch (err) {}
+                            }}
+                            onChange={(e) => onFieldChange(rowIdx, 'tanggal', e.target.value)}
+                            className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
                             required
                         />
-                        <button
-                            type="button"
-                            disabled={isProcessing}
-                            onClick={() => onQtyChange(rowIdx, row.qty + 1)}
-                            className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
-                        >
-                            <Plus className="w-3 h-3" />
-                        </button>
+                    </div>
+
+                    {/* Dropdown Kode PPL dengan subLabel teks kecil bersih */}
+                    <div className="sm:col-span-4 space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                            Kode PPL *
+                        </Label>
+                        <HybridDropdown
+                            value={targetBarang?.kode_barang || ''}
+                            options={activePplOptions}
+                            renderOption={(opt) => {
+                                const isSn = Boolean(opt?.is_wajib_sn);
+                                const isPn = Boolean(opt?.is_wajib_pn);
+                                const kode = opt?.kode_barang || opt?.value || '-';
+                                return (
+                                    <div className="flex flex-col items-start min-w-0 pr-2 leading-tight">
+                                        <span className="truncate font-mono font-bold text-xs">
+                                            {kode}
+                                        </span>
+                                        <div className="flex items-center gap-1 text-[7px] leading-none mt-1">
+                                            {isSn && (
+                                                <span className="text-amber-500 dark:text-amber-400 font-semibold">
+                                                    Wajib SN
+                                                </span>
+                                            )}
+                                            {isSn && isPn && <span className="text-slate-400 dark:text-slate-600">&bull;</span>}
+                                            {isPn && (
+                                                <span className="text-cyan-600 dark:text-cyan-400 font-semibold">
+                                                    Wajib PN
+                                                </span>
+                                            )}
+                                            {!isSn && !isPn && (
+                                                <span className="text-slate-400 dark:text-slate-500 font-normal">
+                                                    Standar
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            }}
+                            onChange={(val, selectedOpt) => {
+                                if (!val) {
+                                    onBarangChange(rowIdx, '');
+                                    return;
+                                }
+                                const cleanKode = String(selectedOpt?.value || val).split(' ')[0].trim().toLowerCase();
+                                const found = barangs.find(b => 
+                                    b.id === selectedOpt?.id || 
+                                    b.kode_barang.toLowerCase() === cleanKode || 
+                                    b.kode_barang.toLowerCase() === String(val).trim().toLowerCase()
+                                );
+                                if (found) onBarangChange(rowIdx, found.id);
+                            }}
+                            placeholder="Pilih PPL..."
+                            searchPlaceholder="Cari Kode PPL..."
+                            disabled={isProcessing || isEditMode}
+                            inputClassName="h-8 text-xs font-mono font-bold"
+                        />
+                    </div>
+
+                    {/* Dropdown Nama Barang */}
+                    <div className="sm:col-span-5 space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
+                        <HybridDropdown
+                            value={currentNamaBarang}
+                            options={namaOptions}
+                            onChange={(val, selectedOpt) => {
+                                if (!val) {
+                                    onBarangChange(rowIdx, '');
+                                    return;
+                                }
+                                const found = barangs.find(b => {
+                                    if (b.id === selectedOpt?.id) return true;
+                                    const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
+                                    return fullName.toLowerCase() === val.trim().toLowerCase() || b.kode_barang.toLowerCase() === val.trim().toLowerCase();
+                                });
+                                if (found) onBarangChange(rowIdx, found.id);
+                            }}
+                            placeholder="Pilih Barang..."
+                            searchPlaceholder="Cari Nama Barang..."
+                            disabled={isProcessing || isEditMode}
+                            inputClassName="h-8 text-xs"
+                        />
                     </div>
                 </div>
 
-                {/* Harga Satuan & Subtotal (Khusus Pembelian) */}
+                {/* BARIS BAWAH: Part Number, Satuan / Unit, Quantity, Kondisi Fisik */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Part Number</Label>
+                        <Input
+                            disabled
+                            placeholder={isWajibPn ? "Part Number" : "-"}
+                            value={isWajibPn ? (targetBarang?.part_number || '') : '-'}
+                            className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-mono text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Satuan / Unit</Label>
+                        <Input
+                            disabled
+                            value={targetBarang?.deskripsi || targetBarang?.satuan || 'Unit'}
+                            className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-medium text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
+                        />
+                    </div>
+
+                    {/* Stepper Quantity */}
+                    <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Quantity *</Label>
+                        <div className="flex items-center">
+                            <button
+                                type="button"
+                                disabled={isProcessing || row.qty <= 1}
+                                onClick={() => onQtyChange(rowIdx, row.qty - 1)}
+                                className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
+                            >
+                                <Minus className="w-3 h-3" />
+                            </button>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={50}
+                                disabled={isProcessing}
+                                value={row.qty}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => onQtyChange(rowIdx, e.target.value)}
+                                className="h-8 w-full text-center font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                                required
+                            />
+                            <button
+                                type="button"
+                                disabled={isProcessing}
+                                onClick={() => onQtyChange(rowIdx, row.qty + 1)}
+                                className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
+                            >
+                                <Plus className="w-3 h-3" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Kondisi Fisik */}
+                    <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kondisi Fisik *</Label>
+                        <HybridDropdown
+                            value={row.kondisi || ''}
+                            options={kondisiOptions}
+                            onChange={(val, selectedOpt) => {
+                                const resVal = selectedOpt?.value !== undefined ? selectedOpt.value : (val ?? '');
+                                onFieldChange(rowIdx, 'kondisi', resVal);
+                            }}
+                            placeholder="Pilih Kondisi..."
+                            searchPlaceholder="Cari Kondisi..."
+                            disabled={isProcessing}
+                            inputClassName="h-8 text-xs font-semibold"
+                        />
+                    </div>
+                </div>
+
+                {/* Form Harga Satuan: Setengah Lebar (sm:w-1/2 max-w-sm) */}
                 {row.sub_jenis === 'PEMBELIAN' && (
-                    <div className="space-y-1 sm:col-span-2">
+                    <div className="w-full sm:w-1/2 max-w-sm space-y-1 pt-1">
                         <div className="flex items-center justify-between">
                             <Label className="text-[11px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
                                 <Coins className="w-3 h-3" />
@@ -325,23 +406,6 @@ export default function ModalBarangMasukRow({
                         </div>
                     </div>
                 )}
-
-                {/* Kondisi Fisik (Kompak, tombol X berfungsi membersihkan pilihan) */}
-                <div className="space-y-1 sm:col-span-1 lg:col-span-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kondisi Fisik *</Label>
-                    <HybridDropdown
-                        value={row.kondisi || ''}
-                        options={kondisiOptions}
-                        onChange={(val, selectedOpt) => {
-                            const resVal = selectedOpt?.value !== undefined ? selectedOpt.value : (val ?? '');
-                            onFieldChange(rowIdx, 'kondisi', resVal);
-                        }}
-                        placeholder="Pilih Kondisi..."
-                        searchPlaceholder="Cari Kondisi..."
-                        disabled={isProcessing}
-                        inputClassName="h-8 text-xs font-semibold"
-                    />
-                </div>
             </div>
 
             {/* 4. Input Manual Serial Number */}

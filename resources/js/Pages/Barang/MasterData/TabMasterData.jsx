@@ -210,15 +210,9 @@ export default function TabMasterData({
                 onResetZoom={handleResetZoom}
                 onFitZoom={handleFitZoom}
                 leftContent={
-                    <div className="flex items-center gap-2">
-                        <Badge 
-                            variant="secondary" 
-                            className="bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-3 py-1.5 rounded-lg text-xs font-bold gap-1.5"
-                        >
-                            <Package className="w-3.5 h-3.5" />
-                            <span>SKU Aktif ({barangs?.total || 0})</span>
-                        </Badge>
-                    </div>
+                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                     Total Barang: <span className="font-bold text-slate-900 dark:text-white">{barangs?.total ?? dataList.length}</span>
+                  </div>
                 }
             />
 

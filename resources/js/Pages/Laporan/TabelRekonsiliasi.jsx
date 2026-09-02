@@ -17,7 +17,8 @@ const REKONSILIASI_COLUMNS = [
 
 export default function TabelRekonsiliasi({
     dataList = [],
-    zoomLevel = 100
+    zoomLevel = 100,
+    getRowNumber
 }) {
     const getItemId = (item) => item?.id || item?.kode_barang;
 
@@ -32,49 +33,42 @@ export default function TabelRekonsiliasi({
                                 {item.kode_barang || '-'}
                             </span>
                         );
-
                     case 'nama_barang':
                         return (
-                            <span className="font-bold text-xs text-slate-900 dark:text-slate-100 block max-w-[280px] truncate" title={item.nama_barang}>
+                            <span className="font-bold text-xs text-slate-900 dark:text-slate-100 block max-w-70 truncate" title={item.nama_barang}>
                                 {item.nama_barang || '-'}
                             </span>
                         );
-
                     case 'part_number':
                         return (
                             <span className={`font-mono text-xs ${item.part_number && item.part_number !== '-' ? 'text-slate-700 dark:text-slate-300 font-semibold' : 'text-slate-400'}`}>
                                 {item.part_number || '-'}
                             </span>
                         );
-
                     case 'satuan':
                         return (
                             <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                                 {item.satuan || 'Unit'}
                             </span>
                         );
-
                     case 'stok_awal':
                         return (
                             <span className="font-mono font-bold text-xs text-slate-700 dark:text-slate-300">
                                 {(item.stok_awal || 0).toLocaleString('id-ID')}
                             </span>
                         );
-
                     case 'masuk':
                         return (
                             <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
                                 +{(item.masuk || 0).toLocaleString('id-ID')}
                             </span>
                         );
-
                     case 'keluar':
                         return (
                             <span className="font-mono font-bold text-xs text-rose-600 dark:text-rose-400">
                                 -{(item.keluar || 0).toLocaleString('id-ID')}
                             </span>
                         );
-
                     case 'transfer_net': {
                         const trf = item.transfer_net || 0;
                         return (
@@ -83,14 +77,12 @@ export default function TabelRekonsiliasi({
                             </span>
                         );
                     }
-
                     case 'stok_akhir':
                         return (
                             <Badge variant="outline" className="font-mono font-black text-xs bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5">
                                 {(item.stok_akhir || 0).toLocaleString('id-ID')}
                             </Badge>
                         );
-
                     case 'kondisi_rincian':
                         return (
                             <div className="flex items-center gap-1.5 text-[11px] font-mono whitespace-nowrap">
@@ -105,7 +97,6 @@ export default function TabelRekonsiliasi({
                                 </Badge>
                             </div>
                         );
-
                     default:
                         return '-';
                 }
@@ -114,15 +105,13 @@ export default function TabelRekonsiliasi({
     }, []);
 
     return (
-        <div className="w-full flex flex-col">
-            <Tabel
-                data={dataList}
-                columns={formattedColumns}
-                getItemId={getItemId}
-                getRowNumber={(idx) => idx + 1}
-                zoomLevel={zoomLevel}
-                emptyMessage="Tidak ada data rekonsiliasi stok pada periode ini."
-            />
-        </div>
+        <Tabel
+            data={dataList}
+            columns={formattedColumns}
+            getItemId={getItemId}
+            getRowNumber={getRowNumber}
+            zoomLevel={zoomLevel}
+            emptyMessage="Tidak ada data rekonsiliasi stok pada periode ini."
+        />
     );
 }

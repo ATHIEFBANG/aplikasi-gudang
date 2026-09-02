@@ -2,18 +2,19 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Boxes } from 'lucide-react';
 
-// Import asset langsung dari resources/images agar dibundle oleh Vite
+// Import asset langsung dari resources/images
 import defaultLogo from '../../images/ppll.png';
 
 export function AppLogo({ 
     className, 
     imageSrc = defaultLogo, 
-    showTextOnMobile = false, 
+    showTextOnMobile = true, 
+    textClassName = 'text-slate-900 dark:text-white',
     ...props 
 }) {
     return (
         <div className={cn('flex items-center gap-3 select-none', className)} {...props}>
-            {/* LOGO IMAGE / FALLBACK ICON (Tanpa Bayangan) */}
+            {/* LOGO IMAGE */}
             {imageSrc ? (
                 <img 
                     src={imageSrc} 
@@ -26,12 +27,12 @@ export function AppLogo({
                 </div>
             )}
 
-            {/* BRAND TEXT (Adaptif: Terbaca Jelas di Light Mode & Dark Mode) */}
+            {/* BRAND TEXT */}
             <div className={showTextOnMobile ? "flex flex-col" : "hidden sm:flex flex-col"}>
-                <span className="font-extrabold text-base tracking-wider text-slate-900 dark:text-white block leading-none">
+                <span className={cn("font-black text-base tracking-wider block leading-none", textClassName)}>
                     PANCA PILAR LAKSANA
                 </span>
-                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold tracking-[0.2em] uppercase mt-1 block">
+                <span className="text-[10px] text-amber-500 font-bold tracking-[0.2em] uppercase mt-1 block">
                     Warehouse Management
                 </span>
             </div>
