@@ -60,11 +60,66 @@ export function useModalBarangKeluarControl({
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
+    // Opsi Gudang Asal dengan Sub-Label Kondisi Fisik Unit
     const gudangOptions = useMemo(() => {
-        return gudangs.map(g => ({ value: g.nama_gudang, label: g.nama_gudang, id: g.id }));
-    }, [gudangs]);
+        return gudangs.map(g => {
+            let baru  = g.stok_baru;
+            let bekas = g.stok_bekas;
+            let rusak = g.stok_rusak;
 
-    // Opsi Kode PPL: Sub-label khusus Wajib SN / PN saja dengan font kecil dan tidak ada info stok
+            // Fallback kalkulasi otomatis dari data barang jika belum disediakan controller
+            if (baru === undefined || bekas === undefined || rusak === undefined) {
+                let countBaru = 0;
+                let countBekas = 0;
+                let countRusak = 0;
+
+                barangs.forEach(b => {
+                    if (b.is_wajib_sn) {
+                        (b.serials || []).forEach(s => {
+                            if (String(s.gudang_id) === String(g.id) && s.status === 'IN_WAREHOUSE') {
+                                const k = String(s.kondisi || 'Baru').toUpperCase();
+                                if (k === 'RUSAK') countRusak++;
+                                else if (k.includes('BEKAS') || k.includes('SECOND')) countBekas++;
+                                else countBaru++;
+                            }
+                        });
+                    } else {
+                        const stokRec = (b.stoks || []).find(st => String(st.gudang_id) === String(g.id));
+                        if (stokRec && stokRec.jumlah > 0) {
+                            countBaru += parseInt(stokRec.jumlah, 10);
+                        }
+                    }
+                });
+
+                baru  = countBaru;
+                bekas = countBekas;
+                rusak = countRusak;
+            }
+
+            return {
+                value: g.nama_gudang,
+                label: g.nama_gudang,
+                id: g.id,
+                subLabel: (
+                    <div className="flex items-center gap-1.5 text-[7px] leading-none mt-0.5 font-sans">
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            {baru} Baru
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
+                        <span className="font-bold text-amber-500 dark:text-amber-400">
+                            {bekas} Bekas
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
+                        <span className="font-bold text-rose-500 dark:text-rose-400">
+                            {rusak} Rusak
+                        </span>
+                    </div>
+                )
+            };
+        });
+    }, [gudangs, barangs]);
+
+    // Opsi Kode PPL: Sub-label khusus status Wajib SN / PN saja
     const getBarangPplOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
         return barangs
@@ -105,7 +160,7 @@ export function useModalBarangKeluarControl({
             });
     }, [barangs, getBarangStockInWarehouse]);
 
-    // Opsi Nama Barang: Nama utama bersih dan info stok dipindahkan ke subLabel
+    // Opsi Nama Barang: Sub-label stok yang tersedia di gudang asal
     const getBarangNamaOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
         return barangs

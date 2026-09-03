@@ -25,7 +25,7 @@ class DashboardController extends Controller
             ? "CAST(strftime('%m', transaksis.tanggal) AS INTEGER)" 
             : "EXTRACT(MONTH FROM transaksis.tanggal)";
 
-        // 1. STATISTIK KPI & TOTAL UNIT (Agregasi Cepat dalam 1 Query)
+        // 1. STATISTIK KPI & TOTAL UNIT
         $totalBarang = Barang::count();
         $totalGudang = Gudang::where('is_active', true)->count();
 
@@ -66,7 +66,7 @@ class DashboardController extends Controller
         $totalTransfer       = (int) ($kpiTotals->total_transfer ?? 0);
         $totalNilaiPembelian = (float) ($kpiTotals->total_beli ?? 0);
 
-        // Distribusi Kategori Donut Chart (Mendukung Proyek & Non Proyek)
+        // Distribusi Kategori Donut Chart
         $donutRaw = (clone $baseDetailQuery)
             ->selectRaw("
                 transaksis.sub_jenis,
@@ -99,13 +99,13 @@ class DashboardController extends Controller
             'Pemakaian Internal' => $nonProyekQty,
         ];
 
-        // 2. DATA PETA GUDANG (Diambil dengan Agregasi Massal di Luar Perulangan)
+        // 2. DATA PETA & TABEL TITIK GUDANG OPERASIONAL
         $gudangsAktif = Gudang::where('is_active', true)
             ->whereNotNull('lat_long')
             ->where('lat_long', '!=', '')
             ->get();
 
-        // Agregasi SN per gudang (1 query)
+        // A. Ambil seluruh stok fisik barang Wajib SN aktif per gudang
         $serialStatsByGudang = BarangSerial::where('status', 'IN_WAREHOUSE')
             ->selectRaw("
                 gudang_id,
@@ -118,30 +118,41 @@ class DashboardController extends Controller
             ->get()
             ->keyBy('gudang_id');
 
-        // Agregasi barang masuk per gudang_tujuan_id (1 query)
-        $masukStatsByGudang = DB::table('transaksi_details')
+        // B. Ambil mutasi masuk khusus barang Non-SN (is_wajib_sn = false / 0)
+        $masukNonSnByGudang = DB::table('transaksi_details')
             ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
+            ->join('barangs', 'transaksi_details.barang_id', '=', 'barangs.id')
             ->where(function ($q) {
                 $q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
                   ->orWhereNull('transaksis.status');
+            })
+            ->where(function ($q) {
+                $q->where('barangs.is_wajib_sn', false)
+                  ->orWhere('barangs.is_wajib_sn', 0);
             })
             ->whereNotNull('transaksis.gudang_tujuan_id')
             ->selectRaw("
                 transaksis.gudang_tujuan_id,
                 SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BARU' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BAIK') THEN transaksi_details.qty ELSE 0 END) as baru,
                 SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%SECOND%') THEN transaksi_details.qty ELSE 0 END) as bekas,
-                SUM(CASE WHEN UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%RUSAK%' THEN transaksi_details.qty ELSE 0 END) as rusak
+                SUM(CASE WHEN UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%RUSAK%' THEN transaksi_details.qty ELSE 0 END) as rusak,
+                SUM(transaksi_details.qty) as total_masuk
             ")
             ->groupBy('transaksis.gudang_tujuan_id')
             ->get()
             ->keyBy('gudang_tujuan_id');
 
-        // Agregasi barang keluar per gudang_asal_id (1 query)
-        $keluarStatsByGudang = DB::table('transaksi_details')
+        // C. Ambil mutasi keluar khusus barang Non-SN (is_wajib_sn = false / 0)
+        $keluarNonSnByGudang = DB::table('transaksi_details')
             ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
+            ->join('barangs', 'transaksi_details.barang_id', '=', 'barangs.id')
             ->where(function ($q) {
                 $q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
                   ->orWhereNull('transaksis.status');
+            })
+            ->where(function ($q) {
+                $q->where('barangs.is_wajib_sn', false)
+                  ->orWhere('barangs.is_wajib_sn', 0);
             })
             ->whereNotNull('transaksis.gudang_asal_id')
             ->selectRaw("
@@ -151,7 +162,8 @@ class DashboardController extends Controller
             ->groupBy('transaksis.gudang_asal_id')
             ->pluck('total_keluar', 'gudang_asal_id');
 
-        $warehouseMapData = $gudangsAktif->map(function ($g) use ($serialStatsByGudang, $masukStatsByGudang, $keluarStatsByGudang) {
+        // D. Mapping & Hitung Akumulasi Gabungan (SN + Non-SN)
+        $warehouseMapData = $gudangsAktif->map(function ($g) use ($serialStatsByGudang, $masukNonSnByGudang, $keluarNonSnByGudang) {
             $raw = trim($g->lat_long ?? '');
             $parts = preg_split('/[\s,;\/]+/', $raw);
             if (count($parts) < 2) return null;
@@ -161,30 +173,28 @@ class DashboardController extends Controller
             $lat = abs($v1) <= 90 ? $v1 : $v2;
             $lng = abs($v1) <= 90 ? $v2 : $v1;
 
+            // 1. Stok dari Barang Wajib SN
             $sn = $serialStatsByGudang->get($g->id);
             $snTotal = (int) ($sn->total_sn ?? 0);
             $snBaru  = (int) ($sn->sn_baru ?? 0);
             $snBekas = (int) ($sn->sn_bekas ?? 0);
             $snRusak = (int) ($sn->sn_rusak ?? 0);
 
-            $masuk = $masukStatsByGudang->get($g->id);
-            $masukBaru  = (int) ($masuk->baru ?? 0);
-            $masukBekas = (int) ($masuk->bekas ?? 0);
-            $masukRusak = (int) ($masuk->rusak ?? 0);
+            // 2. Stok dari Barang Non-SN
+            $nonSn = $masukNonSnByGudang->get($g->id);
+            $nonSnMasukTotal = (int) ($nonSn->total_masuk ?? 0);
+            $nonSnKeluar     = (int) ($keluarNonSnByGudang[$g->id] ?? 0);
+            $nonSnSisa       = max(0, $nonSnMasukTotal - $nonSnKeluar);
 
-            $keluarQty = (int) ($keluarStatsByGudang[$g->id] ?? 0);
+            $nonSnBaru  = max(0, ((int) ($nonSn->baru ?? 0)) - $nonSnKeluar);
+            $nonSnBekas = (int) ($nonSn->bekas ?? 0);
+            $nonSnRusak = (int) ($nonSn->rusak ?? 0);
 
-            if ($snTotal > 0) {
-                $qtyBaru   = $snBaru;
-                $qtyBekas  = $snBekas;
-                $qtyRusak  = $snRusak;
-                $qtyAktual = $qtyBaru + $qtyBekas + $qtyRusak;
-            } else {
-                $qtyBaru   = $masukBaru;
-                $qtyBekas  = $masukBekas;
-                $qtyRusak  = $masukRusak;
-                $qtyAktual = max(0, ($qtyBaru + $qtyBekas + $qtyRusak) - $keluarQty);
-            }
+            // GABUNGKAN STOK SN + NON-SN SECARA BERSAMAAN
+            $qtyAktual = $snTotal + $nonSnSisa;
+            $qtyBaru   = $snBaru + $nonSnBaru;
+            $qtyBekas  = $snBekas + $nonSnBekas;
+            $qtyRusak  = $snRusak + $nonSnRusak;
 
             return [
                 'id'          => $g->id,
@@ -202,7 +212,7 @@ class DashboardController extends Controller
             ];
         })->filter()->values();
 
-        // 3. GRAFIK BULANAN LOGISTIK & KONDISI (1 Tarikan Query Gabungan)
+        // 3. GRAFIK BULANAN LOGISTIK & KONDISI
         $monthlyCombined = (clone $baseDetailQuery)
             ->selectRaw("
                 {$monthField} as bulan,
@@ -225,9 +235,9 @@ class DashboardController extends Controller
 
         $chartData = [];
         $kondisiChartData = [];
+
         for ($m = 1; $m <= 12; $m++) {
             $row = $monthlyCombined->get($m);
-
             $masuk    = (int) ($row->masuk ?? 0);
             $keluar   = (int) ($row->keluar ?? 0);
             $transfer = (int) ($row->transfer ?? 0);
@@ -259,7 +269,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // 4. RIWAYAT TRANSAKSI TERAKHIR (Dibatasi 6 baris)
+        // 4. RIWAYAT TRANSAKSI TERAKHIR
         $recentTransactions = Transaksi::with(['gudangAsal', 'gudangTujuan', 'supplier', 'picUser', 'details.barang'])
             ->latest('tanggal')
             ->latest('id')
@@ -322,6 +332,7 @@ class DashboardController extends Controller
     public function updateGudang(Request $request, int $id)
     {
         $gudang = Gudang::findOrFail($id);
+
         $validated = $request->validate([
             'kode_gudang' => 'required|string|max:50|unique:gudangs,kode_gudang,' . $gudang->id,
             'nama_gudang' => 'required|string|max:255',
@@ -344,6 +355,7 @@ class DashboardController extends Controller
     {
         $gudang = Gudang::findOrFail($id);
         $gudang->delete();
+
         return redirect()->back()->with('success', 'Lokasi gudang berhasil dihapus.');
     }
 }

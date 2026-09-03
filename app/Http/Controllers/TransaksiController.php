@@ -72,9 +72,87 @@ class TransaksiController extends Controller
             });
         }
 
+        // 1. Agregasi stok fisik SN aktif per gudang berdasarkan kondisi
+        $snStats = BarangSerial::where('status', 'IN_WAREHOUSE')
+            ->selectRaw("
+                gudang_id,
+                SUM(CASE WHEN UPPER(COALESCE(kondisi, 'BARU')) IN ('BARU', 'BAIK') THEN 1 ELSE 0 END) as sn_baru,
+                SUM(CASE WHEN UPPER(COALESCE(kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(kondisi, 'BARU')) LIKE '%SECOND%' THEN 1 ELSE 0 END) as sn_bekas,
+                SUM(CASE WHEN UPPER(COALESCE(kondisi, 'BARU')) LIKE '%RUSAK%' THEN 1 ELSE 0 END) as sn_rusak
+            ")
+            ->groupBy('gudang_id')
+            ->get()
+            ->keyBy('gudang_id');
+
+        // 2. Agregasi mutasi masuk Non-SN per gudang tujuan
+        $nonSnMasuk = DB::table('transaksi_details')
+            ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
+            ->join('barangs', 'transaksi_details.barang_id', '=', 'barangs.id')
+            ->where(function ($q) {
+                $q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
+                  ->orWhereNull('transaksis.status');
+            })
+            ->where(function ($q) {
+                $q->where('barangs.is_wajib_sn', false)
+                  ->orWhere('barangs.is_wajib_sn', 0);
+            })
+            ->whereNotNull('transaksis.gudang_tujuan_id')
+            ->selectRaw("
+                transaksis.gudang_tujuan_id,
+                SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BARU' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) = 'BAIK') THEN transaksi_details.qty ELSE 0 END) as baru,
+                SUM(CASE WHEN (UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%SECOND%') THEN transaksi_details.qty ELSE 0 END) as bekas,
+                SUM(CASE WHEN UPPER(COALESCE(transaksis.kondisi, 'BARU')) LIKE '%RUSAK%' THEN transaksi_details.qty ELSE 0 END) as rusak
+            ")
+            ->groupBy('transaksis.gudang_tujuan_id')
+            ->get()
+            ->keyBy('gudang_tujuan_id');
+
+        // 3. Agregasi mutasi keluar Non-SN per gudang asal
+        $nonSnKeluar = DB::table('transaksi_details')
+            ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
+            ->join('barangs', 'transaksi_details.barang_id', '=', 'barangs.id')
+            ->where(function ($q) {
+                $q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
+                  ->orWhereNull('transaksis.status');
+            })
+            ->where(function ($q) {
+                $q->where('barangs.is_wajib_sn', false)
+                  ->orWhere('barangs.is_wajib_sn', 0);
+            })
+            ->whereNotNull('transaksis.gudang_asal_id')
+            ->selectRaw("
+                transaksis.gudang_asal_id,
+                SUM(transaksi_details.qty) as total_keluar
+            ")
+            ->groupBy('transaksis.gudang_asal_id')
+            ->pluck('total_keluar', 'transaksis.gudang_asal_id');
+
+        // 4. Penggabungan data gudang dengan informasi rincian stok
+        $gudangList = Gudang::where('is_active', true)
+            ->get(['id', 'nama_gudang', 'kode_gudang'])
+            ->map(function ($g) use ($snStats, $nonSnMasuk, $nonSnKeluar) {
+                $sn = $snStats->get($g->id);
+                $snBaru  = (int) ($sn?->sn_baru ?? 0);
+                $snBekas = (int) ($sn?->sn_bekas ?? 0);
+                $snRusak = (int) ($sn?->sn_rusak ?? 0);
+
+                $ns = $nonSnMasuk->get($g->id);
+                $nsKeluar = (int) ($nonSnKeluar[$g->id] ?? 0);
+                $nsBaru   = max(0, ((int) ($ns?->baru ?? 0)) - $nsKeluar);
+                $nsBekas  = (int) ($ns?->bekas ?? 0);
+                $nsRusak  = (int) ($ns?->rusak ?? 0);
+
+                $g->stok_baru  = $snBaru + $nsBaru;
+                $g->stok_bekas = $snBekas + $nsBekas;
+                $g->stok_rusak = $snRusak + $nsRusak;
+                $g->total_stok = $g->stok_baru + $g->stok_bekas + $g->stok_rusak;
+
+                return $g;
+            });
+
         return Inertia::render('Transaksi/Index', [
             'transaksis' => $query->paginate($perPage)->withQueryString(),
-            'gudangs'    => Gudang::where('is_active', true)->get(['id', 'nama_gudang', 'kode_gudang']),
+            'gudangs'    => $gudangList,
             'suppliers'  => Supplier::all(['id', 'nama_supplier']),
             'barangs'    => Barang::with([
                 'stoks',
@@ -226,7 +304,6 @@ class TransaksiController extends Controller
         return redirect()->back()->with('error', 'Format data tidak valid.');
     }
 
-    // Endpoint khusus mencatat Transfer Antar-Gudang
     public function storeTransfer(Request $request)
     {
         $validated = $request->validate([

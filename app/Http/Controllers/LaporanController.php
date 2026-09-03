@@ -79,7 +79,6 @@ class LaporanController extends Controller
             ->keyBy('barang_id');
 
         // 3. QUERY AGREGASI MUTASI BULAN BERJALAN (between startDate & endDate)
-        // Kolom MASUK (+) hanya menghitung barang Baru / Baik
         $mutasiBulan = TransaksiDetail::select(
                 'td.barang_id',
                 DB::raw("SUM(CASE 
@@ -116,7 +115,7 @@ class LaporanController extends Controller
             ->get()
             ->keyBy('barang_id');
 
-        // 4. QUERY KHUSUS: AGREGASI KONDISI DARI TRANSAKSI (UNTUK BARANG NON-SN)
+        // 4. QUERY AGREGASI KONDISI DARI TRANSAKSI (UNTUK BARANG NON-SN)
         $kondisiNonSn = DB::table('transaksi_details as td')
             ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
             ->where(function ($q) {
@@ -174,21 +173,18 @@ class LaporanController extends Controller
             $transferNet = ($gudangId !== 'ALL') ? ($trfIn - $trfOut) : 0;
             $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
 
-            // HITUNG RINCIAN KONDISI FISIK UNIT
+            // Rincian kondisi fisik unit
             if ($b->is_wajib_sn) {
-                // Barang Wajib SN: Ambil langsung dari serial number fisik di gudang
                 $serials = $b->serials;
                 $kBaru   = $serials->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK']))->count();
                 $kBekas  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
                 $kRusak  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
             } else {
-                // Barang Non-SN: Ambil dari agregasi transaksi riil per kondisi
                 $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? $stokAkhir));
                 $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
                 $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
             }
 
-            // Penyesuaian jika filter kondisi aktif
             if ($kondisi && $kondisi !== 'ALL') {
                 $kondisiUpper = strtoupper($kondisi);
                 if ($kondisiUpper === 'BARU') {
@@ -203,6 +199,8 @@ class LaporanController extends Controller
                 }
             }
 
+            // Hitung Grand Total Akumulasi Seluruh Kondisi Fisik
+            $grandTotalFisik = $kBaru + $kBekas + $kRusak;
             $namaLengkap = trim("{$b->brand} {$b->tipe} {$b->kategori}") ?: $b->nama_barang;
 
             return [
@@ -222,10 +220,10 @@ class LaporanController extends Controller
                 'kondisi_baru'  => $kBaru,
                 'kondisi_bekas' => $kBekas,
                 'kondisi_rusak' => $kRusak,
+                'grand_total'   => $grandTotalFisik,
             ];
         });
 
-        // Filter baris rekonsiliasi jika filter kondisi aktif (agar hanya menampilkan barang yang relevan)
         if ($kondisi && $kondisi !== 'ALL') {
             $kUpper = strtoupper($kondisi);
             $laporanStok = $laporanStok->filter(function ($item) use ($kUpper) {
@@ -480,7 +478,8 @@ class LaporanController extends Controller
                 'Total Keluar (-)',
                 'Transfer Net',
                 'Stok Akhir',
-                'Kondisi Fisik (Baru / Bekas / Rusak)'
+                'Kondisi Fisik (Baru / Bekas / Rusak)',
+                'Grand Total Fisik'
             ], ';');
 
             $no = 1;
@@ -526,6 +525,7 @@ class LaporanController extends Controller
                     }
                 }
 
+                $grandTotalFisik = $kBaru + $kBekas + $kRusak;
                 $kondisiRincian = "{$kBaru} Baru • {$kBekas} Bekas • {$kRusak} Rusak";
                 $namaLengkap = trim("{$b->brand} {$b->tipe} {$b->kategori}") ?: $b->nama_barang;
 
@@ -540,7 +540,8 @@ class LaporanController extends Controller
                     $keluarBulan,
                     $transferNet >= 0 ? "+{$transferNet}" : "{$transferNet}",
                     $stokAkhir,
-                    $kondisiRincian
+                    $kondisiRincian,
+                    $grandTotalFisik
                 ], ';');
             }
 

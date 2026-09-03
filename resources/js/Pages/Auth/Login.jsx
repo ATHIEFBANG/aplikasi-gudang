@@ -28,7 +28,7 @@ export default function Login({ status, canResetPassword }) {
     const [currentDate, setCurrentDate] = useState('');
     const [bgIndex, setBgIndex] = useState(0);
 
-    // Jam & tanggal real-time untuk taskbar desktop
+    // Jam & tanggal real-time
     useEffect(() => {
         const updateClock = () => {
             const now = new Date();
@@ -65,8 +65,13 @@ export default function Login({ status, canResetPassword }) {
         <div className="dark min-h-screen w-full bg-slate-950 flex flex-col justify-between items-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
             <Head title="Login - System Gudang" />
 
-            {/* ANIMASI CSS GRAFIK GUDANG */}
+            {/* CSS CUSTOM: ANIMASI & PENGHILANG MATA BAWAAN BROWSER */}
             <style>{`
+                /* Hilangkan ikon mata bawaan browser Edge/Chrome */
+                input::-ms-reveal,
+                input::-ms-clear {
+                    display: none !important;
+                }
                 @keyframes conveyorTrack {
                     0% { stroke-dashoffset: 24; }
                     100% { stroke-dashoffset: 0; }
@@ -96,7 +101,7 @@ export default function Login({ status, canResetPassword }) {
             <div className="absolute top-1/4 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 blur-[140px] rounded-full pointer-events-none animate-pulse duration-[5000ms]" />
             <div className="absolute bottom-1/4 right-1/3 translate-x-1/2 translate-y-1/2 w-[450px] h-[450px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none" />
 
-            {/* 1. TOP HEADER (LOGO APLIKASI) */}
+            {/* 1. TOP HEADER */}
             <header className="w-full max-w-4xl mx-auto flex items-center justify-start z-30 mb-2 sm:mb-4">
                 <Link 
                     href="/" 
@@ -307,7 +312,7 @@ export default function Login({ status, canResetPassword }) {
                                             Email
                                         </Label>
                                         <div className="relative">
-                                            <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                                            <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10 pointer-events-none" />
                                             <Input
                                                 id="email"
                                                 type="email"
@@ -328,7 +333,7 @@ export default function Login({ status, canResetPassword }) {
                                             Password
                                         </Label>
                                         <div className="relative">
-                                            <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                                            <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10 pointer-events-none" />
                                             <Input
                                                 id="password"
                                                 type={showPassword ? "text" : "password"}
@@ -339,10 +344,11 @@ export default function Login({ status, canResetPassword }) {
                                                 onChange={(e) => setData('password', e.target.value)}
                                                 className="pl-10 pr-10 h-10 text-xs rounded-xl bg-slate-900/90 border-slate-700/80 text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm"
                                             />
+                                            {/* Satu-satunya tombol reveal password */}
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors z-10 cursor-pointer"
+                                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors z-10 cursor-pointer p-0.5"
                                             >
                                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                             </button>
@@ -356,9 +362,9 @@ export default function Login({ status, canResetPassword }) {
                                                 id="remember"
                                                 checked={data.remember}
                                                 onCheckedChange={(checked) => setData('remember', !!checked)}
-                                                className="border-slate-600 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                                className="border-slate-600 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 cursor-pointer"
                                             />
-                                            <Label htmlFor="remember" className="text-xs text-slate-300 cursor-pointer font-normal">
+                                            <Label htmlFor="remember" className="text-xs text-slate-300 cursor-pointer font-normal select-none">
                                                 Ingat saya
                                             </Label>
                                         </div>
@@ -428,10 +434,10 @@ export default function Login({ status, canResetPassword }) {
                     </div>
                 </div>
 
-                {/* C. LAPTOP HINGE (PERSIS MITRATEL) */}
+                {/* C. LAPTOP HINGE */}
                 <div className="w-[96%] mx-auto h-2 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-x border-slate-700/60 relative z-20" />
 
-                {/* D. LAPTOP BASE DECK (PERSIS MITRATEL DENGAN CUTOUT NOTCH & PERSPECTIVE REFLECTION) */}
+                {/* D. LAPTOP BASE DECK */}
                 <div className="relative z-10 -mt-0.5">
                     <div className="w-[108%] -ml-[4%] h-3.5 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 rounded-b-md border-t border-slate-500/60 shadow-md relative z-20 flex items-start justify-center">
                         <div className="w-24 h-1.5 bg-slate-950 rounded-b-md border-x border-b border-slate-700/70" />

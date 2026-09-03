@@ -13,6 +13,7 @@ const REKONSILIASI_COLUMNS = [
     { key: 'transfer_net', label: 'TRANSFER NET' },
     { key: 'stok_akhir', label: 'STOK AKHIR' },
     { key: 'kondisi_rincian', label: 'RINCIAN KONDISI FISIK UNIT' },
+    { key: 'grand_total', label: 'GRAND TOTAL' },
 ];
 
 export default function TabelRekonsiliasi({
@@ -99,6 +100,16 @@ export default function TabelRekonsiliasi({
                                 </span>
                             </div>
                         );
+                    case 'grand_total': {
+                        const grandTotal = item.grand_total !== undefined 
+                            ? item.grand_total 
+                            : ((item.kondisi_baru || 0) + (item.kondisi_bekas || 0) + (item.kondisi_rusak || 0));
+                        return (
+                            <Badge variant="outline" className="font-mono font-black text-xs bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-2.5 py-0.5">
+                                {grandTotal.toLocaleString('id-ID')}
+                            </Badge>
+                        );
+                    }
                     default:
                         return '-';
                 }
