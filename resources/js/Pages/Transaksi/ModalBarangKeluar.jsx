@@ -29,6 +29,8 @@ export default function ModalBarangKeluar({
         handleRowFieldChange,
         handleBarangChange,
         handleQtyChange,
+        handleNonSnBatchQtyChange,
+        handleAutoSelectNonSnBatches,
         handleToggleTransferSn,
         handleAutoSelectTransferSns,
         handleClearTransferSns,
@@ -105,6 +107,8 @@ export default function ModalBarangKeluar({
                             onFieldChange={handleRowFieldChange}
                             onBarangChange={handleBarangChange}
                             onQtyChange={handleQtyChange}
+                            onNonSnBatchQtyChange={handleNonSnBatchQtyChange}
+                            onAutoSelectNonSnBatches={handleAutoSelectNonSnBatches}
                             onSnSearchChange={handleSnSearchChange}
                             onToggleTransferSn={handleToggleTransferSn}
                             onAutoSelectTransferSns={handleAutoSelectTransferSns}

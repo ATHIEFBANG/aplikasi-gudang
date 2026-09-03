@@ -171,21 +171,18 @@ export function useModalBarangMasukControl({
     const handleQtyChange = (rowIdx, val) => {
         let count = parseInt(val, 10);
         if (isNaN(count) || count < 1) count = 1;
-        if (count > 50) count = 50;
-
+        if (count > 10) count = 10;
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
             const targetBarang = barangs.find(b => String(b.id) === String(currentRow.barang_id));
             const isSn = Boolean(targetBarang?.is_wajib_sn);
-
             let newSerials = currentRow.serials || [];
             if (isSn) {
                 newSerials = [...newSerials];
                 while (newSerials.length < count) newSerials.push('');
                 newSerials = newSerials.slice(0, count);
             }
-
             updated[rowIdx] = {
                 ...currentRow,
                 qty: count,
@@ -194,7 +191,7 @@ export function useModalBarangMasukControl({
             return updated;
         });
     };
-
+    
     const handleManualSerialChange = (rowIdx, snIdx, val) => {
         setRows(prev => {
             const updated = [...prev];

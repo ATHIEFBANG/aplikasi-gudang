@@ -230,26 +230,30 @@ export default function CrudTable({
                     }
                     case 'serials': {
                         const listSn = detail.serials || item.serials || [];
+                        const rawKondisi = String(detail.kondisi || item.kondisi || 'Baru').trim();
+                        const brandNama = barang.brand || barang.nama_barang || item.nama_barang || '-';
+                        const imcText = item.nomor_imc || detail.nomor_imc || '-';
+
                         return (
                             <div className="flex flex-wrap gap-1 max-w-[280px] max-h-24 overflow-y-auto py-1">
                                 {listSn.length > 0 ? (
                                     listSn.map((s, idx) => {
                                         const snVal = s.serial_number || s;
-                                        const rawKondisi = String(s.kondisi || '').toUpperCase().trim();
+                                        const k = String(s.kondisi || '').toUpperCase().trim();
                                         let kondisiText = '';
                                         let badgeColor = '';
-                                        if (rawKondisi === 'RUSAK') {
+                                        if (k === 'RUSAK') {
                                             kondisiText = 'Rusak';
                                             badgeColor = 'bg-rose-500/20 text-rose-600';
-                                        } else if (rawKondisi.includes('BEKAS') || rawKondisi.includes('SECOND')) {
+                                        } else if (k.includes('BEKAS') || k.includes('SECOND')) {
                                             kondisiText = 'Bekas';
                                             badgeColor = 'bg-amber-500/20 text-amber-600';
-                                        } else if (rawKondisi === 'BARU' || rawKondisi === 'BAIK') {
+                                        } else if (k === 'BARU' || k === 'BAIK') {
                                             kondisiText = 'Baru';
                                             badgeColor = 'bg-emerald-500/20 text-emerald-600';
                                         }
                                         return (
-                                            <Badge 
+                                            <Badge
                                                 key={idx}
                                                 variant="outline"
                                                 className="text-[10px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.5 shrink-0 flex items-center gap-1"
@@ -264,7 +268,37 @@ export default function CrudTable({
                                         );
                                     })
                                 ) : (
-                                    <span className="text-slate-400 text-xs">-</span>
+                                    /* Tampilan Khusus Non-SN: Format Nama Barang / No IMC + Badge Tiap Kondisi */
+                                    <div className="flex flex-wrap items-center gap-1">
+                                        <Badge
+                                            variant="outline"
+                                            className="text-[10px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-2 py-0.5 shrink-0 max-w-[170px] truncate"
+                                            title={`${brandNama} / ${imcText}`}
+                                        >
+                                            {brandNama} / {imcText}
+                                        </Badge>
+
+                                        {rawKondisi.split(',').map((part, idx) => {
+                                            const cleanPart = part.trim();
+                                            const upper = cleanPart.toUpperCase();
+                                            let badgeColor = 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
+                                            if (upper.includes('RUSAK')) {
+                                                badgeColor = 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30';
+                                            } else if (upper.includes('BEKAS') || upper.includes('SECOND')) {
+                                                badgeColor = 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30';
+                                            }
+
+                                            return (
+                                                <Badge
+                                                    key={idx}
+                                                    variant="outline"
+                                                    className={`text-[8.5px] px-1.5 py-0.2 rounded font-sans font-bold uppercase ${badgeColor}`}
+                                                >
+                                                    {cleanPart}
+                                                </Badge>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </div>
                         );

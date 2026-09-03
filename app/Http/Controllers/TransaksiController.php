@@ -40,7 +40,6 @@ class TransaksiController extends Controller
             ->orderBy('tanggal', $order)
             ->orderBy('id', $order);
 
-        // Filter 3 Tab Utama: MASUK, KELUAR, dan TRANSFER
         if ($jenis === 'TRANSFER') {
             $query->where(function ($q) {
                 $q->where('jenis_transaksi', 'TRANSFER')
@@ -50,7 +49,6 @@ class TransaksiController extends Controller
             $query->where('jenis_transaksi', 'KELUAR')
                   ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         } else {
-            // Default: MASUK (Murni Inbound)
             $query->where('jenis_transaksi', 'MASUK')
                   ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         }
@@ -72,7 +70,6 @@ class TransaksiController extends Controller
             });
         }
 
-        // 1. Agregasi stok fisik SN aktif per gudang berdasarkan kondisi
         $snStats = BarangSerial::where('status', 'IN_WAREHOUSE')
             ->selectRaw("
                 gudang_id,
@@ -84,7 +81,6 @@ class TransaksiController extends Controller
             ->get()
             ->keyBy('gudang_id');
 
-        // 2. Agregasi mutasi masuk Non-SN per gudang tujuan
         $nonSnMasuk = DB::table('transaksi_details')
             ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
             ->join('barangs', 'transaksi_details.barang_id', '=', 'barangs.id')
@@ -107,7 +103,6 @@ class TransaksiController extends Controller
             ->get()
             ->keyBy('gudang_tujuan_id');
 
-        // 3. Agregasi mutasi keluar Non-SN per gudang asal
         $nonSnKeluar = DB::table('transaksi_details')
             ->join('transaksis', 'transaksi_details.transaksi_id', '=', 'transaksis.id')
             ->join('barangs', 'transaksi_details.barang_id', '=', 'barangs.id')
@@ -127,7 +122,6 @@ class TransaksiController extends Controller
             ->groupBy('transaksis.gudang_asal_id')
             ->pluck('total_keluar', 'transaksis.gudang_asal_id');
 
-        // 4. Penggabungan data gudang dengan informasi rincian stok
         $gudangList = Gudang::where('is_active', true)
             ->get(['id', 'nama_gudang', 'kode_gudang'])
             ->map(function ($g) use ($snStats, $nonSnMasuk, $nonSnKeluar) {
@@ -158,6 +152,16 @@ class TransaksiController extends Controller
                 'stoks',
                 'serials' => function ($q) {
                     $q->where('status', 'IN_WAREHOUSE');
+                },
+                'transaksiDetails' => function ($q) {
+                    $q->whereHas('transaksi', function ($qt) {
+                        $qt->whereIn('status', ['COMPLETED', 'completed'])
+                           ->where(function ($sub) {
+                               $sub->where('jenis_transaksi', 'MASUK')
+                                   ->orWhere('jenis_transaksi', 'TRANSFER')
+                                   ->orWhere('sub_jenis', 'TRANSFER_GUDANG');
+                           });
+                    })->with(['transaksi:id,no_transaksi,nomor_imc,nomor_omc,kondisi,gudang_tujuan_id,tanggal']);
                 }
             ])->get([
                 'id', 
@@ -193,7 +197,7 @@ class TransaksiController extends Controller
                 'items.*.pihak_asal'        => 'required|string|max:255',
                 'items.*.gudang_tujuan_id'  => 'required|exists:gudangs,id',
                 'items.*.barang_id'         => 'required|exists:barangs,id',
-                'items.*.qty'               => 'required|integer|min:1|max:50',
+                'items.*.qty'               => 'required|integer|min:1|max:10',
                 'items.*.harga'             => 'nullable|numeric|min:0',
                 'items.*.serials'           => 'nullable|array',
                 'items.*.serials.*'         => 'nullable|string|max:100',
@@ -370,7 +374,6 @@ class TransaksiController extends Controller
                     'kondisi'      => '-',
                 ]);
 
-                // 1. Kurangi Gudang Asal
                 $stokAsal->decrement('jumlah', $qty);
                 $stokAsal->refresh();
                 StockLog::create([
@@ -383,7 +386,6 @@ class TransaksiController extends Controller
                     'keterangan'    => "Transfer Keluar ke Gudang #{$gudangTujuanId}",
                 ]);
 
-                // 2. Tambah Gudang Tujuan
                 $stokTujuan = Stok::firstOrCreate(
                     ['barang_id' => $barangId, 'gudang_id' => $gudangTujuanId],
                     ['jumlah' => 0]
@@ -400,7 +402,6 @@ class TransaksiController extends Controller
                     'keterangan'    => "Penerimaan Transfer dari Gudang #{$gudangAsalId}",
                 ]);
 
-                // 3. Pindahkan Gudang ID Serial Number
                 if (!empty($serials)) {
                     foreach ($serials as $sn) {
                         $serialRecord = BarangSerial::where('barang_id', $barangId)

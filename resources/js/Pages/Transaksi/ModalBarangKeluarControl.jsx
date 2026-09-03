@@ -4,13 +4,11 @@ import { Truck, Wrench } from 'lucide-react';
 
 export const MAX_ROWS_LIMIT = 50;
 
-// Kategori Jenis Pengeluaran
 export const CATEGORIES_KELUAR = [
     { id: 'BARANG_KE_SITE', label: 'Proyek', icon: Truck },
     { id: 'PEMAKAIAN_INTERNAL', label: 'Non Proyek', icon: Wrench },
 ];
 
-// Daftar Keperluan Departemen Paten
 export const LIST_KEPERLUAN_PATEN = [
     'General Affair',
     'Operasional',
@@ -32,15 +30,24 @@ export function useModalBarangKeluarControl({
     const [isProcessing, setIsProcessing] = useState(false);
     const [snSearches, setSnSearches] = useState({});
 
+    // Kalkulasi Stok Fisik: Menghitung total transaksi masuk riil di gudang jika data stoks belum sinkron
     const getBarangStockInWarehouse = useCallback((barang, gudangId) => {
         if (!barang || !gudangId) return 0;
+        if (barang.is_wajib_sn) {
+            return (barang.serials || []).filter(
+                s => String(s.gudang_id) === String(gudangId) && s.status === 'IN_WAREHOUSE'
+            ).length;
+        }
+
         const stokRec = barang.stoks?.find(st => String(st.gudang_id) === String(gudangId));
         const stokQty = stokRec ? parseInt(stokRec.jumlah, 10) : 0;
-        const snCount = (barang.serials || []).filter(
-            s => String(s.gudang_id) === String(gudangId) && s.status === 'IN_WAREHOUSE'
-        ).length;
-        
-        return barang.is_wajib_sn ? snCount : Math.max(stokQty, snCount);
+
+        const details = barang.transaksi_details || barang.transaksiDetails || [];
+        const matchingMasuk = details
+            .filter(td => td.transaksi && String(td.transaksi.gudang_tujuan_id) === String(gudangId))
+            .reduce((sum, td) => sum + (parseInt(td.qty, 10) || 0), 0);
+
+        return Math.max(stokQty, matchingMasuk);
     }, []);
 
     const createEmptyRow = useCallback(() => {
@@ -48,26 +55,26 @@ export function useModalBarangKeluarControl({
             sub_jenis: 'BARANG_KE_SITE',
             tanggal: new Date().toISOString().slice(0, 10),
             nomor_omc: '',
-            pihak_asal: '', // Site Tujuan jika Proyek, atau Departemen jika Non Proyek
+            nomor_imc: '',
+            pihak_asal: '',
             gudang_asal_id: gudangs[0]?.id ? String(gudangs[0].id) : '',
             barang_id: '',
             qty: 1,
             harga: '',
-            kondisi: '-',
-            serials: []
+            kondisi: 'Baru',
+            serials: [],
+            non_sn_selections: {}
         };
     }, [gudangs]);
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
-    // Opsi Gudang Asal dengan Sub-Label Kondisi Fisik Unit
     const gudangOptions = useMemo(() => {
         return gudangs.map(g => {
             let baru  = g.stok_baru;
             let bekas = g.stok_bekas;
             let rusak = g.stok_rusak;
 
-            // Fallback kalkulasi otomatis dari data barang jika belum disediakan controller
             if (baru === undefined || bekas === undefined || rusak === undefined) {
                 let countBaru = 0;
                 let countBekas = 0;
@@ -101,7 +108,7 @@ export function useModalBarangKeluarControl({
                 label: g.nama_gudang,
                 id: g.id,
                 subLabel: (
-                    <div className="flex items-center gap-1.5 text-[7px] leading-none mt-0.5 font-sans">
+                    <div className="flex items-center gap-1.5 text-[8.5px] leading-none mt-0.5 font-sans">
                         <span className="font-bold text-emerald-600 dark:text-emerald-400">
                             {baru} Baru
                         </span>
@@ -119,7 +126,6 @@ export function useModalBarangKeluarControl({
         });
     }, [gudangs, barangs]);
 
-    // Opsi Kode PPL: Sub-label khusus status Wajib SN / PN saja
     const getBarangPplOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
         return barangs
@@ -160,7 +166,6 @@ export function useModalBarangKeluarControl({
             });
     }, [barangs, getBarangStockInWarehouse]);
 
-    // Opsi Nama Barang: Sub-label stok yang tersedia di gudang asal
     const getBarangNamaOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
         return barangs
@@ -198,12 +203,14 @@ export function useModalBarangKeluarControl({
                     sub_jenis: selectedItem.sub_jenis || 'BARANG_KE_SITE',
                     tanggal: selectedItem.tanggal ? String(selectedItem.tanggal).split('T')[0] : new Date().toISOString().slice(0, 10),
                     nomor_omc: selectedItem.nomor_omc || '',
+                    nomor_imc: selectedItem.nomor_imc || '',
                     pihak_asal: selectedItem.pihak_asal || '',
                     gudang_asal_id: selectedItem.gudang_asal_id ? String(selectedItem.gudang_asal_id) : '',
                     barang_id: detail.barang_id ? String(detail.barang_id) : '',
                     qty: detail.qty || 1,
-                    kondisi: '-',
-                    serials: isSn ? existingSns : []
+                    kondisi: selectedItem.kondisi && selectedItem.kondisi !== '-' ? selectedItem.kondisi : 'Baru',
+                    serials: isSn ? existingSns : [],
+                    non_sn_selections: {}
                 }]);
             } else {
                 setRows([createEmptyRow()]);
@@ -237,18 +244,15 @@ export function useModalBarangKeluarControl({
             let newSerials = currentRow.serials;
             let newQty = currentRow.qty;
             let newPihakAsal = currentRow.pihak_asal;
+            let newNomorImc = currentRow.nomor_imc;
+            let newSelections = currentRow.non_sn_selections || {};
 
             if (field === 'gudang_asal_id') {
-                const targetBarang = barangs.find(b => String(b.id) === String(newBarangId));
-                const stockInNewWh = getBarangStockInWarehouse(targetBarang, value);
-                if (stockInNewWh <= 0) {
-                    newBarangId = '';
-                    newSerials = [];
-                    newQty = 1;
-                } else {
-                    newSerials = [];
-                    newQty = 1;
-                }
+                newBarangId = '';
+                newSerials = [];
+                newQty = 1;
+                newNomorImc = '';
+                newSelections = {};
             }
 
             if (field === 'sub_jenis') {
@@ -272,7 +276,8 @@ export function useModalBarangKeluarControl({
                 serials: newSerials,
                 qty: newQty,
                 pihak_asal: newPihakAsal,
-                kondisi: '-'
+                nomor_imc: newNomorImc,
+                non_sn_selections: newSelections
             };
             return updated;
         });
@@ -284,14 +289,18 @@ export function useModalBarangKeluarControl({
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
-            let currentQty = currentRow.qty || 1;
+            let currentQty = 1;
             const maxStok = getBarangStockInWarehouse(targetBarang, currentRow.gudang_asal_id);
             if (currentQty > maxStok && maxStok > 0) currentQty = maxStok;
+
             updated[rowIdx] = {
                 ...currentRow,
                 barang_id: String(newBarangId),
                 qty: currentQty,
-                serials: []
+                serials: [],
+                nomor_imc: '',
+                kondisi: 'Baru',
+                non_sn_selections: {}
             };
             return updated;
         });
@@ -323,6 +332,98 @@ export function useModalBarangKeluarControl({
         });
     };
 
+    // Handler Penambahan / Pengurangan Stepper Pada Kartu Non-SN
+    const handleNonSnBatchQtyChange = (rowIdx, batchKey, batchData, nextQty, maxBatchStock) => {
+        setRows(prev => {
+            const updated = [...prev];
+            const currentRow = updated[rowIdx];
+            const selections = { ...(currentRow.non_sn_selections || {}) };
+
+            const targetBarang = barangs.find(b => String(b.id) === String(currentRow.barang_id));
+            const maxTotalStock = getBarangStockInWarehouse(targetBarang, currentRow.gudang_asal_id);
+
+            let safeQty = parseInt(nextQty, 10);
+            if (isNaN(safeQty) || safeQty <= 0) {
+                delete selections[batchKey];
+            } else {
+                if (safeQty > maxBatchStock) safeQty = maxBatchStock;
+                selections[batchKey] = {
+                    nomor_imc: batchData.nomor_imc,
+                    kondisi: batchData.kondisi,
+                    qty: safeQty
+                };
+            }
+
+            // Total Qty otomatis mengikuti jumlah seluruh kartu terpilih
+            let totalUnit = Object.values(selections).reduce((acc, curr) => acc + (curr.qty || 0), 0);
+            if (maxTotalStock > 0 && totalUnit > maxTotalStock) {
+                totalUnit = maxTotalStock;
+            }
+
+            const kondisiParts = [];
+            const imcParts = [];
+            Object.values(selections).forEach(s => {
+                kondisiParts.push(`${s.qty} ${s.kondisi}`);
+                if (s.nomor_imc && !imcParts.includes(s.nomor_imc)) {
+                    imcParts.push(s.nomor_imc);
+                }
+            });
+
+            updated[rowIdx] = {
+                ...currentRow,
+                non_sn_selections: selections,
+                qty: totalUnit > 0 ? totalUnit : 1,
+                kondisi: kondisiParts.length > 0 ? kondisiParts.join(', ') : 'Baru',
+                nomor_imc: imcParts.join(', ')
+            };
+
+            return updated;
+        });
+    };
+
+    // Handler Pilih Otomatis Batch Non-SN
+    const handleAutoSelectNonSnBatches = (rowIdx, batches, targetQty) => {
+        setRows(prev => {
+            const updated = [...prev];
+            const currentRow = updated[rowIdx];
+            const selections = {};
+            let remaining = targetQty || 1;
+
+            for (const b of batches) {
+                if (remaining <= 0) break;
+                const allocate = Math.min(remaining, b.max_stock);
+                if (allocate > 0) {
+                    selections[b.key] = {
+                        nomor_imc: b.nomor_imc,
+                        kondisi: b.kondisi,
+                        qty: allocate
+                    };
+                    remaining -= allocate;
+                }
+            }
+
+            const totalUnit = Object.values(selections).reduce((acc, curr) => acc + (curr.qty || 0), 0);
+            const kondisiParts = [];
+            const imcParts = [];
+            Object.values(selections).forEach(s => {
+                kondisiParts.push(`${s.qty} ${s.kondisi}`);
+                if (s.nomor_imc && !imcParts.includes(s.nomor_imc)) {
+                    imcParts.push(s.nomor_imc);
+                }
+            });
+
+            updated[rowIdx] = {
+                ...currentRow,
+                non_sn_selections: selections,
+                qty: totalUnit > 0 ? totalUnit : 1,
+                kondisi: kondisiParts.length > 0 ? kondisiParts.join(', ') : 'Baru',
+                nomor_imc: imcParts.join(', ')
+            };
+
+            return updated;
+        });
+    };
+
     const handleToggleTransferSn = (rowIdx, snValue) => {
         setRows(prev => {
             const updated = [...prev];
@@ -335,7 +436,6 @@ export function useModalBarangKeluarControl({
             updated[rowIdx] = {
                 ...currentRow,
                 qty: newQty,
-                kondisi: '-',
                 serials: newSerials
             };
             return updated;
@@ -351,7 +451,6 @@ export function useModalBarangKeluarControl({
             updated[rowIdx] = {
                 ...currentRow,
                 qty: autoSelected.length > 0 ? autoSelected.length : targetQty,
-                kondisi: '-',
                 serials: autoSelected
             };
             return updated;
@@ -426,16 +525,18 @@ export function useModalBarangKeluarControl({
         const payload = isEditMode
             ? {
                 tanggal: rows[0].tanggal,
-                kondisi: '-',
+                kondisi: rows[0].kondisi || 'Baru',
                 nomor_omc: rows[0].nomor_omc.trim(),
+                nomor_imc: rows[0].nomor_imc ? rows[0].nomor_imc.trim() : null,
                 pihak_asal: rows[0].pihak_asal.trim(),
             }
             : {
                 items: rows.map(r => ({
                     sub_jenis: r.sub_jenis,
                     tanggal: r.tanggal,
-                    kondisi: '-',
+                    kondisi: r.kondisi || 'Baru',
                     nomor_omc: r.nomor_omc.trim(),
+                    nomor_imc: r.nomor_imc ? r.nomor_imc.trim() : null,
                     pihak_asal: r.pihak_asal.trim(),
                     gudang_asal_id: parseInt(r.gudang_asal_id, 10),
                     barang_id: parseInt(r.barang_id, 10),
@@ -471,6 +572,8 @@ export function useModalBarangKeluarControl({
         handleRowFieldChange,
         handleBarangChange,
         handleQtyChange,
+        handleNonSnBatchQtyChange,
+        handleAutoSelectNonSnBatches,
         handleToggleTransferSn,
         handleAutoSelectTransferSns,
         handleClearTransferSns,

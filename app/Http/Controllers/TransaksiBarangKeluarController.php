@@ -24,7 +24,8 @@ class TransaksiBarangKeluarController extends Controller
                 'items.*.tanggal'           => 'required|date',
                 'items.*.kondisi'           => 'nullable|string|max:50',
                 'items.*.nomor_omc'         => 'required|string|max:100',
-                'items.*.pihak_asal'        => 'required|string|max:255', // Site Tujuan / PIC Pemakai
+                'items.*.nomor_imc'         => 'nullable|string|max:100',
+                'items.*.pihak_asal'        => 'required|string|max:255',
                 'items.*.gudang_asal_id'    => 'required|exists:gudangs,id',
                 'items.*.barang_id'         => 'required|exists:barangs,id',
                 'items.*.qty'               => 'required|integer|min:1|max:50',
@@ -49,7 +50,19 @@ class TransaksiBarangKeluarController extends Controller
                     $barang       = Barang::findOrFail($barangId);
                     $serials      = array_filter($item['serials'] ?? []);
 
-                    // 1. Cek Saldo Stok di Gudang Asal
+                    $kondisiFix = !empty($item['kondisi']) && $item['kondisi'] !== '-' 
+                        ? ucfirst(strtolower($item['kondisi'])) 
+                        : 'Baru';
+
+                    if ($barang->is_wajib_sn && !empty($serials)) {
+                        $firstSn = BarangSerial::where('barang_id', $barangId)
+                            ->where('serial_number', trim($serials[0]))
+                            ->first();
+                        if ($firstSn && !empty($firstSn->kondisi)) {
+                            $kondisiFix = ucfirst(strtolower($firstSn->kondisi));
+                        }
+                    }
+
                     $stokAsal = Stok::where('barang_id', $barangId)
                         ->where('gudang_id', $gudangAsalId)
                         ->lockForUpdate()
@@ -64,15 +77,15 @@ class TransaksiBarangKeluarController extends Controller
                         throw new \Exception("Jumlah Serial Number untuk barang '{$barang->nama_barang}' harus tepat {$qty} unit.");
                     }
 
-                    // 2. Simpan Header Transaksi Keluar
+                    // 2. Simpan Header Transaksi Keluar (nomor_imc dari batch barang masuk tersimpan)
                     $transaksi = Transaksi::create([
                         'no_transaksi'     => $noTransaksi,
                         'jenis_transaksi'  => 'KELUAR',
                         'sub_jenis'        => $subJenis,
                         'tanggal'          => $item['tanggal'],
-                        'kondisi'          => '-',
+                        'kondisi'          => $kondisiFix,
                         'nomor_omc'        => $item['nomor_omc'],
-                        'nomor_imc'        => null,
+                        'nomor_imc'        => !empty($item['nomor_imc']) ? trim($item['nomor_imc']) : null,
                         'pihak_asal'       => $item['pihak_asal'],
                         'gudang_asal_id'   => $gudangAsalId,
                         'gudang_tujuan_id' => null,
@@ -86,7 +99,7 @@ class TransaksiBarangKeluarController extends Controller
                         'barang_id'    => $barangId,
                         'qty'          => $qty,
                         'harga'        => 0,
-                        'kondisi'      => '-',
+                        'kondisi'      => $kondisiFix,
                     ]);
 
                     // 4. Potong Stok Fisik Gudang Asal
@@ -100,10 +113,10 @@ class TransaksiBarangKeluarController extends Controller
                         'user_id'       => $request->user()->id,
                         'qty_perubahan' => -$qty,
                         'qty_akhir'     => $stokAsal->jumlah,
-                        'keterangan'    => "Pengeluaran Stok ({$subJenis}) ke {$transaksi->pihak_asal}",
+                        'keterangan'    => "Pengeluaran Stok ({$subJenis}) ke {$transaksi->pihak_asal} [{$kondisiFix}]",
                     ]);
 
-                    // 5. Update Status Serial Number menjadi IN_USE
+                    // 5. Update Status Serial Number
                     if (!empty($serials)) {
                         foreach ($serials as $sn) {
                             $cleanSn = trim($sn);
@@ -143,19 +156,32 @@ class TransaksiBarangKeluarController extends Controller
 
         $validated = $request->validate([
             'tanggal'    => 'required|date',
+            'kondisi'    => 'nullable|string|max:50',
             'nomor_omc'  => 'required|string|max:100',
+            'nomor_imc'  => 'nullable|string|max:100',
             'pihak_asal' => 'required|string|max:255',
             'keterangan' => 'nullable|string|max:500',
         ]);
 
-        DB::transaction(function () use ($transaksi, $validated) {
+        $kondisiFix = !empty($validated['kondisi']) && $validated['kondisi'] !== '-' 
+            ? ucfirst(strtolower($validated['kondisi'])) 
+            : ($transaksi->kondisi !== '-' ? $transaksi->kondisi : 'Baru');
+
+        DB::transaction(function () use ($transaksi, $validated, $kondisiFix) {
             $transaksi->update([
                 'tanggal'    => $validated['tanggal'],
-                'kondisi'    => '-',
+                'kondisi'    => $kondisiFix,
                 'nomor_omc'  => $validated['nomor_omc'],
+                'nomor_imc'  => $validated['nomor_imc'] ?? $transaksi->nomor_imc,
                 'pihak_asal' => $validated['pihak_asal'],
                 'keterangan' => $validated['keterangan'] ?? $transaksi->keterangan,
             ]);
+
+            foreach ($transaksi->details as $detail) {
+                $detail->update([
+                    'kondisi' => $kondisiFix,
+                ]);
+            }
         });
 
         return redirect()->back()->with('success', 'Data transaksi keluar berhasil diperbarui.');
