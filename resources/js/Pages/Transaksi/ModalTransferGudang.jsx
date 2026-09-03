@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import Modal from '@/components/Modal';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, PlusCircle, Trash2, Minus, Plus } from 'lucide-react';
-import { router } from '@inertiajs/react';
+import { AlertCircle, PlusCircle, Trash2, Minus, Plus, PackageCheck, Search, X, Check } from 'lucide-react';
 import HybridDropdown from '@/components/HybridDropdown';
 import ModalSerialSelector from './ModalSerialSelector';
+import { useModalTransferGudangControl } from './ModalTransferGudangControl';
 
 export default function ModalTransferGudang({
     isOpen,
@@ -16,241 +16,32 @@ export default function ModalTransferGudang({
     gudangs = [],
     barangs = []
 }) {
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [snSearches, setSnSearches] = useState({});
-
-    const getBarangStockInWarehouse = useCallback((barang, gudangId) => {
-        if (!barang || !gudangId) return 0;
-        const stokRec = barang.stoks?.find(st => String(st.gudang_id) === String(gudangId));
-        const stokQty = stokRec ? parseInt(stokRec.jumlah, 10) : 0;
-        const snCount = (barang.serials || []).filter(
-            s => String(s.gudang_id) === String(gudangId) && s.status === 'IN_WAREHOUSE'
-        ).length;
-        return barang.is_wajib_sn ? snCount : Math.max(stokQty, snCount);
-    }, []);
-
-    const createEmptyRow = useCallback(() => ({
-        tanggal: new Date().toISOString().slice(0, 10),
-        nomor_omc: '',
-        nomor_imc: '',
-        gudang_asal_id: gudangs[0]?.id ? String(gudangs[0].id) : '',
-        gudang_tujuan_id: gudangs[1]?.id ? String(gudangs[1].id) : '',
-        barang_id: '',
-        qty: 1,
-        serials: []
-    }), [gudangs]);
-
-    const [rows, setRows] = useState([createEmptyRow()]);
-
-    useEffect(() => {
-        if (isOpen) {
-            setRows([createEmptyRow()]);
-            setSnSearches({});
-        }
-    }, [isOpen, createEmptyRow]);
-
-    const gudangOptions = useMemo(() => {
-        return gudangs.map(g => ({ value: g.nama_gudang, label: g.nama_gudang, id: g.id }));
-    }, [gudangs]);
-
-    // Opsi Kode PPL: SubLabel khusus Wajib SN/PN/Standar ukuran ringkas
-    const getBarangPplOptions = useCallback((row) => {
-        if (!row.gudang_asal_id) return [];
-        return barangs
-            .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
-            .map(b => {
-                const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
-                const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
-                const isPn = Boolean(b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1');
-
-                return {
-                    value: b.kode_barang,
-                    label: b.kode_barang,
-                    id: b.id,
-                    stock: stok,
-                    is_wajib_sn: isSn,
-                    is_wajib_pn: isPn,
-                    subLabel: (
-                        <div className="flex items-center gap-1 text-[8px] leading-none mt-0.5 font-sans">
-                            {isSn && (
-                                <span className="text-amber-500 dark:text-amber-400 font-bold tracking-tight">
-                                    Wajib SN
-                                </span>
-                            )}
-                            {isSn && isPn && <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>}
-                            {isPn && (
-                                <span className="text-cyan-600 dark:text-cyan-400 font-bold tracking-tight">
-                                    Wajib PN
-                                </span>
-                            )}
-                            {!isSn && !isPn && (
-                                <span className="text-slate-400 dark:text-slate-500 font-medium">
-                                    Standar
-                                </span>
-                            )}
-                        </div>
-                    )
-                };
-            });
-    }, [barangs, getBarangStockInWarehouse]);
-
-    // Opsi Nama Barang: SubLabel menampilkan stok fisik yang tersedia di Gudang Asal
-    const getBarangNamaOptions = useCallback((row) => {
-        if (!row.gudang_asal_id) return [];
-        return barangs
-            .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
-            .map(b => {
-                const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
-                const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
-                return {
-                    value: kombinasiNama,
-                    label: kombinasiNama,
-                    id: b.id,
-                    stock: stok,
-                    subLabel: (
-                        <div className="flex items-center gap-1 text-[8.5px] leading-none mt-0.5 font-sans">
-                            <span className="text-slate-400 dark:text-slate-500 font-medium">Tersedia:</span>
-                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                {stok} {b.deskripsi || b.satuan || 'Unit'}
-                            </span>
-                        </div>
-                    )
-                };
-            });
-    }, [barangs, getBarangStockInWarehouse]);
-
-    const handleRowFieldChange = (idx, field, value) => {
-        setRows(prev => {
-            const updated = [...prev];
-            updated[idx] = { ...updated[idx], [field]: value };
-            if (field === 'gudang_asal_id') {
-                updated[idx].barang_id = '';
-                updated[idx].serials = [];
-                updated[idx].qty = 1;
-            }
-            return updated;
-        });
-    };
-
-    const handleBarangChange = (idx, barangId) => {
-        if (!barangId) {
-            setRows(prev => {
-                const updated = [...prev];
-                updated[idx] = {
-                    ...updated[idx],
-                    barang_id: '',
-                    qty: 1,
-                    serials: []
-                };
-                return updated;
-            });
-            return;
-        }
-
-        const target = barangs.find(b => String(b.id) === String(barangId));
-        setRows(prev => {
-            const updated = [...prev];
-            const maxStok = getBarangStockInWarehouse(target, updated[idx].gudang_asal_id);
-            updated[idx] = {
-                ...updated[idx],
-                barang_id: String(barangId),
-                qty: Math.min(updated[idx].qty || 1, maxStok || 1),
-                serials: []
-            };
-            return updated;
-        });
-    };
-
-    const handleQtyChange = (idx, val) => {
-        let count = parseInt(val, 10);
-        if (isNaN(count) || count < 1) count = 1;
-        setRows(prev => {
-            const updated = [...prev];
-            const target = barangs.find(b => String(b.id) === String(updated[idx].barang_id));
-            const maxStok = getBarangStockInWarehouse(target, updated[idx].gudang_asal_id);
-            if (maxStok > 0 && count > maxStok) count = maxStok;
-            updated[idx] = {
-                ...updated[idx],
-                qty: count,
-                serials: updated[idx].serials.slice(0, count)
-            };
-            return updated;
-        });
-    };
-
-    const handleToggleSn = (rowIdx, snValue) => {
-        setRows(prev => {
-            const updated = [...prev];
-            const current = updated[rowIdx].serials || [];
-            const exists = current.includes(snValue);
-            const next = exists ? current.filter(s => s !== snValue) : [...current, snValue];
-            updated[rowIdx] = {
-                ...updated[rowIdx],
-                qty: next.length > 0 ? next.length : 1,
-                serials: next
-            };
-            return updated;
-        });
-    };
-
-    const handleAutoSelectSns = (rowIdx, list) => {
-        setRows(prev => {
-            const updated = [...prev];
-            const qty = updated[rowIdx].qty || 1;
-            updated[rowIdx] = {
-                ...updated[rowIdx],
-                serials: list.slice(0, qty).map(s => s.serial_number)
-            };
-            return updated;
-        });
-    };
-
-    const handleClearSns = (rowIdx) => {
-        setRows(prev => {
-            const updated = [...prev];
-            updated[rowIdx] = { ...updated[rowIdx], serials: [] };
-            return updated;
-        });
-    };
-
-    const handleSubmit = (e) => {
-        e?.preventDefault();
-        for (let i = 0; i < rows.length; i++) {
-            const r = rows[i];
-            const num = i + 1;
-            if (!r.gudang_asal_id || !r.gudang_tujuan_id) {
-                alert(`Baris #${num}: Gudang Asal dan Tujuan wajib dipilih.`);
-                return;
-            }
-            if (String(r.gudang_asal_id) === String(r.gudang_tujuan_id)) {
-                alert(`Baris #${num}: Gudang Asal dan Tujuan tidak boleh sama.`);
-                return;
-            }
-            if (!r.nomor_omc.trim()) {
-                alert(`Baris #${num}: Nomor OMC (Surat Jalan Transfer) wajib diisi.`);
-                return;
-            }
-            if (!r.barang_id) {
-                alert(`Baris #${num}: Harap pilih barang.`);
-                return;
-            }
-            const target = barangs.find(b => String(b.id) === String(r.barang_id));
-            if (target?.is_wajib_sn && r.serials.length !== r.qty) {
-                alert(`Baris #${num}: Harap centang Serial Number tepat ${r.qty} unit.`);
-                return;
-            }
-        }
-        setIsProcessing(true);
-        router.post('/transaksi/transfer', { items: rows }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setIsProcessing(false);
-                onClose();
-            },
-            onError: () => setIsProcessing(false),
-            onFinish: () => setIsProcessing(false)
-        });
-    };
+    const {
+        isProcessing,
+        rows,
+        setRows,
+        snSearches,
+        setSnSearches,
+        nonSnSearches,
+        setNonSnSearches,
+        gudangOptions,
+        getBarangStockInWarehouse,
+        getBarangPplOptions,
+        getBarangNamaOptions,
+        handleRowFieldChange,
+        handleBarangChange,
+        handleQtyChange,
+        handleNonSnBatchQtyChange,
+        handleToggleSn,
+        handleClearSns,
+        handleSubmit,
+        createEmptyRow
+    } = useModalTransferGudangControl({
+        isOpen,
+        onClose,
+        gudangs,
+        barangs
+    });
 
     return (
         <Modal
@@ -288,6 +79,70 @@ export default function ModalTransferGudang({
                     );
                     const pplOptions = getBarangPplOptions(row);
                     const namaOptions = getBarangNamaOptions(row);
+                    const nonSnSearch = nonSnSearches[rowIdx] || '';
+
+                    // Grouping Non-SN Batches by condition for Transfer
+                    const groupedNonSnBatches = useMemo(() => {
+                        if (isWajibSn || !targetBarang || !row.gudang_asal_id) return [];
+                        const details = targetBarang.transaksi_details || targetBarang.transaksiDetails || [];
+                        const matching = details.filter(td => {
+                            const trx = td.transaksi;
+                            return trx && String(trx.gudang_tujuan_id) === String(row.gudang_asal_id);
+                        });
+                        const conditionMap = new Map();
+                        if (matching.length > 0) {
+                            matching.forEach((td) => {
+                                const trx = td.transaksi;
+                                const imc = trx?.nomor_imc || trx?.no_transaksi || '';
+                                const rawK = String(td.kondisi || trx?.kondisi || 'Baru').toUpperCase();
+                                let normKondisi = 'Baru';
+                                let badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                                if (rawK === 'RUSAK') {
+                                    normKondisi = 'Rusak';
+                                    badgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20';
+                                } else if (rawK.includes('BEKAS') || rawK.includes('SECOND')) {
+                                    normKondisi = 'Bekas';
+                                    badgeClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
+                                }
+                                if (conditionMap.has(normKondisi)) {
+                                    const existing = conditionMap.get(normKondisi);
+                                    existing.max_stock += (parseInt(td.qty, 10) || 1);
+                                    if (imc && !existing.imcs.includes(imc)) existing.imcs.push(imc);
+                                } else {
+                                    conditionMap.set(normKondisi, {
+                                        key: normKondisi,
+                                        kondisi: normKondisi,
+                                        max_stock: parseInt(td.qty, 10) || 1,
+                                        imcs: imc ? [imc] : [],
+                                        badgeClass
+                                    });
+                                }
+                            });
+                            return Array.from(conditionMap.values()).map(item => ({
+                                ...item,
+                                nomor_imc: item.imcs.length > 0 ? item.imcs.join(', ') : (targetBarang.kode_barang || 'IMC-IN')
+                            }));
+                        }
+                        return [{
+                            key: 'Baru',
+                            nomor_imc: targetBarang.kode_barang || 'IMC-IN',
+                            kondisi: 'Baru',
+                            max_stock: stockInOrigin || 1,
+                            badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        }];
+                    }, [isWajibSn, targetBarang, row.gudang_asal_id, stockInOrigin]);
+
+                    const filteredBatches = useMemo(() => {
+                        if (!nonSnSearch.trim()) return groupedNonSnBatches;
+                        const s = nonSnSearch.toLowerCase().trim();
+                        return groupedNonSnBatches.filter(b => 
+                            b.nomor_imc.toLowerCase().includes(s) || 
+                            currentNamaBarang.toLowerCase().includes(s) ||
+                            b.kondisi.toLowerCase().includes(s)
+                        );
+                    }, [groupedNonSnBatches, nonSnSearch, currentNamaBarang]);
+
+                    const selections = row.non_sn_selections || {};
 
                     return (
                         <div key={`trf-row-${rowIdx}`} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 space-y-3">
@@ -363,27 +218,10 @@ export default function ModalTransferGudang({
                                 </div>
                             </div>
 
-                            {/* Detail Barang, Tanggal, dan Kuantitas (2 Baris Lega) */}
+                            {/* Detail Barang, Tanggal, dan Kuantitas (Nama Barang Diperlebar sm:col-span-8) */}
                             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                                {/* Baris 1: Tanggal, Kode PPL Lega, Nama Barang Lega */}
+                                {/* BARIS 1: KODE PPL (4/12) & NAMA BARANG (8/12 - LEGA DAN LEBAR) */}
                                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                                    <div className="sm:col-span-3 space-y-1">
-                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal *</Label>
-                                        <Input
-                                            type="date"
-                                            value={row.tanggal}
-                                            onClick={(e) => {
-                                                try {
-                                                    if (typeof e.target.showPicker === 'function') e.target.showPicker();
-                                                } catch (err) {}
-                                            }}
-                                            onChange={(e) => handleRowFieldChange(rowIdx, 'tanggal', e.target.value)}
-                                            className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
-                                            required
-                                        />
-                                    </div>
-
-                                    {/* Dropdown Kode PPL (Lega) */}
                                     <div className="sm:col-span-4 space-y-1">
                                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kode PPL *</Label>
                                         <HybridDropdown
@@ -396,7 +234,7 @@ export default function ModalTransferGudang({
                                                 }
                                                 const cleanKode = String(selectedOpt?.value || val).split(' ')[0].trim().toLowerCase();
                                                 const foundId = selectedOpt?.id || barangs.find(b => 
-                                                    b.kode_barang.toLowerCase() === cleanKode ||
+                                                    b.kode_barang.toLowerCase() === cleanKode || 
                                                     b.kode_barang.toLowerCase() === String(val).trim().toLowerCase()
                                                 )?.id;
                                                 if (foundId) handleBarangChange(rowIdx, foundId);
@@ -411,9 +249,7 @@ export default function ModalTransferGudang({
                                             inputClassName="h-8 text-xs font-mono font-bold"
                                         />
                                     </div>
-
-                                    {/* Dropdown Nama Barang (Lega) */}
-                                    <div className="sm:col-span-5 space-y-1">
+                                    <div className="sm:col-span-8 space-y-1">
                                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
                                         <HybridDropdown
                                             value={currentNamaBarang}
@@ -441,9 +277,24 @@ export default function ModalTransferGudang({
                                     </div>
                                 </div>
 
-                                {/* Baris 2: Quantity (Tepat di Bawah Tanggal), Satuan / Unit, dan Part Number */}
-                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                                    <div className="sm:col-span-3 space-y-1">
+                                {/* BARIS 2: TANGGAL, QUANTITY, SATUAN, PART NUMBER */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal *</Label>
+                                        <Input
+                                            type="date"
+                                            value={row.tanggal}
+                                            onClick={(e) => {
+                                                try {
+                                                    if (typeof e.target.showPicker === 'function') e.target.showPicker();
+                                                } catch (err) {}
+                                            }}
+                                            onChange={(e) => handleRowFieldChange(rowIdx, 'tanggal', e.target.value)}
+                                            className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
                                         <div className="flex items-center justify-between">
                                             <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Quantity *</Label>
                                             {stockInOrigin !== null && (
@@ -479,9 +330,7 @@ export default function ModalTransferGudang({
                                             </button>
                                         </div>
                                     </div>
-
-                                    {/* Kolom Satuan / Unit */}
-                                    <div className="sm:col-span-3 space-y-1">
+                                    <div className="space-y-1">
                                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Satuan / Unit</Label>
                                         <Input
                                             disabled
@@ -489,9 +338,7 @@ export default function ModalTransferGudang({
                                             className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-medium text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
                                         />
                                     </div>
-
-                                    {/* Kolom Part Number */}
-                                    <div className="sm:col-span-6 space-y-1">
+                                    <div className="space-y-1">
                                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Part Number</Label>
                                         <Input
                                             disabled
@@ -503,6 +350,135 @@ export default function ModalTransferGudang({
                                 </div>
                             </div>
 
+                            {/* Selektor Non-SN dengan Stepper di Kartu untuk Transfer */}
+                            {!isWajibSn && targetBarang && (
+                                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5">
+                                            <PackageCheck className="w-3.5 h-3.5 text-amber-500" />
+                                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                                Pilih Barang Masuk dari Gudang Asal (Non-SN)
+                                            </span>
+                                        </div>
+                                        <div className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                            {row.qty} Unit &bull; {row.kondisi || 'Baru'}
+                                        </div>
+                                    </div>
+
+                                    <div className="relative w-full sm:w-72">
+                                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                        <Input
+                                            value={nonSnSearch}
+                                            onChange={(e) => setNonSnSearches(prev => ({ ...prev, [rowIdx]: e.target.value }))}
+                                            placeholder="Cari nama barang / no IMC..."
+                                            className="h-7 text-[11px] pl-7 pr-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                        />
+                                        {nonSnSearch && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setNonSnSearches(prev => ({ ...prev, [rowIdx]: '' }))} 
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto pt-1">
+                                        {filteredBatches.length === 0 ? (
+                                            <div className="col-span-full py-3 text-center text-xs text-slate-400">
+                                                Tidak ada data Barang Masuk yang cocok.
+                                            </div>
+                                        ) : (
+                                            filteredBatches.map((b) => {
+                                                const selectedBatch = selections[b.key];
+                                                const isChecked = Boolean(selectedBatch && selectedBatch.qty > 0);
+                                                const currentBatchQty = selectedBatch?.qty || 0;
+
+                                                return (
+                                                    <div
+                                                        key={b.key}
+                                                        className={`p-2.5 rounded-lg border transition-all flex flex-col justify-between gap-2 ${
+                                                            isChecked
+                                                                ? 'bg-blue-600/10 border-blue-600/60 text-blue-700 dark:text-blue-300 shadow-2xs'
+                                                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400'
+                                                        }`}
+                                                    >
+                                                        <div 
+                                                            className="flex items-start justify-between gap-1.5 cursor-pointer select-none"
+                                                            onClick={() => {
+                                                                if (isChecked) {
+                                                                    handleNonSnBatchQtyChange(rowIdx, b.key, b, 0, b.max_stock);
+                                                                } else {
+                                                                    handleNonSnBatchQtyChange(rowIdx, b.key, b, 1, b.max_stock);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <div className={`w-3.5 h-3.5 rounded-xs flex items-center justify-center border shrink-0 ${
+                                                                    isChecked 
+                                                                        ? 'bg-blue-600 border-blue-600 text-white' 
+                                                                        : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900'
+                                                                }`}>
+                                                                    {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                                                                </div>
+                                                                <span 
+                                                                    className="font-mono text-[11px] font-bold truncate leading-tight" 
+                                                                    title={`${currentNamaBarang} / ${b.nomor_imc}`}
+                                                                >
+                                                                    {currentNamaBarang} / {b.nomor_imc}
+                                                                </span>
+                                                            </div>
+                                                            <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${b.badgeClass}`}>
+                                                                {b.kondisi}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                                                Tersedia: <strong>{b.max_stock}</strong>
+                                                            </span>
+
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={currentBatchQty <= 0}
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        handleNonSnBatchQtyChange(rowIdx, b.key, b, currentBatchQty - 1, b.max_stock);
+                                                                    }}
+                                                                    className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                                                                >
+                                                                    <Minus className="w-2.5 h-2.5" />
+                                                                </button>
+
+                                                                <span className="w-6 text-center font-mono font-bold text-xs text-slate-900 dark:text-slate-100">
+                                                                    {currentBatchQty}
+                                                                </span>
+
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={currentBatchQty >= b.max_stock}
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        handleNonSnBatchQtyChange(rowIdx, b.key, b, currentBatchQty + 1, b.max_stock);
+                                                                    }}
+                                                                    className="w-5 h-5 rounded bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-xs font-bold text-white disabled:opacity-30 cursor-pointer"
+                                                                >
+                                                                    <Plus className="w-2.5 h-2.5" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Serial Number Picker */}
                             {isWajibSn && (
                                 <ModalSerialSelector
@@ -512,14 +488,12 @@ export default function ModalTransferGudang({
                                     snSearch={snSearches[rowIdx] || ''}
                                     onSnSearchChange={(rIdx, val) => setSnSearches(prev => ({ ...prev, [rIdx]: val }))}
                                     onToggleTransferSn={handleToggleSn}
-                                    onAutoSelectTransferSns={handleAutoSelectSns}
                                     onClearTransferSns={handleClearSns}
                                 />
                             )}
                         </div>
                     );
                 })}
-
                 <Button
                     type="button"
                     variant="outline"
