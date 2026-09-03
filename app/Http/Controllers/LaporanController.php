@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Barang;
 use App\Models\Gudang;
-use App\Models\Transaksi;
 use App\Models\TransaksiDetail;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -279,73 +278,10 @@ class LaporanController extends Controller
             })->values();
         }
 
-        // 7. BUKU JURNAL MUTASI DETAIL
-        $ledgerQuery = Transaksi::with([
-            'gudangAsal:id,nama_gudang',
-            'gudangTujuan:id,nama_gudang',
-            'supplier:id,nama_supplier',
-            'details.barang',
-            'details.serials'
-        ])
-            ->where(function ($q) {
-                $q->whereIn('status', ['COMPLETED', 'completed'])
-                  ->orWhereNull('status');
-            })
-            ->whereBetween('tanggal', [$startDate, $endDate])
-            ->orderBy('tanggal', 'asc')
-            ->orderBy('id', 'asc');
-
-        if ($gudangId && $gudangId !== 'ALL') {
-            $ledgerQuery->where(function ($q) use ($gudangId) {
-                $q->where('gudang_asal_id', $gudangId)
-                  ->orWhere('gudang_tujuan_id', $gudangId);
-            });
-        }
-
-        if ($kondisi && $kondisi !== 'ALL') {
-            $kUpper = strtoupper($kondisi);
-            if ($kUpper === 'BARU') {
-                $ledgerQuery->whereIn(DB::raw("UPPER(COALESCE(kondisi, 'BARU'))"), ['BARU', 'BAIK']);
-            } else {
-                $ledgerQuery->where('kondisi', 'like', "%{$kondisi}%");
-            }
-        }
-
-        $jurnalMutasi = $ledgerQuery->get()->map(function ($t) {
-            $detail = $t->details->first();
-            $barang = $detail?->barang;
-            $namaLengkap = $barang ? trim("{$barang->brand} {$barang->tipe} {$barang->kategori}") : ($barang?->nama_barang ?? '-');
-
-            $listSn = $detail ? $detail->serials->map(fn($s) => [
-                'serial_number' => $s->serial_number,
-                'kondisi'       => $s->kondisi ?: 'Baru'
-            ]) : [];
-
-            return [
-                'id'            => $t->id,
-                'no_transaksi'  => $t->no_transaksi,
-                'jenis'         => $t->jenis_transaksi,
-                'sub_jenis'     => $t->sub_jenis,
-                'kondisi'       => $t->kondisi ?: 'Baru',
-                'tanggal'       => $t->tanggal ? date('Y-m-d', strtotime($t->tanggal)) : '-',
-                'nomor_dokumen' => $t->nomor_omc ?: ($t->nomor_imc ?: '-'),
-                'nomor_imc'     => $t->nomor_imc ?: '-',
-                'nomor_omc'     => $t->nomor_omc ?: '-',
-                'asal'          => $t->gudangAsal?->nama_gudang ?: ($t->pihak_asal ?: '-'),
-                'tujuan'        => $t->gudangTujuan?->nama_gudang ?: ($t->pihak_asal ?: '-'),
-                'kode_barang'   => $barang?->kode_barang ?? '-',
-                'nama_barang'   => $namaLengkap,
-                'part_number'   => $barang?->part_number ?? '-',
-                'qty'           => $detail?->qty ?? 0,
-                'serials'       => $listSn,
-            ];
-        });
-
         return Inertia::render('Laporan/Index', [
-            'laporanStok'  => $laporanStok,
-            'jurnalMutasi' => $jurnalMutasi,
-            'gudangs'      => Gudang::where('is_active', true)->get(['id', 'nama_gudang', 'kode_gudang']),
-            'filters'      => [
+            'laporanStok' => $laporanStok,
+            'gudangs'     => Gudang::where('is_active', true)->get(['id', 'nama_gudang', 'kode_gudang']),
+            'filters'     => [
                 'bulan'     => $bulan,
                 'tahun'     => $tahun,
                 'gudang_id' => $gudangId,

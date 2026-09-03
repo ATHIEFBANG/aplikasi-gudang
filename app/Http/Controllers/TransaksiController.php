@@ -22,6 +22,9 @@ class TransaksiController extends Controller
 {
     public function index(Request $request): Response
     {
+        // 1. Tambahkan batas waktu toleransi eksekusi
+        set_time_limit(120);
+
         $jenis    = $request->input('jenis_transaksi', 'MASUK');
         $search   = $request->input('search');
         $perPage  = (int) $request->input('per_page', 10);
@@ -29,13 +32,17 @@ class TransaksiController extends Controller
         $rawOrder = strtolower((string) $request->input('order', 'desc'));
         $order    = in_array($rawOrder, ['asc', 'desc'], true) ? $rawOrder : 'desc';
 
+        // 2. Query Transaksi Utama (Optimasi kolom select pada eager load)
         $query = Transaksi::with([
             'gudangAsal:id,nama_gudang',
             'gudangTujuan:id,nama_gudang',
             'supplier:id,nama_supplier',
             'picUser:id,name',
-            'details.barang',
-            'details.serials'
+            'details' => function ($q) {
+                $q->select('id', 'transaksi_id', 'barang_id', 'qty', 'harga', 'kondisi');
+            },
+            'details.barang:id,kode_barang,nama_barang,brand,tipe,kategori,part_number,deskripsi,is_wajib_sn,is_wajib_pn',
+            'details.serials:id,serial_number,kondisi'
         ])
             ->orderBy('tanggal', $order)
             ->orderBy('id', $order);
@@ -53,23 +60,31 @@ class TransaksiController extends Controller
                   ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         }
 
+        // 3. Optimasi Pencarian (Menggunakan single EXISTS JOIN menggantikan double nested whereHas)
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('no_transaksi', 'like', "%{$search}%")
                   ->orWhere('nomor_imc', 'like', "%{$search}%")
                   ->orWhere('nomor_omc', 'like', "%{$search}%")
                   ->orWhere('pihak_asal', 'like', "%{$search}%")
-                  ->orWhereHas('details.barang', function ($qb) use ($search) {
-                      $qb->where('nama_barang', 'like', "%{$search}%")
-                         ->orWhere('kode_barang', 'like', "%{$search}%")
-                         ->orWhere('brand', 'like', "%{$search}%")
-                         ->orWhere('tipe', 'like', "%{$search}%")
-                         ->orWhere('kategori', 'like', "%{$search}%")
-                         ->orWhere('part_number', 'like', "%{$search}%");
+                  ->orWhereExists(function ($sub) use ($search) {
+                      $sub->select(DB::raw(1))
+                          ->from('transaksi_details')
+                          ->join('barangs', 'transaksi_details.barang_id', '=', 'barangs.id')
+                          ->whereColumn('transaksi_details.transaksi_id', 'transaksis.id')
+                          ->where(function ($qb) use ($search) {
+                              $qb->where('barangs.nama_barang', 'like', "%{$search}%")
+                                 ->orWhere('barangs.kode_barang', 'like', "%{$search}%")
+                                 ->orWhere('barangs.brand', 'like', "%{$search}%")
+                                 ->orWhere('barangs.tipe', 'like', "%{$search}%")
+                                 ->orWhere('barangs.kategori', 'like', "%{$search}%")
+                                 ->orWhere('barangs.part_number', 'like', "%{$search}%");
+                          });
                   });
             });
         }
 
+        // 4. Ringkasan Stok Gudang
         $snStats = BarangSerial::where('status', 'IN_WAREHOUSE')
             ->selectRaw("
                 gudang_id,
@@ -140,41 +155,40 @@ class TransaksiController extends Controller
                 $g->stok_bekas = $snBekas + $nsBekas;
                 $g->stok_rusak = $snRusak + $nsRusak;
                 $g->total_stok = $g->stok_baru + $g->stok_bekas + $g->stok_rusak;
-
                 return $g;
             });
+
+        // 5. Query Master Barang Cepat & Ringan (Tanpa Subquery whereHas yang memicu timeout)
+        $barangList = Barang::select([
+            'id', 
+            'kode_barang', 
+            'nama_barang', 
+            'part_number', 
+            'brand', 
+            'tipe', 
+            'kategori', 
+            'deskripsi', 
+            'is_wajib_sn', 
+            'is_wajib_pn'
+        ])->with([
+            'stoks' => function ($q) {
+                $q->select('id', 'barang_id', 'gudang_id', 'jumlah');
+            },
+            'serials' => function ($q) {
+                $q->select('id', 'barang_id', 'gudang_id', 'serial_number', 'kondisi', 'status')
+                  ->where('status', 'IN_WAREHOUSE');
+            },
+            'transaksiDetails' => function ($q) {
+                $q->select('id', 'transaksi_id', 'barang_id', 'qty', 'kondisi')
+                  ->with(['transaksi:id,no_transaksi,nomor_imc,nomor_omc,kondisi,gudang_tujuan_id,tanggal,status,jenis_transaksi,sub_jenis']);
+            }
+        ])->get();
 
         return Inertia::render('Transaksi/Index', [
             'transaksis' => $query->paginate($perPage)->withQueryString(),
             'gudangs'    => $gudangList,
             'suppliers'  => Supplier::all(['id', 'nama_supplier']),
-            'barangs'    => Barang::with([
-                'stoks',
-                'serials' => function ($q) {
-                    $q->where('status', 'IN_WAREHOUSE');
-                },
-                'transaksiDetails' => function ($q) {
-                    $q->whereHas('transaksi', function ($qt) {
-                        $qt->whereIn('status', ['COMPLETED', 'completed'])
-                           ->where(function ($sub) {
-                               $sub->where('jenis_transaksi', 'MASUK')
-                                   ->orWhere('jenis_transaksi', 'TRANSFER')
-                                   ->orWhere('sub_jenis', 'TRANSFER_GUDANG');
-                           });
-                    })->with(['transaksi:id,no_transaksi,nomor_imc,nomor_omc,kondisi,gudang_tujuan_id,tanggal']);
-                }
-            ])->get([
-                'id', 
-                'kode_barang', 
-                'nama_barang', 
-                'part_number', 
-                'brand', 
-                'tipe', 
-                'kategori', 
-                'deskripsi', 
-                'is_wajib_sn', 
-                'is_wajib_pn'
-            ]),
+            'barangs'    => $barangList,
             'filters'    => [
                 'jenis_transaksi' => $jenis,
                 'search'          => $search ?? '',
@@ -197,7 +211,7 @@ class TransaksiController extends Controller
                 'items.*.pihak_asal'        => 'required|string|max:255',
                 'items.*.gudang_tujuan_id'  => 'required|exists:gudangs,id',
                 'items.*.barang_id'         => 'required|exists:barangs,id',
-                'items.*.qty'               => 'required|integer|min:1|max:10',
+                'items.*.qty'               => 'required|integer|min:1|max:50',
                 'items.*.harga'             => 'nullable|numeric|min:0',
                 'items.*.serials'           => 'nullable|array',
                 'items.*.serials.*'         => 'nullable|string|max:100',
@@ -207,10 +221,10 @@ class TransaksiController extends Controller
                 foreach ($validated['items'] as $item) {
                     $subJenis = $item['sub_jenis'];
                     $prefix = match($subJenis) {
-                        'PEMBELIAN'       => 'TRX-IN-BUY',
-                        'PEMINJAMAN'      => 'TRX-IN-BORROW',
-                        'PENGEMBALIAN'    => 'TRX-IN-RET',
-                        default           => 'TRX-MASUK',
+                        'PEMBELIAN'    => 'TRX-IN-BUY',
+                        'PEMINJAMAN'   => 'TRX-IN-BORROW',
+                        'PENGEMBALIAN' => 'TRX-IN-RET',
+                        default        => 'TRX-MASUK',
                     };
 
                     $randomSuffix = strtoupper(Str::random(4));
@@ -331,6 +345,7 @@ class TransaksiController extends Controller
                 $gudangAsalId = (int) $item['gudang_asal_id'];
                 $gudangTujuanId = (int) $item['gudang_tujuan_id'];
                 $qty          = (int) $item['qty'];
+
                 $barang       = Barang::findOrFail($barangId);
                 $serials      = array_filter($item['serials'] ?? []);
 
@@ -376,6 +391,7 @@ class TransaksiController extends Controller
 
                 $stokAsal->decrement('jumlah', $qty);
                 $stokAsal->refresh();
+
                 StockLog::create([
                     'barang_id'     => $barangId,
                     'gudang_id'     => $gudangAsalId,
@@ -392,6 +408,7 @@ class TransaksiController extends Controller
                 );
                 $stokTujuan->increment('jumlah', $qty);
                 $stokTujuan->refresh();
+
                 StockLog::create([
                     'barang_id'     => $barangId,
                     'gudang_id'     => $gudangTujuanId,
@@ -449,7 +466,7 @@ class TransaksiController extends Controller
         $hargaFix   = $transaksi->sub_jenis === 'PEMBELIAN' ? (float) ($validated['harga'] ?? 0) : 0;
         $newQty     = isset($validated['qty']) ? (int) $validated['qty'] : null;
 
-        DB::transaction(function () use ($transaksi, $validated, $kondisiFix, $hargaFix, $newQty, $request) {
+        DB::transaction(function () use ($transaksi, $validated, $kondisiFix, $hargaFix, $newQty) {
             $oldGudangTujuanId = (int) $transaksi->gudang_tujuan_id;
             $newGudangTujuanId = isset($validated['gudang_tujuan_id']) ? (int) $validated['gudang_tujuan_id'] : $oldGudangTujuanId;
 
@@ -469,6 +486,7 @@ class TransaksiController extends Controller
                     if ($stokLama) {
                         $stokLama->decrement('jumlah', min($stokLama->jumlah, $oldQty));
                     }
+
                     $stokBaru = Stok::firstOrCreate(['barang_id' => $barangId, 'gudang_id' => $newGudangTujuanId], ['jumlah' => 0]);
                     $stokBaru->increment('jumlah', $finalQty);
 
@@ -508,12 +526,15 @@ class TransaksiController extends Controller
             'ids'   => 'required|array',
             'ids.*' => 'exists:transaksis,id',
         ]);
+
         Transaksi::destroy($request->ids);
         return redirect()->back()->with('success', count($request->ids) . ' transaksi terpilih berhasil dihapus.');
     }
 
     public function export(Request $request): StreamedResponse
     {
+        set_time_limit(180);
+
         $jenis    = $request->input('jenis_transaksi', 'MASUK');
         $rawOrder = strtolower((string) $request->input('order', 'desc'));
         $order    = in_array($rawOrder, ['asc', 'desc'], true) ? $rawOrder : 'desc';
@@ -531,6 +552,7 @@ class TransaksiController extends Controller
 
         $transaksis = $query->get();
         $csvFileName = 'Transaksi_' . $jenis . '_' . date('Y-m-d_His') . '.csv';
+
         $headers = [
             'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$csvFileName}\"",
@@ -562,6 +584,7 @@ class TransaksiController extends Controller
             $file = fopen('php://output', 'w');
             fputs($file, "\xEF\xBB\xBF");
             fputcsv($file, $columns, ';');
+
             foreach ($transaksis as $t) {
                 $detail = $t->details->first();
                 $barang = $detail?->barang;
@@ -589,6 +612,7 @@ class TransaksiController extends Controller
                     $snList ?: '-',
                 ], ';');
             }
+
             fclose($file);
         };
 

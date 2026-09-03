@@ -6,10 +6,8 @@ import { Input } from "@/components/ui/input";
 import HybridDropdown from '@/components/HybridDropdown';
 import Toolbar from '@/components/Toolbar';
 import TabelRekonsiliasi from './TabelRekonsiliasi';
-import TabelJurnal from './TabelJurnal';
 import { 
     Boxes,
-    BookOpen,
     FileSpreadsheet,
     Filter,
     Search,
@@ -43,20 +41,17 @@ const KONDISI_OPTIONS = [
 
 export default function LaporanIndex({
     laporanStok = [],
-    jurnalMutasi = [],
     gudangs = [],
     filters = {}
 }) {
-    const [subTab, setSubTab] = useState('rekonsiliasi'); // 'rekonsiliasi' | 'jurnal'
     const [bulan, setBulan] = useState(String(filters.bulan || new Date().getMonth() + 1));
     const [tahun, setTahun] = useState(String(filters.tahun || 2026));
     const [gudangId, setGudangId] = useState(String(filters.gudang_id || 'ALL'));
     const [kondisi, setKondisi] = useState(String(filters.kondisi || 'ALL'));
 
-    // State input pencarian lokal dan query aktif
+    // State pencarian lokal dan query aktif
     const [searchInput, setSearchInput] = useState(filters.search || '');
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
-
     const [sortOrder, setSortOrder] = useState('asc');
     const [zoomLevel, setZoomLevel] = useState(100);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -105,24 +100,24 @@ export default function LaporanIndex({
         return found ? found.label : 'Semua Kondisi';
     }, [kondisi]);
 
-    // Data Aktif & Sorting
-    const rawList = subTab === 'rekonsiliasi' ? laporanStok : jurnalMutasi;
+    // Data Sorting
     const sortedList = useMemo(() => {
-        const list = [...rawList];
+        const list = [...laporanStok];
         list.sort((a, b) => {
-            const keyA = a.kode_barang || a.no_transaksi || a.tanggal || '';
-            const keyB = b.kode_barang || b.no_transaksi || b.tanggal || '';
+            const keyA = a.kode_barang || a.nama_barang || '';
+            const keyB = b.kode_barang || b.nama_barang || '';
             if (sortOrder === 'asc') return String(keyA).localeCompare(String(keyB));
             return String(keyB).localeCompare(String(keyA));
         });
         return list;
-    }, [rawList, sortOrder]);
+    }, [laporanStok, sortOrder]);
 
     // Client-Side Pagination
     const totalData = sortedList.length;
     const totalPages = Math.ceil(totalData / perPage) || 1;
     const fromIndex = totalData > 0 ? (currentPage - 1) * perPage + 1 : 0;
     const toIndex = Math.min(currentPage * perPage, totalData);
+
     const paginatedData = useMemo(() => {
         const start = (currentPage - 1) * perPage;
         return sortedList.slice(start, start + perPage);
@@ -132,7 +127,7 @@ export default function LaporanIndex({
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [subTab, bulan, tahun, gudangId, kondisi, searchQuery]);
+    }, [bulan, tahun, gudangId, kondisi, searchQuery]);
 
     const handlePerPageSubmit = () => {
         let val = parseInt(perPageInput, 10);
@@ -166,7 +161,6 @@ export default function LaporanIndex({
         });
     };
 
-    // Eksekusi pencarian HANYA saat tombol Enter ditekan
     const handleSearchSubmit = () => {
         const trimmed = searchInput.trim();
         setSearchQuery(trimmed);
@@ -185,7 +179,6 @@ export default function LaporanIndex({
         });
     };
 
-    // Tombol reset/clear input pencarian
     const handleClearSearch = () => {
         setSearchInput('');
         setSearchQuery('');
@@ -215,7 +208,6 @@ export default function LaporanIndex({
         setKondisi('ALL');
         setSearchInput('');
         setSearchQuery('');
-
         router.get('/laporan', { 
             bulan: defaultBulan, 
             tahun: defaultTahun, 
@@ -238,8 +230,9 @@ export default function LaporanIndex({
     return (
         <AuthenticatedLayout header="Laporan Bulanan">
             <Head title={`Laporan Logistik - ${activeBulanLabel} ${tahun}`} />
+
             <div className="space-y-4 max-w-7xl mx-auto">
-                {/* 1. HEADER CAPTION & TITLE */}
+                {/* 1. Header Caption & Title */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
@@ -249,18 +242,18 @@ export default function LaporanIndex({
                             <span>Laporan & Rekonsiliasi Logistik</span>
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                            Pusat audit saldo mutasi periodik, riwayat pergerakan fisik gudang, dan buku jurnal logistik.
+                            Pusat audit saldo mutasi periodik, rekonsiliasi stok awal/akhir, dan kondisi fisik barang gudang.
                         </p>
                     </div>
                 </div>
 
-                {/* 2. STANDALONE FILTER CARD (WARNA LEMBUT & TANPA KOLOM SEARCH) */}
+                {/* 2. Standalone Filter Card */}
                 <div className="bg-white dark:bg-slate-900/70 p-3.5 sm:p-4 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xs flex flex-wrap items-center gap-2.5">
-                    {/* Header Label Filter */}
                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider pr-1">
                         <Filter className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         <span>Filter Laporan</span>
                     </div>
+
                     <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block" />
 
                     {/* Filter Bulan */}
@@ -327,9 +320,9 @@ export default function LaporanIndex({
                     )}
                 </div>
 
-                {/* 3. CARD CONTAINER TABEL UTAMA */}
+                {/* 3. Card Container Tabel Utama */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-                    {/* Toolbar Atas (Tab Switcher & Action Buttons) */}
+                    {/* Toolbar Atas */}
                     <Toolbar
                         sortOrder={sortOrder}
                         onToggleSort={toggleSort}
@@ -341,51 +334,29 @@ export default function LaporanIndex({
                         onResetZoom={handleResetZoom}
                         onFitZoom={handleFitZoom}
                         leftContent={
-                            <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
-                                <button
-                                    type="button"
-                                    onClick={() => setSubTab('rekonsiliasi')}
-                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                        subTab === 'rekonsiliasi'
-                                            ? 'bg-blue-600 text-white shadow-xs'
-                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                                    }`}
-                                >
-                                    <Boxes className="w-3.5 h-3.5" />
-                                    <span>Rekonsiliasi Stok ({laporanStok.length})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSubTab('jurnal')}
-                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                        subTab === 'jurnal'
-                                            ? 'bg-blue-600 text-white shadow-xs'
-                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                                    }`}
-                                >
-                                    <BookOpen className="w-3.5 h-3.5" />
-                                    <span>Buku Jurnal ({jurnalMutasi.length})</span>
-                                </button>
+                            <div className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded-xl border border-blue-200/60 dark:border-blue-900/40 text-xs font-bold font-mono">
+                                <Boxes className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                <span>Rekonsiliasi Saldo Stok ({laporanStok.length} SKU)</span>
                             </div>
                         }
                     />
 
-                    {/* Sub-Header: Informasi Konteks di Kiri & Kolom Pencarian Enter di Kanan */}
+                    {/* Sub-Header: Informasi Konteks & Kolom Pencarian */}
                     <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         <div>
                             <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
-                                {subTab === 'rekonsiliasi' ? 'Daftar Rekonsiliasi Saldo Stok SKU' : 'Daftar Buku Jurnal Mutasi'}
+                                Daftar Rekonsiliasi Saldo Stok SKU
                             </span>
                             <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">
                                 Periode: <strong className="text-slate-700 dark:text-slate-300">{activeBulanLabel} {tahun}</strong> &bull; Lokasi: <strong className="text-slate-700 dark:text-slate-300">{activeGudangLabel}</strong> &bull; Kondisi: <strong className="text-slate-700 dark:text-slate-300">{activeKondisiLabel}</strong>
                             </span>
                         </div>
 
-                        {/* Input Pencarian dengan Eksekusi Tombol Enter */}
+                        {/* Input Pencarian dengan Enter */}
                         <div className="relative w-full sm:w-60">
                             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             <Input
-                                placeholder={subTab === 'rekonsiliasi' ? "Cari lalu tekan Enter..." : "Cari dokumen lalu Enter..."}
+                                placeholder="Cari barang lalu tekan Enter..."
                                 value={searchInput}
                                 onChange={(e) => setSearchInput(e.target.value)}
                                 onKeyDown={(e) => {
@@ -409,21 +380,13 @@ export default function LaporanIndex({
                         </div>
                     </div>
 
-                    {/* Tabel Data */}
+                    {/* Tabel Data Rekonsiliasi Stok */}
                     <div className="w-full overflow-x-auto relative border-b border-slate-200 dark:border-slate-800">
-                        {subTab === 'rekonsiliasi' ? (
-                            <TabelRekonsiliasi
-                                dataList={paginatedData}
-                                getRowNumber={getRowNumber}
-                                zoomLevel={zoomLevel}
-                            />
-                        ) : (
-                            <TabelJurnal
-                                dataList={paginatedData}
-                                getRowNumber={getRowNumber}
-                                zoomLevel={zoomLevel}
-                            />
-                        )}
+                        <TabelRekonsiliasi
+                            dataList={paginatedData}
+                            getRowNumber={getRowNumber}
+                            zoomLevel={zoomLevel}
+                        />
                     </div>
 
                     {/* Pagination Footer */}
@@ -452,9 +415,11 @@ export default function LaporanIndex({
                             />
                             <span>data per halaman</span>
                         </div>
+
                         <div className="text-slate-500">
                             Menampilkan <span className="font-semibold text-slate-700 dark:text-slate-300">{fromIndex}</span> - <span className="font-semibold text-slate-700 dark:text-slate-300">{toIndex}</span> dari <span className="font-semibold text-slate-700 dark:text-slate-300">{totalData}</span> data
                         </div>
+
                         <div className="flex items-center gap-1">
                             <Button
                                 type="button"
@@ -466,6 +431,7 @@ export default function LaporanIndex({
                             >
                                 <ChevronLeft className="w-3.5 h-3.5" />
                             </Button>
+
                             {Array.from({ length: totalPages }, (_, i) => i + 1).slice(
                                 Math.max(0, currentPage - 3),
                                 Math.min(totalPages, currentPage + 2)
@@ -485,6 +451,7 @@ export default function LaporanIndex({
                                     {pageNum}
                                 </Button>
                             ))}
+
                             <Button
                                 type="button"
                                 variant="outline"

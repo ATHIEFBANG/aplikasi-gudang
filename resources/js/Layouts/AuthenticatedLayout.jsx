@@ -19,6 +19,7 @@ import {
     LayoutDashboard,
     Package,
     ArrowLeftRight,
+    History,
     FileSpreadsheet,
     User as UserIcon,
     LogOut,
@@ -39,6 +40,7 @@ const ROUTE_FALLBACKS = {
     'home': '/dashboard',
     'barang.index': '/barang',
     'transaksi.index': '/transaksi',
+    'history-moving.index': '/history-moving',
     'laporan.index': '/laporan',
     'admin.users.index': '/admin/users',
     'profile.edit': '/profile',
@@ -335,7 +337,7 @@ export default function AuthenticatedLayout({ header, children }) {
                         </div>
                     </div>
 
-                    {/* TIER 2: Main Navigation Menu (Dashboard, Master Barang, Transaksi Stok, Laporan Bulanan) */}
+                    {/* TIER 2: Main Navigation Menu (Dashboard, Master Barang, Transaksi Stok, History Moving, Laporan Bulanan) */}
                     <div 
                         className={`hidden md:flex justify-center w-full transition-all duration-300 ease-in-out z-40 bg-gradient-to-r from-blue-700 via-blue-600 to-blue-700 dark:from-slate-900 dark:via-blue-950 dark:to-slate-900 border-b border-blue-800/80 dark:border-blue-900/60 shadow-md ${
                             isNavOpen ? 'max-h-14 opacity-100 overflow-visible' : 'max-h-0 opacity-0 overflow-hidden'
@@ -382,7 +384,20 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <span>Transaksi Stok</span>
                             </Link>
 
-                            {/* 4. LAPORAN BULANAN */}
+                            {/* 4. HISTORY MOVING */}
+                            <Link
+                                href={getRoute('history-moving.index')}
+                                className={`flex items-center gap-2 px-1 h-full font-medium text-sm transition-all duration-200 outline-none border-b-[3px] ${
+                                    checkActive('history-moving.index')
+                                        ? 'border-amber-400 text-amber-300 font-bold'
+                                        : 'border-transparent text-white/80 hover:text-white hover:border-white/50'
+                                }`}
+                            >
+                                <History className="w-4 h-4" />
+                                <span>History Moving</span>
+                            </Link>
+
+                            {/* 5. LAPORAN BULANAN */}
                             <Link
                                 href={getRoute('laporan.index')}
                                 className={`flex items-center gap-2 px-1 h-full font-medium text-sm transition-all duration-200 outline-none border-b-[3px] ${
@@ -442,6 +457,16 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <ArrowLeftRight className="w-4 h-4" /> Transaksi Stok
                             </Link>
                             <Link 
+                                href={getRoute('history-moving.index')} 
+                                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                                    checkActive('history-moving.index') 
+                                        ? 'bg-blue-600 text-white shadow-sm' 
+                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                }`}
+                            >
+                                <History className="w-4 h-4" /> History Moving
+                            </Link>
+                            <Link 
                                 href={getRoute('laporan.index')} 
                                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                                     checkActive('laporan.index') 
@@ -473,7 +498,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     {children}
                 </main>
 
-                {/* CONTAINER NOTIFIKASI TOAST (Ditinggikan ke z-[99999] agar di atas modal) */}
+                {/* CONTAINER NOTIFIKASI TOAST */}
                 <div className="relative z-[99999]">
                     <Toast 
                         key={toastState.key} 
@@ -486,7 +511,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     />
                 </div>
                 
-                {/* CONTAINER CONFIRM MODAL (Ditinggikan ke z-[99999] agar di atas modal) */}
+                {/* CONTAINER CONFIRM MODAL */}
                 <div className="relative z-[99999]">
                     <ConfirmModal 
                         isOpen={confirmState.isOpen} 

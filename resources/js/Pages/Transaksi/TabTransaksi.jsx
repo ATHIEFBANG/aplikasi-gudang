@@ -186,6 +186,8 @@ export default function TabTransaksi({
         setSelectedItem(item);
         if (item.jenis_transaksi === 'KELUAR') {
             setIsModalKeluarOpen(true);
+        } else if (item.jenis_transaksi === 'TRANSFER' || item.sub_jenis === 'TRANSFER_GUDANG') {
+            setIsModalTransferOpen(true);
         } else {
             setIsModalMasukOpen(true);
         }
@@ -316,7 +318,7 @@ export default function TabTransaksi({
                     selectedIds={selectedIds}
                     onSelectAll={handleSelectAll}
                     onSelectRow={handleSelectRow}
-                    onEditRow={mainTab !== 'TRANSFER' && canWrite ? handleOpenEdit : undefined}
+                    onEditRow={canWrite ? handleOpenEdit : undefined}
                     getRowNumber={getRowNumber}
                     zoomLevel={zoomLevel}
                     mainTab={mainTab}
@@ -410,7 +412,10 @@ export default function TabTransaksi({
                 isOpen={isModalTransferOpen}
                 onClose={() => {
                     setIsModalTransferOpen(false);
+                    setSelectedItem(null);
                 }}
+                isEditMode={isEditMode}
+                selectedItem={selectedItem}
                 gudangs={gudangs}
                 barangs={barangs}
             />

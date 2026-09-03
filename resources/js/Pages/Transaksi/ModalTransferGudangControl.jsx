@@ -3,9 +3,11 @@ import { router } from '@inertiajs/react';
 
 export function useModalTransferGudangControl({
     isOpen,
-    onClose,
+    isEditMode = false,
+    selectedItem = null,
     gudangs = [],
-    barangs = []
+    barangs = [],
+    onClose
 }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [snSearches, setSnSearches] = useState({});
@@ -38,11 +40,31 @@ export function useModalTransferGudangControl({
 
     useEffect(() => {
         if (isOpen) {
-            setRows([createEmptyRow()]);
             setSnSearches({});
             setNonSnSearches({});
+            if (isEditMode && selectedItem) {
+                const detail = selectedItem.details?.[0] || {};
+                const targetBarang = barangs.find(b => String(b.id) === String(detail.barang_id));
+                const isSn = Boolean(targetBarang?.is_wajib_sn);
+                const existingSns = detail.serials ? detail.serials.map(s => s.serial_number || s) : [];
+                setRows([{
+                    id: selectedItem.id,
+                    tanggal: selectedItem.tanggal ? String(selectedItem.tanggal).split('T')[0] : new Date().toISOString().slice(0, 10),
+                    nomor_omc: selectedItem.nomor_omc || '',
+                    nomor_imc: selectedItem.nomor_imc || '',
+                    kondisi: selectedItem.kondisi && selectedItem.kondisi !== '-' ? selectedItem.kondisi : (detail.kondisi || 'Baru'),
+                    gudang_asal_id: selectedItem.gudang_asal_id ? String(selectedItem.gudang_asal_id) : '',
+                    gudang_tujuan_id: selectedItem.gudang_tujuan_id ? String(selectedItem.gudang_tujuan_id) : '',
+                    barang_id: detail.barang_id ? String(detail.barang_id) : '',
+                    qty: detail.qty || 1,
+                    serials: isSn ? existingSns : [],
+                    non_sn_selections: {}
+                }]);
+            } else {
+                setRows([createEmptyRow()]);
+            }
         }
-    }, [isOpen, createEmptyRow]);
+    }, [isOpen, isEditMode, selectedItem, barangs, gudangs, createEmptyRow]);
 
     const gudangOptions = useMemo(() => {
         return gudangs.map(g => ({ value: g.nama_gudang, label: g.nama_gudang, id: g.id }));
@@ -115,7 +137,7 @@ export function useModalTransferGudangControl({
         setRows(prev => {
             const updated = [...prev];
             updated[idx] = { ...updated[idx], [field]: value };
-            if (field === 'gudang_asal_id') {
+            if (field === 'gudang_asal_id' && !isEditMode) {
                 updated[idx].barang_id = '';
                 updated[idx].serials = [];
                 updated[idx].non_sn_selections = {};
@@ -207,7 +229,6 @@ export function useModalTransferGudangControl({
                 non_sn_selections: selections,
                 qty: totalUnit > 0 ? totalUnit : 1,
                 kondisi: kondisiParts.length > 0 ? kondisiParts.join(', ') : 'Baru',
-                // nomor_imc TIDAK LAGI DI-OVERWRITE OTOMATIS DI SINI (BIAR KOSONG / MANUAL KETIK)
             };
             return updated;
         });
@@ -259,13 +280,27 @@ export function useModalTransferGudangControl({
                 return;
             }
             const target = barangs.find(b => String(b.id) === String(r.barang_id));
-            if (target?.is_wajib_sn && r.serials.length !== r.qty) {
+            if (target?.is_wajib_sn && !isEditMode && r.serials.length !== r.qty) {
                 alert(`Baris #${num}: Harap centang Serial Number tepat ${r.qty} unit.`);
                 return;
             }
         }
+
         setIsProcessing(true);
-        router.post('/transaksi/transfer', { items: rows }, {
+        const targetUrl = isEditMode ? `/transaksi/${selectedItem.id}` : '/transaksi/transfer';
+        const method = isEditMode ? 'put' : 'post';
+        const payload = isEditMode
+            ? {
+                tanggal: rows[0].tanggal,
+                kondisi: rows[0].kondisi || 'Baru',
+                nomor_imc: rows[0].nomor_imc ? rows[0].nomor_imc.trim() : null,
+                nomor_omc: rows[0].nomor_omc ? rows[0].nomor_omc.trim() : null,
+                gudang_tujuan_id: parseInt(rows[0].gudang_tujuan_id, 10),
+                qty: parseInt(rows[0].qty, 10) || 1,
+            }
+            : { items: rows };
+
+        router[method](targetUrl, payload, {
             preserveScroll: true,
             onSuccess: () => {
                 setIsProcessing(false);

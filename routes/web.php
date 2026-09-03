@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\BarangController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HistoryMovingController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransaksiController;
@@ -52,6 +53,12 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{id}', 'update')->name('update');
     });
 
+    // HISTORY MOVING (PELACAKAN MUTASI & RIWAYAT PERJALANAN BARANG)
+    Route::prefix('history-moving')->name('history-moving.')->controller(HistoryMovingController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/export', 'export')->name('export');
+    });
+
     // LAPORAN BULANAN (REKONSILIASI STOK & BUKU JURNAL MUTASI)
     Route::prefix('laporan')->name('laporan.')->controller(LaporanController::class)->group(function () {
         Route::get('/', 'index')->name('index');
@@ -75,4 +82,4 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-require __DIR__ . '/auth.php'; //[cite: 4]
+require __DIR__ . '/auth.php';

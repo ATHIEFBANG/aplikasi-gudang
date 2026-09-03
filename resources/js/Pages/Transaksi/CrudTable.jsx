@@ -87,7 +87,6 @@ export default function CrudTable({
                             else rawSub = item.jenis_transaksi || 'PEMBELIAN';
                         }
 
-                        // Penyesuaian nama tampilan ke Proyek dan Non Proyek
                         let displayLabel = rawSub?.replace(/_/g, ' ');
                         if (rawSub === 'BARANG_KE_SITE') displayLabel = 'PROYEK';
                         else if (rawSub === 'PEMAKAIAN_INTERNAL') displayLabel = 'NON PROYEK';
@@ -209,8 +208,8 @@ export default function CrudTable({
                             </span>
                         );
                     case 'asal': {
-                        const asalText = (mainTab === 'KELUAR' || mainTab === 'TRANSFER')
-                            ? (item.gudang_asal?.nama_gudang || '-')
+                        const asalText = (mainTab === 'KELUAR' || mainTab === 'TRANSFER') 
+                            ? (item.gudang_asal?.nama_gudang || '-') 
                             : (item.pihak_asal || item.supplier?.nama_supplier);
                         return (
                             <span className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate block max-w-[150px]" title={asalText}>
@@ -219,8 +218,8 @@ export default function CrudTable({
                         );
                     }
                     case 'gudang_tujuan': {
-                        const tujuanText = (mainTab === 'TRANSFER')
-                            ? item.gudang_tujuan?.nama_gudang
+                        const tujuanText = (mainTab === 'TRANSFER') 
+                            ? item.gudang_tujuan?.nama_gudang 
                             : (mainTab === 'KELUAR' ? item.pihak_asal : item.gudang_tujuan?.nama_gudang);
                         return (
                             <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 truncate block max-w-[150px]" title={tujuanText}>
@@ -231,14 +230,13 @@ export default function CrudTable({
                     case 'serials': {
                         const listSn = detail.serials || item.serials || [];
                         const rawKondisi = String(detail.kondisi || item.kondisi || 'Baru').trim();
-                        const brandNama = barang.brand || barang.nama_barang || item.nama_barang || '-';
-                        const imcText = item.nomor_imc || detail.nomor_imc || '-';
+                        const qty = detail.qty || item.qty || 1;
 
-                        return (
-                            <div className="flex flex-wrap gap-1 max-w-[280px] max-h-24 overflow-y-auto py-1">
-                                {listSn.length > 0 ? (
-                                    /* JIKA BARANG BER-SERIAL NUMBER (SN) */
-                                    listSn.map((s, idx) => {
+                        // 1. JIKA BARANG WAJIB SERIAL NUMBER (SN)
+                        if (listSn.length > 0) {
+                            return (
+                                <div className="flex flex-wrap gap-1 max-w-[280px] max-h-24 overflow-y-auto py-1">
+                                    {listSn.map((s, idx) => {
                                         const snVal = s.serial_number || s;
                                         const k = String(s.kondisi || '').toUpperCase().trim();
                                         let kondisiText = '';
@@ -267,48 +265,28 @@ export default function CrudTable({
                                                 )}
                                             </Badge>
                                         );
-                                    })
-                                ) : (
-                                    /* JIKA BARANG NON-SN */
-                                    mainTab === 'KELUAR' ? (
-                                        /* 1. KHUSUS BARANG KELUAR: TAMPILKAN FORMAT [Nama Barang / No IMC + Badge Kondisi] */
-                                        <div className="flex flex-wrap items-center gap-1">
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-2 py-0.5 shrink-0 max-w-[170px] truncate"
-                                                title={`${brandNama} / ${imcText}`}
-                                            >
-                                                {brandNama} / {imcText}
-                                            </Badge>
+                                    })}
+                                </div>
+                            );
+                        }
 
-                                            {rawKondisi.split(',').map((part, idx) => {
-                                                const cleanPart = part.trim();
-                                                const upper = cleanPart.toUpperCase();
-                                                let badgeColor = 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
-                                                if (upper.includes('RUSAK')) {
-                                                    badgeColor = 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30';
-                                                } else if (upper.includes('BEKAS') || upper.includes('SECOND')) {
-                                                    badgeColor = 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30';
-                                                }
+                        // 2. JIKA BARANG STANDAR (NON-SN): HANYA DI KELUAR & TRANSFER
+                        // Format teks sederhana: No SN (angka kondisi, angka kondisi, ...)
+                        if (mainTab === 'KELUAR' || mainTab === 'TRANSFER') {
+                            let cleanKondisi = (!rawKondisi || rawKondisi === '-') ? 'Baru' : rawKondisi;
+                            if (!/^\d+/.test(cleanKondisi)) {
+                                cleanKondisi = `${qty} ${cleanKondisi}`;
+                            }
 
-                                                return (
-                                                    <Badge
-                                                        key={idx}
-                                                        variant="outline"
-                                                        className={`text-[8.5px] px-1.5 py-0.2 rounded font-sans font-bold uppercase ${badgeColor}`}
-                                                    >
-                                                        {cleanPart}
-                                                    </Badge>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        /* 2. UNTUK BARANG MASUK & TRANSFER: BERSIH TANPA INFO NAMA/IMC */
-                                        <span className="text-slate-400 font-mono text-xs">-</span>
-                                    )
-                                )}
-                            </div>
-                        );
+                            return (
+                                <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                    No SN ({cleanKondisi})
+                                </span>
+                            );
+                        }
+
+                        // 3. BARANG MASUK (NON-SN): BERSIH TANPA INFO NON-SN
+                        return <span className="text-slate-400 font-mono text-xs">-</span>;
                     }
                     default:
                         return '-';

@@ -13,6 +13,8 @@ import { useModalTransferGudangControl } from './ModalTransferGudangControl';
 export default function ModalTransferGudang({
     isOpen,
     onClose,
+    isEditMode = false,
+    selectedItem = null,
     gudangs = [],
     barangs = []
 }) {
@@ -38,23 +40,27 @@ export default function ModalTransferGudang({
         createEmptyRow
     } = useModalTransferGudangControl({
         isOpen,
-        onClose,
+        isEditMode,
+        selectedItem,
         gudangs,
-        barangs
+        barangs,
+        onClose
     });
 
     return (
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="Tambah Transfer Antar-Gudang"
+            title={isEditMode ? 'Edit Data Transfer Antar-Gudang' : 'Tambah Transfer Antar-Gudang'}
             onSubmit={handleSubmit}
-            submitLabel="Simpan Transfer Gudang"
+            submitLabel={isEditMode ? 'Simpan Perubahan' : 'Simpan Transfer Gudang'}
             isProcessing={isProcessing}
             headerExtra={
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-mono font-bold">
-                    {rows.length} Baris
-                </Badge>
+                !isEditMode && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-mono font-bold">
+                        {rows.length} Baris
+                    </Badge>
+                )
             }
         >
             <Alert className="shrink-0 mb-3 bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 p-2.5 flex items-start gap-2">
@@ -150,7 +156,7 @@ export default function ModalTransferGudang({
                                 <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
                                     Transfer #{rowIdx + 1}
                                 </span>
-                                {rows.length > 1 && (
+                                {rows.length > 1 && !isEditMode && (
                                     <Button
                                         type="button"
                                         variant="ghost"
@@ -177,6 +183,7 @@ export default function ModalTransferGudang({
                                             }}
                                             placeholder="Pilih Gudang Asal..."
                                             searchPlaceholder="Cari Gudang Asal..."
+                                            disabled={isProcessing || isEditMode}
                                             inputClassName="h-8 text-xs font-semibold"
                                         />
                                     </div>
@@ -203,6 +210,7 @@ export default function ModalTransferGudang({
                                             }}
                                             placeholder="Pilih Gudang Penerima..."
                                             searchPlaceholder="Cari Gudang Penerima..."
+                                            disabled={isProcessing}
                                             inputClassName="h-8 text-xs font-semibold text-emerald-600 dark:text-emerald-400"
                                         />
                                     </div>
@@ -218,9 +226,8 @@ export default function ModalTransferGudang({
                                 </div>
                             </div>
 
-                            {/* Detail Barang, Tanggal, dan Kuantitas (Nama Barang Diperlebar sm:col-span-8) */}
+                            {/* Detail Barang, Tanggal, dan Kuantitas */}
                             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                                {/* BARIS 1: KODE PPL (4/12) & NAMA BARANG (8/12 - LEGA DAN LEBAR) */}
                                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                                     <div className="sm:col-span-4 space-y-1">
                                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kode PPL *</Label>
@@ -245,7 +252,7 @@ export default function ModalTransferGudang({
                                                     : (pplOptions.length === 0 ? "Stok Kosong di Gudang Ini" : "Pilih PPL...")
                                             }
                                             searchPlaceholder="Cari Kode PPL..."
-                                            disabled={isProcessing || !row.gudang_asal_id}
+                                            disabled={isProcessing || isEditMode || !row.gudang_asal_id}
                                             inputClassName="h-8 text-xs font-mono font-bold"
                                         />
                                     </div>
@@ -271,13 +278,12 @@ export default function ModalTransferGudang({
                                                     : (namaOptions.length === 0 ? "Stok Kosong di Gudang Ini" : "Pilih Barang...")
                                             }
                                             searchPlaceholder="Cari Nama Barang..."
-                                            disabled={isProcessing || !row.gudang_asal_id}
+                                            disabled={isProcessing || isEditMode || !row.gudang_asal_id}
                                             inputClassName="h-8 text-xs"
                                         />
                                     </div>
                                 </div>
 
-                                {/* BARIS 2: TANGGAL, QUANTITY, SATUAN, PART NUMBER */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                     <div className="space-y-1">
                                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal *</Label>
@@ -351,7 +357,7 @@ export default function ModalTransferGudang({
                             </div>
 
                             {/* Selektor Non-SN dengan Stepper di Kartu untuk Transfer */}
-                            {!isWajibSn && targetBarang && (
+                            {!isWajibSn && targetBarang && !isEditMode && (
                                 <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div className="flex items-center gap-1.5">
@@ -480,7 +486,7 @@ export default function ModalTransferGudang({
                             )}
 
                             {/* Serial Number Picker */}
-                            {isWajibSn && (
+                            {isWajibSn && !isEditMode && (
                                 <ModalSerialSelector
                                     rowIdx={rowIdx}
                                     row={{ ...row, sub_jenis: 'TRANSFER_GUDANG' }}
@@ -494,16 +500,18 @@ export default function ModalTransferGudang({
                         </div>
                     );
                 })}
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRows(prev => [...prev, createEmptyRow()])}
-                    className="h-8 text-xs gap-1.5 cursor-pointer"
-                >
-                    <PlusCircle className="w-3.5 h-3.5" />
-                    <span>Tambah Baris Transfer</span>
-                </Button>
+                {!isEditMode && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRows(prev => [...prev, createEmptyRow()])}
+                        className="h-8 text-xs gap-1.5 cursor-pointer"
+                    >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>Tambah Baris Transfer</span>
+                    </Button>
+                )}
             </div>
         </Modal>
     );
