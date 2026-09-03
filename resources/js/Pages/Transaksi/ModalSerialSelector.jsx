@@ -2,7 +2,7 @@ import React from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { QrCode, Search, X, CheckSquare, Check } from 'lucide-react';
+import { QrCode, Search, X, Check } from 'lucide-react';
 
 export default function ModalSerialSelector({
     rowIdx,
@@ -12,7 +12,6 @@ export default function ModalSerialSelector({
     snSearch = '',
     onSnSearchChange,
     onToggleTransferSn,
-    onAutoSelectTransferSns,
     onClearTransferSns,
     onManualSerialChange
 }) {
@@ -34,7 +33,6 @@ export default function ModalSerialSelector({
                         }
                     </span>
                 </div>
-
                 <div className="text-[11px] font-mono font-bold">
                     <span className={row.serials.length === row.qty ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
                         {row.serials.length} / {row.qty} Unit Terpilih
@@ -42,7 +40,7 @@ export default function ModalSerialSelector({
                 </div>
             </div>
 
-            {/* Mode Transfer Gudang */}
+            {/* Mode Transfer / Pengeluaran Gudang */}
             {row.sub_jenis === 'TRANSFER_GUDANG' ? (
                 !row.gudang_asal_id ? (
                     <div className="py-2 text-[11px] text-amber-700 dark:text-amber-400">
@@ -54,7 +52,7 @@ export default function ModalSerialSelector({
                     </div>
                 ) : (
                     <div className="space-y-2 pt-1">
-                        {/* Search & Actions */}
+                        {/* Search Bar Bersih Tanpa Tombol Pilih Otomatis */}
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="relative flex-1 min-w-[160px] max-w-xs">
                                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -67,47 +65,33 @@ export default function ModalSerialSelector({
                                 {snSearch && (
                                     <button 
                                         type="button" 
-                                        onClick={() => onSnSearchChange(rowIdx, '')}
+                                        onClick={() => onSnSearchChange(rowIdx, '')} 
                                         className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                                     >
                                         <X className="w-3 h-3" />
                                     </button>
                                 )}
                             </div>
-
-                            <div className="flex items-center gap-1.5">
+                            {row.serials.length > 0 && (
                                 <Button
                                     type="button"
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
-                                    onClick={() => onAutoSelectTransferSns(rowIdx, availableSnsForTransfer)}
-                                    className="h-7 px-2 text-[10px] gap-1 border-blue-200 text-blue-600 dark:border-blue-900 dark:text-blue-400 cursor-pointer"
+                                    onClick={() => onClearTransferSns(rowIdx)}
+                                    className="h-7 px-2 text-[10px] text-rose-500 hover:text-rose-700 cursor-pointer"
                                 >
-                                    <CheckSquare className="w-3 h-3" />
-                                    <span>Pilih Otomatis ({row.qty})</span>
+                                    Reset
                                 </Button>
-                                {row.serials.length > 0 && (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => onClearTransferSns(rowIdx)}
-                                        className="h-7 px-2 text-[10px] text-rose-500 hover:text-rose-700 cursor-pointer"
-                                    >
-                                        Reset
-                                    </Button>
-                                )}
-                            </div>
+                            )}
                         </div>
 
-                        {/* Chips SN Terpilih */}
+                        {/* Chips Tag SN Terpilih */}
                         {row.serials.length > 0 && (
                             <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto py-1">
                                 {row.serials.map((snVal) => {
                                     const snItem = availableSnsForTransfer.find(s => s.serial_number === snVal);
                                     const rawSnKondisi = String(snItem?.kondisi || 'Baru').toUpperCase().trim();
                                     let snKondisiLabel = 'Baru';
-
                                     if (rawSnKondisi === 'RUSAK') snKondisiLabel = 'Rusak';
                                     else if (rawSnKondisi.includes('BEKAS') || rawSnKondisi.includes('SECOND')) snKondisiLabel = 'Bekas';
 
@@ -118,10 +102,10 @@ export default function ModalSerialSelector({
                                         >
                                             <span>{snVal}</span>
                                             <span className={`text-[8px] px-1 py-0.2 rounded font-sans uppercase ${
-                                                snKondisiLabel === 'Rusak'
-                                                    ? 'bg-rose-500/20 text-rose-600'
-                                                    : snKondisiLabel === 'Bekas'
-                                                    ? 'bg-amber-500/20 text-amber-600'
+                                                snKondisiLabel === 'Rusak' 
+                                                    ? 'bg-rose-500/20 text-rose-600' 
+                                                    : snKondisiLabel === 'Bekas' 
+                                                    ? 'bg-amber-500/20 text-amber-600' 
                                                     : 'bg-emerald-500/20 text-emerald-600'
                                             }`}>
                                                 {snKondisiLabel}
@@ -150,7 +134,6 @@ export default function ModalSerialSelector({
                                     const isChecked = row.serials.includes(s.serial_number);
                                     const rawKondisi = String(s.kondisi || 'Baru').toUpperCase().trim();
                                     let kondisiLabel = 'Baru';
-
                                     if (rawKondisi === 'RUSAK') {
                                         kondisiLabel = 'Rusak';
                                     } else if (rawKondisi.includes('BEKAS') || rawKondisi.includes('SECOND')) {
@@ -182,10 +165,10 @@ export default function ModalSerialSelector({
                                             </div>
                                             
                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
-                                                kondisiLabel === 'Rusak'
-                                                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                                    : kondisiLabel === 'Bekas'
-                                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                                kondisiLabel === 'Rusak' 
+                                                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20' 
+                                                    : kondisiLabel === 'Bekas' 
+                                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' 
                                                     : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                                             }`}>
                                                 {kondisiLabel}

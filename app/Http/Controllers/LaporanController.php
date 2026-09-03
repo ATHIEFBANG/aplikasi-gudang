@@ -57,7 +57,7 @@ class LaporanController extends Controller
                 DB::raw("SUM(CASE 
                     WHEN t.tanggal < '{$startDate}' 
                     AND t.gudang_tujuan_id " . ($gudangId !== 'ALL' ? "= " . (int)$gudangId : "IS NOT NULL") . " 
-                    AND (t.jenis_transaksi != 'MASUK' OR UPPER(COALESCE(t.kondisi, 'BARU')) IN ('BARU', 'BAIK'))
+                    AND (t.jenis_transaksi != 'MASUK' OR UPPER(COALESCE(t.kondisi, 'BARU')) NOT LIKE '%RUSAK%')
                     THEN td.qty ELSE 0 
                 END) as masuk_lalu"),
                 DB::raw("SUM(CASE 
@@ -79,11 +79,12 @@ class LaporanController extends Controller
             ->keyBy('barang_id');
 
         // 3. QUERY AGREGASI MUTASI BULAN BERJALAN (between startDate & endDate)
+        // Hanya menghitung transaksi MASUK murni (Pembelian, Peminjaman, Pengembalian) KECUALI Rusak
         $mutasiBulan = TransaksiDetail::select(
                 'td.barang_id',
                 DB::raw("SUM(CASE 
                     WHEN t.jenis_transaksi = 'MASUK' 
-                    AND UPPER(COALESCE(t.kondisi, 'BARU')) IN ('BARU', 'BAIK') " . 
+                    AND UPPER(COALESCE(t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' " . 
                     ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int)$gudangId : "") . " 
                     THEN td.qty ELSE 0 
                 END) as masuk_bulan"),
@@ -115,7 +116,30 @@ class LaporanController extends Controller
             ->get()
             ->keyBy('barang_id');
 
-        // 4. QUERY AGREGASI KONDISI DARI TRANSAKSI (UNTUK BARANG NON-SN)
+        // 4. QUERY AGREGASI KONDISI KELUAR BULAN BERJALAN (Baru, Bekas, Rusak)
+        $kondisiKeluar = DB::table('transaksi_details as td')
+            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+            ->where(function ($q) {
+                $q->whereIn('t.status', ['COMPLETED', 'completed'])
+                  ->orWhereNull('t.status');
+            })
+            ->whereIn('td.barang_id', $barangIds)
+            ->whereBetween('t.tanggal', [$startDate, $endDate])
+            ->where('t.jenis_transaksi', 'KELUAR')
+            ->when($gudangId !== 'ALL', function ($q) use ($gudangId) {
+                $q->where('t.gudang_asal_id', (int) $gudangId);
+            })
+            ->selectRaw("
+                td.barang_id,
+                SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) = 'BARU' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) = 'BAIK' THEN td.qty ELSE 0 END) as keluar_baru,
+                SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%' THEN td.qty ELSE 0 END) as keluar_bekas,
+                SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' THEN td.qty ELSE 0 END) as keluar_rusak
+            ")
+            ->groupBy('td.barang_id')
+            ->get()
+            ->keyBy('barang_id');
+
+        // 5. QUERY AGREGASI SISA FISIK KONDISI DARI TRANSAKSI (UNTUK BARANG NON-SN)
         $kondisiNonSn = DB::table('transaksi_details as td')
             ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
             ->where(function ($q) {
@@ -133,6 +157,7 @@ class LaporanController extends Controller
                     THEN td.qty 
                     WHEN (t.jenis_transaksi = 'KELUAR' OR t.jenis_transaksi = 'TRANSFER') " . 
                     ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int)$gudangId : "") . " 
+                    AND (UPPER(COALESCE(t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(t.kondisi, 'BARU')) NOT LIKE '%RUSAK%')
                     THEN -td.qty 
                     ELSE 0 
                 END) as net_baru,
@@ -141,6 +166,10 @@ class LaporanController extends Controller
                     ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int)$gudangId : "") . " 
                     AND (UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%SECOND%') 
                     THEN td.qty 
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR t.jenis_transaksi = 'TRANSFER') " . 
+                    ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int)$gudangId : "") . " 
+                    AND (UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%SECOND%')
+                    THEN -td.qty
                     ELSE 0 
                 END) as net_bekas,
                 SUM(CASE 
@@ -148,6 +177,10 @@ class LaporanController extends Controller
                     ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int)$gudangId : "") . " 
                     AND UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%RUSAK%' 
                     THEN td.qty 
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR t.jenis_transaksi = 'TRANSFER') " . 
+                    ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int)$gudangId : "") . " 
+                    AND UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                    THEN -td.qty
                     ELSE 0 
                 END) as net_rusak
             ")
@@ -155,15 +188,16 @@ class LaporanController extends Controller
             ->get()
             ->keyBy('barang_id');
 
-        // 5. MAPPING LAPORAN REKONSILIASI STOK
-        $laporanStok = $barangs->map(function ($b) use ($mutasiLalu, $mutasiBulan, $kondisiNonSn, $gudangId, $kondisi) {
-            $lalu      = $mutasiLalu->get($b->id);
-            $bulanData = $mutasiBulan->get($b->id);
-            $kNonSn    = $kondisiNonSn->get($b->id);
+        // 6. MAPPING LAPORAN REKONSILIASI STOK
+        $laporanStok = $barangs->map(function ($b) use ($mutasiLalu, $mutasiBulan, $kondisiNonSn, $kondisiKeluar, $gudangId, $kondisi) {
+            $lalu        = $mutasiLalu->get($b->id);
+            $bulanData   = $mutasiBulan->get($b->id);
+            $kNonSn      = $kondisiNonSn->get($b->id);
+            $kKeluarData = $kondisiKeluar->get($b->id);
 
-            $masukLalu  = (int) ($lalu?->masuk_lalu ?? 0);
-            $keluarLalu = (int) ($lalu?->keluar_lalu ?? 0);
-            $stokAwal   = max(0, $masukLalu - $keluarLalu);
+            $masukLalu   = (int) ($lalu?->masuk_lalu ?? 0);
+            $keluarLalu  = (int) ($lalu?->keluar_lalu ?? 0);
+            $stokAwal    = max(0, $masukLalu - $keluarLalu);
 
             $masukBulan  = (int) ($bulanData?->masuk_bulan ?? 0);
             $keluarBulan = (int) ($bulanData?->keluar_bulan ?? 0);
@@ -173,17 +207,26 @@ class LaporanController extends Controller
             $transferNet = ($gudangId !== 'ALL') ? ($trfIn - $trfOut) : 0;
             $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
 
-            // Rincian kondisi fisik unit
+            // Rincian sisa fisik unit di gudang
             if ($b->is_wajib_sn) {
                 $serials = $b->serials;
                 $kBaru   = $serials->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK']))->count();
                 $kBekas  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
                 $kRusak  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
             } else {
-                $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? $stokAkhir));
+                $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? 0));
                 $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
                 $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
+
+                if ($kBaru === 0 && $kBekas === 0 && $stokAkhir > 0) {
+                    $kBaru = $stokAkhir;
+                }
             }
+
+            // Rincian mutasi keluar bulan berjalan
+            $keluarBaru  = (int) ($kKeluarData?->keluar_baru ?? 0);
+            $keluarBekas = (int) ($kKeluarData?->keluar_bekas ?? 0);
+            $keluarRusak = (int) ($kKeluarData?->keluar_rusak ?? 0);
 
             if ($kondisi && $kondisi !== 'ALL') {
                 $kondisiUpper = strtoupper($kondisi);
@@ -199,7 +242,6 @@ class LaporanController extends Controller
                 }
             }
 
-            // Hitung Grand Total Akumulasi Seluruh Kondisi Fisik
             $grandTotalFisik = $kBaru + $kBekas + $kRusak;
             $namaLengkap = trim("{$b->brand} {$b->tipe} {$b->kategori}") ?: $b->nama_barang;
 
@@ -213,6 +255,9 @@ class LaporanController extends Controller
                 'stok_awal'     => $stokAwal,
                 'masuk'         => $masukBulan,
                 'keluar'        => $keluarBulan,
+                'keluar_baru'   => $keluarBaru,
+                'keluar_bekas'  => $keluarBekas,
+                'keluar_rusak'  => $keluarRusak,
                 'transfer_in'   => $trfIn,
                 'transfer_out'  => $trfOut,
                 'transfer_net'  => $transferNet,
@@ -234,7 +279,7 @@ class LaporanController extends Controller
             })->values();
         }
 
-        // 6. BUKU JURNAL MUTASI DETAIL
+        // 7. BUKU JURNAL MUTASI DETAIL
         $ledgerQuery = Transaksi::with([
             'gudangAsal:id,nama_gudang',
             'gudangTujuan:id,nama_gudang',
@@ -344,7 +389,7 @@ class LaporanController extends Controller
                 DB::raw("SUM(CASE 
                     WHEN t.tanggal < '{$startDate}' 
                     AND t.gudang_tujuan_id " . ($gudangId !== 'ALL' ? "= " . (int)$gudangId : "IS NOT NULL") . " 
-                    AND (t.jenis_transaksi != 'MASUK' OR UPPER(COALESCE(t.kondisi, 'BARU')) IN ('BARU', 'BAIK'))
+                    AND (t.jenis_transaksi != 'MASUK' OR UPPER(COALESCE(t.kondisi, 'BARU')) NOT LIKE '%RUSAK%')
                     THEN td.qty ELSE 0 
                 END) as masuk_lalu"),
                 DB::raw("SUM(CASE 
@@ -369,7 +414,7 @@ class LaporanController extends Controller
                 'td.barang_id',
                 DB::raw("SUM(CASE 
                     WHEN t.jenis_transaksi = 'MASUK' 
-                    AND UPPER(COALESCE(t.kondisi, 'BARU')) IN ('BARU', 'BAIK') " . 
+                    AND UPPER(COALESCE(t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' " . 
                     ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int)$gudangId : "") . " 
                     THEN td.qty ELSE 0 
                 END) as masuk_bulan"),
@@ -418,6 +463,7 @@ class LaporanController extends Controller
                     THEN td.qty 
                     WHEN (t.jenis_transaksi = 'KELUAR' OR t.jenis_transaksi = 'TRANSFER') " . 
                     ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int)$gudangId : "") . " 
+                    AND (UPPER(COALESCE(t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(t.kondisi, 'BARU')) NOT LIKE '%RUSAK%')
                     THEN -td.qty 
                     ELSE 0 
                 END) as net_baru,
@@ -426,6 +472,10 @@ class LaporanController extends Controller
                     ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int)$gudangId : "") . " 
                     AND (UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%SECOND%') 
                     THEN td.qty 
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR t.jenis_transaksi = 'TRANSFER') " . 
+                    ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int)$gudangId : "") . " 
+                    AND (UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%SECOND%')
+                    THEN -td.qty
                     ELSE 0 
                 END) as net_bekas,
                 SUM(CASE 
@@ -433,6 +483,10 @@ class LaporanController extends Controller
                     ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int)$gudangId : "") . " 
                     AND UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%RUSAK%' 
                     THEN td.qty 
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR t.jenis_transaksi = 'TRANSFER') " . 
+                    ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int)$gudangId : "") . " 
+                    AND UPPER(COALESCE(t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                    THEN -td.qty
                     ELSE 0 
                 END) as net_rusak
             ")
@@ -506,9 +560,13 @@ class LaporanController extends Controller
                     $kBekas  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS'))->count();
                     $kRusak  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
                 } else {
-                    $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? $stokAkhir));
+                    $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? 0));
                     $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
                     $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
+
+                    if ($kBaru === 0 && $kBekas === 0 && $stokAkhir > 0) {
+                        $kBaru = $stokAkhir;
+                    }
                 }
 
                 if ($kondisi && $kondisi !== 'ALL') {

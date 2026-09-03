@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Trash2, Check, Minus, Plus, PackageCheck, Search, X, CheckSquare } from 'lucide-react';
+import { Trash2, Check, Minus, Plus, PackageCheck, Search, X } from 'lucide-react';
 import HybridDropdown from '@/components/HybridDropdown';
 import ModalSerialSelector from './ModalSerialSelector';
 import { CATEGORIES_KELUAR, LIST_KEPERLUAN_PATEN } from './ModalBarangKeluarControl';
@@ -26,10 +26,8 @@ export default function ModalBarangKeluarRow({
     onBarangChange,
     onQtyChange,
     onNonSnBatchQtyChange,
-    onAutoSelectNonSnBatches,
     onSnSearchChange,
     onToggleTransferSn,
-    onAutoSelectTransferSns,
     onClearTransferSns
 }) {
     const [nonSnSearch, setNonSnSearch] = useState('');
@@ -54,7 +52,7 @@ export default function ModalBarangKeluarRow({
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
         : '';
 
-    // GABUNGKAN DATA BATCH BERDASARKAN KONDISI (KONDISI SAMA = 1 KARTU SAJA DENGAN AKUMULASI STOKNYA)
+    // Pengelompokan batch Non-SN berdasarkan kondisi fisik unit
     const groupedNonSnBatches = useMemo(() => {
         if (isWajibSn || !targetBarang || !row.gudang_asal_id) return [];
 
@@ -105,7 +103,6 @@ export default function ModalBarangKeluarRow({
             }));
         }
 
-        // Fallback jika belum ada transaksi masuk tercatat
         return [
             {
                 key: 'Baru',
@@ -246,146 +243,150 @@ export default function ModalBarangKeluarRow({
                 </div>
             </div>
 
-            {/* 3. Detail Barang & Kuantitas */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Pengeluaran *</Label>
-                    <Input
-                        type="date"
-                        disabled={isProcessing}
-                        value={row.tanggal}
-                        onClick={(e) => {
-                            try {
-                                if (typeof e.target.showPicker === 'function') e.target.showPicker();
-                            } catch (err) {}
-                        }}
-                        onChange={(e) => onFieldChange(rowIdx, 'tanggal', e.target.value)}
-                        className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
-                        required
-                    />
-                </div>
-
-                {/* Dropdown Kode PPL */}
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                        Kode PPL *
-                    </Label>
-                    <HybridDropdown
-                        value={targetBarang?.kode_barang || ''}
-                        options={pplOptions}
-                        onChange={(val, selectedOpt) => {
-                            if (!val) {
-                                onBarangChange(rowIdx, '');
-                                return;
+            {/* 3. Detail Barang, Kuantitas, dan Spesifikasi (Tata Letak 2 Baris Lega) */}
+            <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                {/* BARIS 1: KODE PPL (4/12) & NAMA BARANG (8/12 - LEGA DAN LEBAR) */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-4 space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                            Kode PPL *
+                        </Label>
+                        <HybridDropdown
+                            value={targetBarang?.kode_barang || ''}
+                            options={pplOptions}
+                            onChange={(val, selectedOpt) => {
+                                if (!val) {
+                                    onBarangChange(rowIdx, '');
+                                    return;
+                                }
+                                const cleanKode = String(selectedOpt?.value || val).split(' ')[0].trim().toLowerCase();
+                                const foundId = selectedOpt?.id || barangs.find(b => 
+                                    b.kode_barang.toLowerCase() === cleanKode || 
+                                    b.kode_barang.toLowerCase() === String(val).trim().toLowerCase()
+                                )?.id;
+                                if (foundId) onBarangChange(rowIdx, foundId);
+                            }}
+                            placeholder={
+                                !row.gudang_asal_id
+                                    ? "Pilih Gudang Asal Dulu..."
+                                    : (pplOptions.length === 0 ? "Stok Kosong di Gudang Ini" : "Pilih PPL...")
                             }
-                            const cleanKode = String(selectedOpt?.value || val).split(' ')[0].trim().toLowerCase();
-                            const foundId = selectedOpt?.id || barangs.find(b => 
-                                b.kode_barang.toLowerCase() === cleanKode || 
-                                b.kode_barang.toLowerCase() === String(val).trim().toLowerCase()
-                            )?.id;
-                            if (foundId) onBarangChange(rowIdx, foundId);
-                        }}
-                        placeholder={
-                            !row.gudang_asal_id
-                                ? "Pilih Gudang Asal Dulu..."
-                                : (pplOptions.length === 0 ? "Stok Kosong di Gudang Ini" : "Pilih PPL...")
-                        }
-                        searchPlaceholder="Cari Kode PPL..."
-                        disabled={isProcessing || isEditMode || !row.gudang_asal_id}
-                        inputClassName="h-8 text-xs font-mono font-bold"
-                    />
-                </div>
-
-                {/* Dropdown Nama Barang */}
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
-                    <HybridDropdown
-                        value={currentNamaBarang}
-                        options={namaOptions}
-                        onChange={(val, selectedOpt) => {
-                            if (!val) {
-                                onBarangChange(rowIdx, '');
-                                return;
-                            }
-                            const foundId = selectedOpt?.id || barangs.find(b => {
-                                const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
-                                return fullName.toLowerCase() === String(val).trim().toLowerCase();
-                            })?.id;
-                            if (foundId) onBarangChange(rowIdx, foundId);
-                        }}
-                        placeholder={
-                            !row.gudang_asal_id
-                                ? "Pilih Gudang Asal Dulu..."
-                                : (namaOptions.length === 0 ? "Stok Kosong di Gudang Ini" : "Pilih Barang...")
-                        }
-                        searchPlaceholder="Cari Nama Barang..."
-                        disabled={isProcessing || isEditMode || !row.gudang_asal_id}
-                        inputClassName="h-8 text-xs"
-                    />
-                </div>
-
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Part Number</Label>
-                    <Input
-                        disabled
-                        placeholder={isWajibPn ? "Part Number" : "-"}
-                        value={isWajibPn ? (targetBarang?.part_number || '') : '-'}
-                        className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-mono text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
-                    />
-                </div>
-
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Satuan / Unit</Label>
-                    <Input
-                        disabled
-                        value={targetBarang?.deskripsi || targetBarang?.satuan || 'Unit'}
-                        className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-medium text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
-                    />
-                </div>
-
-                {/* Stepper Quantity (Tersinkron Otomatis dengan Unit Kartu di Bawah) */}
-                <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Quantity *</Label>
-                        {stockInOrigin !== null && (
-                            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
-                                (Tersedia: {stockInOrigin})
-                            </span>
-                        )}
+                            searchPlaceholder="Cari Kode PPL..."
+                            disabled={isProcessing || isEditMode || !row.gudang_asal_id}
+                            inputClassName="h-8 text-xs font-mono font-bold"
+                        />
                     </div>
-                    <div className="flex items-center">
-                        <button
-                            type="button"
-                            disabled={isProcessing || row.qty <= 1}
-                            onClick={() => onQtyChange(rowIdx, row.qty - 1)}
-                            className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
-                        >
-                            <Minus className="w-3 h-3" />
-                        </button>
+
+                    <div className="sm:col-span-8 space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
+                        <HybridDropdown
+                            value={currentNamaBarang}
+                            options={namaOptions}
+                            onChange={(val, selectedOpt) => {
+                                if (!val) {
+                                    onBarangChange(rowIdx, '');
+                                    return;
+                                }
+                                const foundId = selectedOpt?.id || barangs.find(b => {
+                                    const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
+                                    return fullName.toLowerCase() === String(val).trim().toLowerCase();
+                                })?.id;
+                                if (foundId) onBarangChange(rowIdx, foundId);
+                            }}
+                            placeholder={
+                                !row.gudang_asal_id
+                                    ? "Pilih Gudang Asal Dulu..."
+                                    : (namaOptions.length === 0 ? "Stok Kosong di Gudang Ini" : "Pilih Barang...")
+                            }
+                            searchPlaceholder="Cari Nama Barang..."
+                            disabled={isProcessing || isEditMode || !row.gudang_asal_id}
+                            inputClassName="h-8 text-xs"
+                        />
+                    </div>
+                </div>
+
+                {/* BARIS 2: TANGGAL, QUANTITY, SATUAN, PART NUMBER */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Keluar *</Label>
                         <Input
-                            type="number"
-                            min={1}
-                            max={stockInOrigin || 50}
+                            type="date"
                             disabled={isProcessing}
-                            value={row.qty}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) => onQtyChange(rowIdx, e.target.value)}
-                            className="h-8 w-full text-center font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-rose-500"
+                            value={row.tanggal}
+                            onClick={(e) => {
+                                try {
+                                    if (typeof e.target.showPicker === 'function') e.target.showPicker();
+                                } catch (err) {}
+                            }}
+                            onChange={(e) => onFieldChange(rowIdx, 'tanggal', e.target.value)}
+                            className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
                             required
                         />
-                        <button
-                            type="button"
-                            disabled={isProcessing || (stockInOrigin !== null && row.qty >= stockInOrigin)}
-                            onClick={() => onQtyChange(rowIdx, row.qty + 1)}
-                            className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
-                        >
-                            <Plus className="w-3 h-3" />
-                        </button>
+                    </div>
+
+                    {/* Stepper Quantity */}
+                    <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Quantity *</Label>
+                            {stockInOrigin !== null && (
+                                <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                                    (Ada: {stockInOrigin})
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center">
+                            <button
+                                type="button"
+                                disabled={isProcessing || row.qty <= 1}
+                                onClick={() => onQtyChange(rowIdx, row.qty - 1)}
+                                className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
+                            >
+                                <Minus className="w-3 h-3" />
+                            </button>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={stockInOrigin || 50}
+                                disabled={isProcessing}
+                                value={row.qty}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => onQtyChange(rowIdx, e.target.value)}
+                                className="h-8 w-full text-center font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-rose-500"
+                                required
+                            />
+                            <button
+                                type="button"
+                                disabled={isProcessing || (stockInOrigin !== null && row.qty >= stockInOrigin)}
+                                onClick={() => onQtyChange(rowIdx, row.qty + 1)}
+                                className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
+                            >
+                                <Plus className="w-3 h-3" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Satuan / Unit</Label>
+                        <Input
+                            disabled
+                            value={targetBarang?.deskripsi || targetBarang?.satuan || 'Unit'}
+                            className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-medium text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Part Number</Label>
+                        <Input
+                            disabled
+                            placeholder={isWajibPn ? "Part Number" : "-"}
+                            value={isWajibPn ? (targetBarang?.part_number || '') : '-'}
+                            className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-mono text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
+                        />
                     </div>
                 </div>
             </div>
 
-            {/* 4. SELEKTOR KHUSUS NON-SN: KONDISI SAMA HANYA 1 KARTU + STEPPER AKTIF + MULTI PILIH */}
+            {/* 4. SELEKTOR KHUSUS NON-SN: CARD KONDISI + STEPPER DI KARTU (TANPA TOMBOL PILIH OTOMATIS) */}
             {!isWajibSn && targetBarang && (
                 <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -400,46 +401,27 @@ export default function ModalBarangKeluarRow({
                         </div>
                     </div>
 
-                    {/* Toolbar Pencarian & Pilih Otomatis */}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="relative flex-1 min-w-[160px] max-w-xs">
-                            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input
-                                value={nonSnSearch}
-                                onChange={(e) => setNonSnSearch(e.target.value)}
-                                placeholder="Cari nama barang / no IMC..."
-                                className="h-7 text-[11px] pl-7 pr-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                            />
-                            {nonSnSearch && (
-                                <button 
-                                    type="button" 
-                                    onClick={() => setNonSnSearch('')} 
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            )}
-                        </div>
-
-                        {filteredBatches.length > 0 && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    if (typeof onAutoSelectNonSnBatches === 'function') {
-                                        onAutoSelectNonSnBatches(rowIdx, filteredBatches, row.qty);
-                                    }
-                                }}
-                                className="h-7 px-2 text-[10px] gap-1 border-blue-200 text-blue-600 dark:border-blue-900 dark:text-blue-400 cursor-pointer"
+                    {/* Toolbar Pencarian Bersih Tanpa Tombol Pilih Otomatis */}
+                    <div className="relative w-full sm:w-72">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <Input
+                            value={nonSnSearch}
+                            onChange={(e) => setNonSnSearch(e.target.value)}
+                            placeholder="Cari nama barang / no IMC..."
+                            className="h-7 text-[11px] pl-7 pr-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                        />
+                        {nonSnSearch && (
+                            <button 
+                                type="button" 
+                                onClick={() => setNonSnSearch('')} 
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                             >
-                                <CheckSquare className="w-3 h-3" />
-                                <span>Pilih Otomatis ({row.qty})</span>
-                            </Button>
+                                <X className="w-3 h-3" />
+                            </button>
                         )}
                     </div>
 
-                    {/* Grid Kartu Non-SN: Kondisi Sama Hanya 1 Kartu */}
+                    {/* Grid Kartu Non-SN */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto pt-1">
                         {filteredBatches.length === 0 ? (
                             <div className="col-span-full py-3 text-center text-xs text-slate-400">
@@ -460,7 +442,7 @@ export default function ModalBarangKeluarRow({
                                                 : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400'
                                         }`}
                                     >
-                                        {/* Bagian Atas Kartu: Checkbox, Nama/IMC, dan Badge Kondisi */}
+                                        {/* Klik Kartu Langsung Menambah 1 Unit */}
                                         <div 
                                             className="flex items-start justify-between gap-1.5 cursor-pointer select-none"
                                             onClick={() => {
@@ -493,7 +475,7 @@ export default function ModalBarangKeluarRow({
                                             </span>
                                         </div>
 
-                                        {/* Bagian Bawah Kartu: Mini Stepper Kuantitas */}
+                                        {/* Stepper Kuantitas Kartu */}
                                         <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80">
                                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                                 Tersedia: <strong>{b.max_stock}</strong>
@@ -553,7 +535,6 @@ export default function ModalBarangKeluarRow({
                     snSearch={snSearch}
                     onSnSearchChange={onSnSearchChange}
                     onToggleTransferSn={onToggleTransferSn}
-                    onAutoSelectTransferSns={onAutoSelectTransferSns}
                     onClearTransferSns={onClearTransferSns}
                 />
             )}
