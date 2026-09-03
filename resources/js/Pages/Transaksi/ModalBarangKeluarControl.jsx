@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import { Truck, Wrench } from 'lucide-react';
 
@@ -64,21 +64,48 @@ export function useModalBarangKeluarControl({
         return gudangs.map(g => ({ value: g.nama_gudang, label: g.nama_gudang, id: g.id }));
     }, [gudangs]);
 
+    // Opsi Kode PPL: Sub-label khusus Wajib SN / PN saja dengan font kecil dan tidak ada info stok
     const getBarangPplOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
         return barangs
             .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
             .map(b => {
                 const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
+                const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
+                const isPn = Boolean(b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1');
+
                 return {
                     value: b.kode_barang,
-                    label: `${b.kode_barang} (Stok: ${stok})`,
+                    label: b.kode_barang,
                     id: b.id,
-                    stock: stok
+                    stock: stok,
+                    is_wajib_sn: isSn,
+                    is_wajib_pn: isPn,
+                    subLabel: (
+                        <div className="flex items-center gap-1 text-[8px] leading-none mt-0.5 font-sans">
+                            {isSn && (
+                                <span className="text-amber-500 dark:text-amber-400 font-bold tracking-tight">
+                                    Wajib SN
+                                </span>
+                            )}
+                            {isSn && isPn && <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>}
+                            {isPn && (
+                                <span className="text-cyan-600 dark:text-cyan-400 font-bold tracking-tight">
+                                    Wajib PN
+                                </span>
+                            )}
+                            {!isSn && !isPn && (
+                                <span className="text-slate-400 dark:text-slate-500 font-medium">
+                                    Standar
+                                </span>
+                            )}
+                        </div>
+                    )
                 };
             });
     }, [barangs, getBarangStockInWarehouse]);
 
+    // Opsi Nama Barang: Nama utama bersih dan info stok dipindahkan ke subLabel
     const getBarangNamaOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
         return barangs
@@ -88,9 +115,17 @@ export function useModalBarangKeluarControl({
                 const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
                 return {
                     value: kombinasiNama,
-                    label: `${kombinasiNama} (Stok: ${stok})`,
+                    label: kombinasiNama,
                     id: b.id,
-                    stock: stok
+                    stock: stok,
+                    subLabel: (
+                        <div className="flex items-center gap-1 text-[8.5px] leading-none mt-0.5 font-sans">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">Tersedia:</span>
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                {stok} {b.deskripsi || b.satuan || 'Unit'}
+                            </span>
+                        </div>
+                    )
                 };
             });
     }, [barangs, getBarangStockInWarehouse]);
@@ -161,7 +196,6 @@ export function useModalBarangKeluarControl({
                 }
             }
 
-            // Atur nilai pihak_asal jika berpindah kategori Non Proyek
             if (field === 'sub_jenis') {
                 if (value === 'PEMAKAIAN_INTERNAL') {
                     if (!LIST_KEPERLUAN_PATEN.includes(newPihakAsal)) {

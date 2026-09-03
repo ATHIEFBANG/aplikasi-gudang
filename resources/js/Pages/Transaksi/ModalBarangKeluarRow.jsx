@@ -44,7 +44,7 @@ export default function ModalBarangKeluarRow({
     const isProyek = row.sub_jenis === 'BARANG_KE_SITE';
     const pihakTujuanLabel = isProyek
         ? 'Site Tujuan / Nama Site / Teknisi *'
-        : 'Keperluan / Divisi *';
+        : 'Keperluan / Departemen *';
 
     const currentNamaBarang = targetBarang 
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
@@ -75,7 +75,7 @@ export default function ModalBarangKeluarRow({
                 )}
             </div>
 
-            {/* 1. Kategori Jenis Pengeluaran (Proyek vs Non Proyek) */}
+            {/* 1. Kategori Jenis Pengeluaran */}
             {!isEditMode && (
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kategori Pengeluaran *</Label>
@@ -139,7 +139,6 @@ export default function ModalBarangKeluarRow({
                     </div>
                 </div>
 
-                {/* Kolom Tujuan: Bebas ketik jika Proyek, Dropdown paten jika Non Proyek */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
                         {pihakTujuanLabel}
@@ -187,7 +186,7 @@ export default function ModalBarangKeluarRow({
                     />
                 </div>
 
-                {/* Dropdown Kode PPL */}
+                {/* Dropdown Kode PPL (SubLabel hanya status Wajib SN/PN/Standar font kecil) */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                         Kode PPL *
@@ -196,7 +195,15 @@ export default function ModalBarangKeluarRow({
                         value={targetBarang?.kode_barang || ''}
                         options={pplOptions}
                         onChange={(val, selectedOpt) => {
-                            const foundId = selectedOpt?.id || barangs.find(b => b.kode_barang.toLowerCase() === val.split(' ')[0].trim().toLowerCase())?.id;
+                            if (!val) {
+                                onBarangChange(rowIdx, '');
+                                return;
+                            }
+                            const cleanKode = String(selectedOpt?.value || val).split(' ')[0].trim().toLowerCase();
+                            const foundId = selectedOpt?.id || barangs.find(b => 
+                                b.kode_barang.toLowerCase() === cleanKode || 
+                                b.kode_barang.toLowerCase() === String(val).trim().toLowerCase()
+                            )?.id;
                             if (foundId) onBarangChange(rowIdx, foundId);
                         }}
                         placeholder={
@@ -210,16 +217,20 @@ export default function ModalBarangKeluarRow({
                     />
                 </div>
 
-                {/* Dropdown Nama Barang */}
+                {/* Dropdown Nama Barang (SubLabel menampilkan Stok Gudang) */}
                 <div className="space-y-1">
                     <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
                     <HybridDropdown
                         value={currentNamaBarang}
                         options={namaOptions}
                         onChange={(val, selectedOpt) => {
+                            if (!val) {
+                                onBarangChange(rowIdx, '');
+                                return;
+                            }
                             const foundId = selectedOpt?.id || barangs.find(b => {
                                 const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
-                                return fullName.toLowerCase() === val.split(' (Stok:')[0].trim().toLowerCase();
+                                return fullName.toLowerCase() === String(val).trim().toLowerCase();
                             })?.id;
                             if (foundId) onBarangChange(rowIdx, foundId);
                         }}

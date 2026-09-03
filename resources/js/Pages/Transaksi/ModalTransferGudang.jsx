@@ -53,30 +53,71 @@ export default function ModalTransferGudang({
         return gudangs.map(g => ({ value: g.nama_gudang, label: g.nama_gudang, id: g.id }));
     }, [gudangs]);
 
-    const getBarangPplOptions = (row) => {
-        if (!row.gudang_asal_id) return [];
-        return barangs
-            .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
-            .map(b => ({
-                value: b.kode_barang,
-                label: `${b.kode_barang} (Stok: ${getBarangStockInWarehouse(b, row.gudang_asal_id)})`,
-                id: b.id,
-            }));
-    };
-
-    const getBarangNamaOptions = (row) => {
+    // Opsi Kode PPL: SubLabel khusus Wajib SN/PN/Standar ukuran ringkas
+    const getBarangPplOptions = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
         return barangs
             .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
             .map(b => {
-                const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
+                const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
+                const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
+                const isPn = Boolean(b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1');
+
                 return {
-                    value: kombinasiNama,
-                    label: `${kombinasiNama} (Stok: ${getBarangStockInWarehouse(b, row.gudang_asal_id)})`,
+                    value: b.kode_barang,
+                    label: b.kode_barang,
                     id: b.id,
+                    stock: stok,
+                    is_wajib_sn: isSn,
+                    is_wajib_pn: isPn,
+                    subLabel: (
+                        <div className="flex items-center gap-1 text-[8px] leading-none mt-0.5 font-sans">
+                            {isSn && (
+                                <span className="text-amber-500 dark:text-amber-400 font-bold tracking-tight">
+                                    Wajib SN
+                                </span>
+                            )}
+                            {isSn && isPn && <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>}
+                            {isPn && (
+                                <span className="text-cyan-600 dark:text-cyan-400 font-bold tracking-tight">
+                                    Wajib PN
+                                </span>
+                            )}
+                            {!isSn && !isPn && (
+                                <span className="text-slate-400 dark:text-slate-500 font-medium">
+                                    Standar
+                                </span>
+                            )}
+                        </div>
+                    )
                 };
             });
-    };
+    }, [barangs, getBarangStockInWarehouse]);
+
+    // Opsi Nama Barang: SubLabel menampilkan stok fisik yang tersedia di Gudang Asal
+    const getBarangNamaOptions = useCallback((row) => {
+        if (!row.gudang_asal_id) return [];
+        return barangs
+            .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
+            .map(b => {
+                const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
+                const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
+                return {
+                    value: kombinasiNama,
+                    label: kombinasiNama,
+                    id: b.id,
+                    stock: stok,
+                    subLabel: (
+                        <div className="flex items-center gap-1 text-[8.5px] leading-none mt-0.5 font-sans">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">Tersedia:</span>
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                {stok} {b.deskripsi || b.satuan || 'Unit'}
+                            </span>
+                        </div>
+                    )
+                };
+            });
+    }, [barangs, getBarangStockInWarehouse]);
 
     const handleRowFieldChange = (idx, field, value) => {
         setRows(prev => {
@@ -92,6 +133,20 @@ export default function ModalTransferGudang({
     };
 
     const handleBarangChange = (idx, barangId) => {
+        if (!barangId) {
+            setRows(prev => {
+                const updated = [...prev];
+                updated[idx] = {
+                    ...updated[idx],
+                    barang_id: '',
+                    qty: 1,
+                    serials: []
+                };
+                return updated;
+            });
+            return;
+        }
+
         const target = barangs.find(b => String(b.id) === String(barangId));
         setRows(prev => {
             const updated = [...prev];
@@ -114,7 +169,6 @@ export default function ModalTransferGudang({
             const target = barangs.find(b => String(b.id) === String(updated[idx].barang_id));
             const maxStok = getBarangStockInWarehouse(target, updated[idx].gudang_asal_id);
             if (maxStok > 0 && count > maxStok) count = maxStok;
-
             updated[idx] = {
                 ...updated[idx],
                 qty: count,
@@ -186,7 +240,6 @@ export default function ModalTransferGudang({
                 return;
             }
         }
-
         setIsProcessing(true);
         router.post('/transaksi/transfer', { items: rows }, {
             preserveScroll: true,
@@ -219,17 +272,22 @@ export default function ModalTransferGudang({
                     <strong>Mutasi Internal:</strong> Transfer akan memotong stok di <strong>Gudang Asal</strong> dan menambahkannya ke <strong>Gudang Tujuan</strong> secara langsung.
                 </AlertDescription>
             </Alert>
-
             <div className="space-y-4">
                 {rows.map((row, rowIdx) => {
                     const targetBarang = barangs.find(b => String(b.id) === String(row.barang_id));
                     const isWajibSn = Boolean(targetBarang?.is_wajib_sn);
+                    const isWajibPn = Boolean(targetBarang?.is_wajib_pn);
+                    const currentNamaBarang = targetBarang 
+                        ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
+                        : '';
                     const stockInOrigin = targetBarang && row.gudang_asal_id 
                         ? getBarangStockInWarehouse(targetBarang, row.gudang_asal_id) 
                         : null;
                     const availableSns = (targetBarang?.serials || []).filter(
                         s => String(s.gudang_id) === String(row.gudang_asal_id) && s.status === 'IN_WAREHOUSE'
                     );
+                    const pplOptions = getBarangPplOptions(row);
+                    const namaOptions = getBarangNamaOptions(row);
 
                     return (
                         <div key={`trf-row-${rowIdx}`} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 space-y-3">
@@ -243,7 +301,7 @@ export default function ModalTransferGudang({
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => setRows(prev => prev.filter((_, i) => i !== rowIdx))}
-                                        className="h-7 px-2 text-rose-500 hover:text-rose-700 text-xs gap-1"
+                                        className="h-7 px-2 text-rose-500 hover:text-rose-700 text-xs gap-1 cursor-pointer"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" /> Hapus
                                     </Button>
@@ -258,11 +316,12 @@ export default function ModalTransferGudang({
                                         <HybridDropdown
                                             value={gudangs.find(g => String(g.id) === String(row.gudang_asal_id))?.nama_gudang || ''}
                                             options={gudangOptions}
-                                            onChange={(val) => {
-                                                const found = gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase());
-                                                handleRowFieldChange(rowIdx, 'gudang_asal_id', found ? String(found.id) : '');
+                                            onChange={(val, selectedOpt) => {
+                                                const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase())?.id;
+                                                handleRowFieldChange(rowIdx, 'gudang_asal_id', targetId ? String(targetId) : '');
                                             }}
                                             placeholder="Pilih Gudang Asal..."
+                                            searchPlaceholder="Cari Gudang Asal..."
                                             inputClassName="h-8 text-xs font-semibold"
                                         />
                                     </div>
@@ -272,23 +331,23 @@ export default function ModalTransferGudang({
                                             placeholder="Ketik nomor OMC..."
                                             value={row.nomor_omc}
                                             onChange={(e) => handleRowFieldChange(rowIdx, 'nomor_omc', e.target.value)}
-                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono"
+                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
                                             required
                                         />
                                     </div>
                                 </div>
-
                                 <div className="space-y-2.5">
                                     <div className="space-y-1">
                                         <Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">2. Gudang Tujuan (Penerima) *</Label>
                                         <HybridDropdown
                                             value={gudangs.find(g => String(g.id) === String(row.gudang_tujuan_id))?.nama_gudang || ''}
                                             options={gudangOptions}
-                                            onChange={(val) => {
-                                                const found = gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase());
-                                                handleRowFieldChange(rowIdx, 'gudang_tujuan_id', found ? String(found.id) : '');
+                                            onChange={(val, selectedOpt) => {
+                                                const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase())?.id;
+                                                handleRowFieldChange(rowIdx, 'gudang_tujuan_id', targetId ? String(targetId) : '');
                                             }}
                                             placeholder="Pilih Gudang Penerima..."
+                                            searchPlaceholder="Cari Gudang Penerima..."
                                             inputClassName="h-8 text-xs font-semibold text-emerald-600 dark:text-emerald-400"
                                         />
                                     </div>
@@ -298,87 +357,148 @@ export default function ModalTransferGudang({
                                             placeholder="Ketik nomor IMC..."
                                             value={row.nomor_imc}
                                             onChange={(e) => handleRowFieldChange(rowIdx, 'nomor_imc', e.target.value)}
-                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono"
+                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Detail Barang & QTY */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                                <div className="space-y-1">
-                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal *</Label>
-                                    <Input
-                                        type="date"
-                                        value={row.tanggal}
-                                        onChange={(e) => handleRowFieldChange(rowIdx, 'tanggal', e.target.value)}
-                                        className="h-8 text-xs bg-white dark:bg-slate-900"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kode PPL *</Label>
-                                    <HybridDropdown
-                                        value={targetBarang?.kode_barang || ''}
-                                        options={getBarangPplOptions(row)}
-                                        onChange={(val) => {
-                                            const found = barangs.find(b => b.kode_barang.toLowerCase() === val.split(' ')[0].toLowerCase());
-                                            if (found) handleBarangChange(rowIdx, found.id);
-                                        }}
-                                        placeholder="Pilih Kode PPL..."
-                                        inputClassName="h-8 text-xs font-mono font-bold"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
-                                    <HybridDropdown
-                                        value={targetBarang ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang) : ''}
-                                        options={getBarangNamaOptions(row)}
-                                        onChange={(val) => {
-                                            const cleanVal = val.split(' (Stok:')[0].trim().toLowerCase();
-                                            const found = barangs.find(b => {
-                                                const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
-                                                return fullName.toLowerCase() === cleanVal || b.kode_barang.toLowerCase() === cleanVal;
-                                            });
-                                            if (found) handleBarangChange(rowIdx, found.id);
-                                        }}
-                                        placeholder="Pilih Barang..."
-                                        inputClassName="h-8 text-xs"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Quantity *</Label>
-                                        {stockInOrigin !== null && (
-                                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">(Stok: {stockInOrigin})</span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center">
-                                        <button
-                                            type="button"
-                                            disabled={row.qty <= 1}
-                                            onClick={() => handleQtyChange(rowIdx, row.qty - 1)}
-                                            className="h-8 w-8 rounded-l-lg border border-r-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs"
-                                        >
-                                            <Minus className="w-3 h-3" />
-                                        </button>
+                            {/* Detail Barang, Tanggal, dan Kuantitas (2 Baris Lega) */}
+                            <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                {/* Baris 1: Tanggal, Kode PPL Lega, Nama Barang Lega */}
+                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                                    <div className="sm:col-span-3 space-y-1">
+                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal *</Label>
                                         <Input
-                                            type="number"
-                                            min={1}
-                                            max={stockInOrigin || 50}
-                                            value={row.qty}
-                                            onChange={(e) => handleQtyChange(rowIdx, e.target.value)}
-                                            className="h-8 w-full text-center font-bold text-xs rounded-none bg-white dark:bg-slate-900"
+                                            type="date"
+                                            value={row.tanggal}
+                                            onClick={(e) => {
+                                                try {
+                                                    if (typeof e.target.showPicker === 'function') e.target.showPicker();
+                                                } catch (err) {}
+                                            }}
+                                            onChange={(e) => handleRowFieldChange(rowIdx, 'tanggal', e.target.value)}
+                                            className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
                                             required
                                         />
-                                        <button
-                                            type="button"
-                                            disabled={stockInOrigin !== null && row.qty >= stockInOrigin}
-                                            onClick={() => handleQtyChange(rowIdx, row.qty + 1)}
-                                            className="h-8 w-8 rounded-r-lg border border-l-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs"
-                                        >
-                                            <Plus className="w-3 h-3" />
-                                        </button>
+                                    </div>
+
+                                    {/* Dropdown Kode PPL (Lega) */}
+                                    <div className="sm:col-span-4 space-y-1">
+                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kode PPL *</Label>
+                                        <HybridDropdown
+                                            value={targetBarang?.kode_barang || ''}
+                                            options={pplOptions}
+                                            onChange={(val, selectedOpt) => {
+                                                if (!val) {
+                                                    handleBarangChange(rowIdx, '');
+                                                    return;
+                                                }
+                                                const cleanKode = String(selectedOpt?.value || val).split(' ')[0].trim().toLowerCase();
+                                                const foundId = selectedOpt?.id || barangs.find(b => 
+                                                    b.kode_barang.toLowerCase() === cleanKode ||
+                                                    b.kode_barang.toLowerCase() === String(val).trim().toLowerCase()
+                                                )?.id;
+                                                if (foundId) handleBarangChange(rowIdx, foundId);
+                                            }}
+                                            placeholder={
+                                                !row.gudang_asal_id
+                                                    ? "Pilih Gudang Asal Dulu..."
+                                                    : (pplOptions.length === 0 ? "Stok Kosong di Gudang Ini" : "Pilih PPL...")
+                                            }
+                                            searchPlaceholder="Cari Kode PPL..."
+                                            disabled={isProcessing || !row.gudang_asal_id}
+                                            inputClassName="h-8 text-xs font-mono font-bold"
+                                        />
+                                    </div>
+
+                                    {/* Dropdown Nama Barang (Lega) */}
+                                    <div className="sm:col-span-5 space-y-1">
+                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Barang *</Label>
+                                        <HybridDropdown
+                                            value={currentNamaBarang}
+                                            options={namaOptions}
+                                            onChange={(val, selectedOpt) => {
+                                                if (!val) {
+                                                    handleBarangChange(rowIdx, '');
+                                                    return;
+                                                }
+                                                const foundId = selectedOpt?.id || barangs.find(b => {
+                                                    const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
+                                                    return fullName.toLowerCase() === String(val).trim().toLowerCase();
+                                                })?.id;
+                                                if (foundId) handleBarangChange(rowIdx, foundId);
+                                            }}
+                                            placeholder={
+                                                !row.gudang_asal_id
+                                                    ? "Pilih Gudang Asal Dulu..."
+                                                    : (namaOptions.length === 0 ? "Stok Kosong di Gudang Ini" : "Pilih Barang...")
+                                            }
+                                            searchPlaceholder="Cari Nama Barang..."
+                                            disabled={isProcessing || !row.gudang_asal_id}
+                                            inputClassName="h-8 text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Baris 2: Quantity (Tepat di Bawah Tanggal), Satuan / Unit, dan Part Number */}
+                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                                    <div className="sm:col-span-3 space-y-1">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Quantity *</Label>
+                                            {stockInOrigin !== null && (
+                                                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">(Stok: {stockInOrigin})</span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center">
+                                            <button
+                                                type="button"
+                                                disabled={row.qty <= 1}
+                                                onClick={() => handleQtyChange(rowIdx, row.qty - 1)}
+                                                className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs cursor-pointer disabled:opacity-40 transition-colors"
+                                            >
+                                                <Minus className="w-3 h-3" />
+                                            </button>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={stockInOrigin || 50}
+                                                value={row.qty}
+                                                onFocus={(e) => e.target.select()}
+                                                onChange={(e) => handleQtyChange(rowIdx, e.target.value)}
+                                                className="h-8 w-full text-center font-bold text-xs rounded-none bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                                                required
+                                            />
+                                            <button
+                                                type="button"
+                                                disabled={stockInOrigin !== null && row.qty >= stockInOrigin}
+                                                onClick={() => handleQtyChange(rowIdx, row.qty + 1)}
+                                                className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs cursor-pointer disabled:opacity-40 transition-colors"
+                                            >
+                                                <Plus className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Kolom Satuan / Unit */}
+                                    <div className="sm:col-span-3 space-y-1">
+                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Satuan / Unit</Label>
+                                        <Input
+                                            disabled
+                                            value={targetBarang?.deskripsi || targetBarang?.satuan || 'Unit'}
+                                            className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-medium text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
+                                        />
+                                    </div>
+
+                                    {/* Kolom Part Number */}
+                                    <div className="sm:col-span-6 space-y-1">
+                                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Part Number</Label>
+                                        <Input
+                                            disabled
+                                            placeholder={isWajibPn ? "Part Number" : "-"}
+                                            value={isWajibPn ? (targetBarang?.part_number || '') : '-'}
+                                            className="h-8 text-xs bg-slate-100 dark:bg-slate-900/60 font-mono text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed"
+                                        />
                                     </div>
                                 </div>
                             </div>
