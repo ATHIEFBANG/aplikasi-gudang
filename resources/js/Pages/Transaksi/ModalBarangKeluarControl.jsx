@@ -16,7 +16,8 @@ export const LIST_KEPERLUAN_PATEN = [
     'Sales',
     'Bill-co',
     'Compliance',
-    'Purchasing'
+    'Purchasing',
+    'Gudang'
 ];
 
 export function useModalBarangKeluarControl({
@@ -57,6 +58,8 @@ export function useModalBarangKeluarControl({
             nomor_omc: '',
             nomor_imc: '',
             pihak_asal: '',
+            kode_projek: '',
+            nama_customer: '',
             gudang_asal_id: gudangs[0]?.id ? String(gudangs[0].id) : '',
             barang_id: '',
             qty: 1,
@@ -205,6 +208,8 @@ export function useModalBarangKeluarControl({
                     nomor_omc: selectedItem.nomor_omc || '',
                     nomor_imc: selectedItem.nomor_imc || '',
                     pihak_asal: selectedItem.pihak_asal || '',
+                    kode_projek: selectedItem.kode_projek || '',
+                    nama_customer: selectedItem.nama_customer || '',
                     gudang_asal_id: selectedItem.gudang_asal_id ? String(selectedItem.gudang_asal_id) : '',
                     barang_id: detail.barang_id ? String(detail.barang_id) : '',
                     qty: detail.qty || 1,
@@ -529,6 +534,8 @@ export function useModalBarangKeluarControl({
                 nomor_omc: rows[0].nomor_omc.trim(),
                 nomor_imc: rows[0].nomor_imc ? rows[0].nomor_imc.trim() : null,
                 pihak_asal: rows[0].pihak_asal.trim(),
+                kode_projek: rows[0].kode_projek ? rows[0].kode_projek.trim() : null,
+                nama_customer: rows[0].nama_customer ? rows[0].nama_customer.trim() : null,
             }
             : {
                 items: rows.map(r => ({
@@ -538,6 +545,8 @@ export function useModalBarangKeluarControl({
                     nomor_omc: r.nomor_omc.trim(),
                     nomor_imc: r.nomor_imc ? r.nomor_imc.trim() : null,
                     pihak_asal: r.pihak_asal.trim(),
+                    kode_projek: r.kode_projek ? r.kode_projek.trim() : null,
+                    nama_customer: r.nama_customer ? r.nama_customer.trim() : null,
                     gudang_asal_id: parseInt(r.gudang_asal_id, 10),
                     barang_id: parseInt(r.barang_id, 10),
                     qty: parseInt(r.qty, 10),

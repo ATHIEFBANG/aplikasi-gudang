@@ -60,13 +60,15 @@ class TransaksiController extends Controller
                   ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         }
 
-        // 3. Optimasi Pencarian (Menggunakan single EXISTS JOIN menggantikan double nested whereHas)
+        // 3. Optimasi Pencarian
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('no_transaksi', 'like', "%{$search}%")
                   ->orWhere('nomor_imc', 'like', "%{$search}%")
                   ->orWhere('nomor_omc', 'like', "%{$search}%")
                   ->orWhere('pihak_asal', 'like', "%{$search}%")
+                  ->orWhere('kode_projek', 'like', "%{$search}%")   // <-- Tambahan Baru
+                  ->orWhere('nama_customer', 'like', "%{$search}%") // <-- Tambahan Baru
                   ->orWhereExists(function ($sub) use ($search) {
                       $sub->select(DB::raw(1))
                           ->from('transaksi_details')
@@ -158,7 +160,7 @@ class TransaksiController extends Controller
                 return $g;
             });
 
-        // 5. Query Master Barang Cepat & Ringan (Tanpa Subquery whereHas yang memicu timeout)
+        // 5. Query Master Barang Cepat & Ringan
         $barangList = Barang::select([
             'id', 
             'kode_barang', 
@@ -180,7 +182,7 @@ class TransaksiController extends Controller
             },
             'transaksiDetails' => function ($q) {
                 $q->select('id', 'transaksi_id', 'barang_id', 'qty', 'kondisi')
-                  ->with(['transaksi:id,no_transaksi,nomor_imc,nomor_omc,kondisi,gudang_tujuan_id,tanggal,status,jenis_transaksi,sub_jenis']);
+                  ->with(['transaksi:id,no_transaksi,nomor_imc,nomor_omc,kondisi,gudang_tujuan_id,tanggal,status,jenis_transaksi,sub_jenis,kode_projek,nama_customer']);
             }
         ])->get();
 
@@ -209,6 +211,8 @@ class TransaksiController extends Controller
                 'items.*.nomor_imc'         => 'required|string|max:100',
                 'items.*.nomor_omc'         => 'nullable|string|max:100',
                 'items.*.pihak_asal'        => 'required|string|max:255',
+                'items.*.kode_projek'       => 'nullable|string|max:100', // <-- Tambahan Baru
+                'items.*.nama_customer'     => 'nullable|string|max:255', // <-- Tambahan Baru
                 'items.*.gudang_tujuan_id'  => 'required|exists:gudangs,id',
                 'items.*.barang_id'         => 'required|exists:barangs,id',
                 'items.*.qty'               => 'required|integer|min:1|max:50',
@@ -240,6 +244,8 @@ class TransaksiController extends Controller
                         'nomor_imc'        => $item['nomor_imc'],
                         'nomor_omc'        => $item['nomor_omc'] ?? null,
                         'pihak_asal'       => $item['pihak_asal'],
+                        'kode_projek'      => !empty($item['kode_projek']) ? trim($item['kode_projek']) : null,   // <-- Tambahan Baru
+                        'nama_customer'    => !empty($item['nama_customer']) ? trim($item['nama_customer']) : null, // <-- Tambahan Baru
                         'gudang_asal_id'   => null,
                         'gudang_tujuan_id' => $item['gudang_tujuan_id'],
                         'pic_user_id'      => $request->user()->id,
@@ -329,6 +335,8 @@ class TransaksiController extends Controller
             'items.*.tanggal'          => 'required|date',
             'items.*.nomor_omc'        => 'required|string|max:100',
             'items.*.nomor_imc'        => 'nullable|string|max:100',
+            'items.*.kode_projek'      => 'nullable|string|max:100', // <-- Tambahan Baru
+            'items.*.nama_customer'    => 'nullable|string|max:255', // <-- Tambahan Baru
             'items.*.gudang_asal_id'   => 'required|exists:gudangs,id',
             'items.*.gudang_tujuan_id' => 'required|exists:gudangs,id',
             'items.*.barang_id'        => 'required|exists:barangs,id',
@@ -375,6 +383,8 @@ class TransaksiController extends Controller
                     'kondisi'          => '-',
                     'nomor_omc'        => $item['nomor_omc'],
                     'nomor_imc'        => $item['nomor_imc'] ?? null,
+                    'kode_projek'      => !empty($item['kode_projek']) ? trim($item['kode_projek']) : null,   // <-- Tambahan Baru
+                    'nama_customer'    => !empty($item['nama_customer']) ? trim($item['nama_customer']) : null, // <-- Tambahan Baru
                     'gudang_asal_id'   => $gudangAsalId,
                     'gudang_tujuan_id' => $gudangTujuanId,
                     'pic_user_id'      => $request->user()->id,
@@ -456,6 +466,8 @@ class TransaksiController extends Controller
             'nomor_imc'        => 'nullable|string|max:100',
             'nomor_omc'        => 'nullable|string|max:100',
             'pihak_asal'       => 'nullable|string|max:255',
+            'kode_projek'      => 'nullable|string|max:100', // <-- Tambahan Baru
+            'nama_customer'    => 'nullable|string|max:255', // <-- Tambahan Baru
             'gudang_tujuan_id' => 'nullable|exists:gudangs,id',
             'qty'              => 'nullable|integer|min:1|max:50',
             'harga'            => 'nullable|numeric|min:0',
@@ -505,6 +517,8 @@ class TransaksiController extends Controller
                 'nomor_imc'        => $validated['nomor_imc'] ?? $transaksi->nomor_imc,
                 'nomor_omc'        => $validated['nomor_omc'] ?? $transaksi->nomor_omc,
                 'pihak_asal'       => $validated['pihak_asal'] ?? $transaksi->pihak_asal,
+                'kode_projek'      => $validated['kode_projek'] ?? $transaksi->kode_projek,     // <-- Tambahan Baru
+                'nama_customer'    => $validated['nama_customer'] ?? $transaksi->nama_customer, // <-- Tambahan Baru
                 'gudang_tujuan_id' => $newGudangTujuanId,
                 'keterangan'       => $validated['keterangan'] ?? $transaksi->keterangan,
             ]);
@@ -575,6 +589,8 @@ class TransaksiController extends Controller
             'Kondisi', 
             'Nomor IMC', 
             'Nomor OMC', 
+            'Kode Projek',    // <-- Tambahan Baru
+            'Nama Customer',  // <-- Tambahan Baru
             'Gudang Asal / Pihak Asal', 
             'Gudang Tujuan / Site', 
             'Serial Numbers'
@@ -607,6 +623,8 @@ class TransaksiController extends Controller
                     $t->kondisi ?? '-',
                     $t->nomor_imc ?? '-',
                     $t->nomor_omc ?? '-',
+                    $t->kode_projek ?? '-',   // <-- Tambahan Baru
+                    $t->nama_customer ?? '-', // <-- Tambahan Baru
                     $t->gudangAsal?->nama_gudang ?? ($t->pihak_asal ?? '-'),
                     $t->gudangTujuan?->nama_gudang ?? ($t->pihak_asal ?? '-'),
                     $snList ?: '-',

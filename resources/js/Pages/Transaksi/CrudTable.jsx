@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 const ALL_COLUMNS = [
     { key: 'no_transaksi', label: 'NO TRANSAKSI' },
     { key: 'sub_jenis', label: 'JENIS TRANSAKSI' },
+    { key: 'kode_projek', label: 'KODE PROYEK' },
+    { key: 'nama_customer', label: 'NAMA CUSTOMER' },
     { key: 'kode_ppl', label: 'KODE PPL' },
     { key: 'nama_barang', label: 'NAMA BARANG' },
     { key: 'part_number', label: 'PART NUMBER' },
@@ -43,7 +45,7 @@ export default function CrudTable({
             ];
         } else if (mainTab === 'KELUAR') {
             visibleKeys = [
-                'no_transaksi', 'sub_jenis', 'kode_ppl', 'nama_barang', 'part_number', 
+                'no_transaksi', 'sub_jenis', 'kode_projek', 'nama_customer', 'kode_ppl', 'nama_barang', 'part_number', 
                 'satuan', 'tanggal', 'qty', 'nomor_omc', 'asal', 'gudang_tujuan', 'serials'
             ];
         } else if (mainTab === 'TRANSFER') {
@@ -108,6 +110,18 @@ export default function CrudTable({
                             </Badge>
                         );
                     }
+                    case 'kode_projek':
+                        return (
+                            <span className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                                {item.kode_projek || '-'}
+                            </span>
+                        );
+                    case 'nama_customer':
+                        return (
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate block max-w-[140px]" title={item.nama_customer}>
+                                {item.nama_customer || '-'}
+                            </span>
+                        );
                     case 'kode_ppl':
                         return (
                             <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -232,7 +246,6 @@ export default function CrudTable({
                         const rawKondisi = String(detail.kondisi || item.kondisi || 'Baru').trim();
                         const qty = detail.qty || item.qty || 1;
 
-                        // 1. JIKA BARANG WAJIB SERIAL NUMBER (SN)
                         if (listSn.length > 0) {
                             return (
                                 <div className="flex flex-wrap gap-1 max-w-[280px] max-h-24 overflow-y-auto py-1">
@@ -270,8 +283,6 @@ export default function CrudTable({
                             );
                         }
 
-                        // 2. JIKA BARANG STANDAR (NON-SN): HANYA DI KELUAR & TRANSFER
-                        // Format teks sederhana: No SN (angka kondisi, angka kondisi, ...)
                         if (mainTab === 'KELUAR' || mainTab === 'TRANSFER') {
                             let cleanKondisi = (!rawKondisi || rawKondisi === '-') ? 'Baru' : rawKondisi;
                             if (!/^\d+/.test(cleanKondisi)) {
@@ -285,7 +296,6 @@ export default function CrudTable({
                             );
                         }
 
-                        // 3. BARANG MASUK (NON-SN): BERSIH TANPA INFO NON-SN
                         return <span className="text-slate-400 font-mono text-xs">-</span>;
                     }
                     default:

@@ -97,6 +97,8 @@ class HistoryMovingController extends Controller
                   ->orWhere('nomor_imc', 'like', "%{$search}%")
                   ->orWhere('nomor_omc', 'like', "%{$search}%")
                   ->orWhere('pihak_asal', 'like', "%{$search}%")
+                  ->orWhere('kode_projek', 'like', "%{$search}%")   // <-- Tambahan Baru
+                  ->orWhere('nama_customer', 'like', "%{$search}%") // <-- Tambahan Baru
                   ->orWhereExists(function ($sub) use ($search) {
                       $sub->select(DB::raw(1))
                           ->from('transaksi_details')
@@ -233,6 +235,8 @@ class HistoryMovingController extends Controller
                 'Kondisi',
                 'Dari (Asal)',
                 'Ke (Tujuan)',
+                'Kode Projek',    // <-- Tambahan Baru
+                'Nama Customer',  // <-- Tambahan Baru
                 'No IMC',
                 'No OMC',
                 'Serial Numbers'
@@ -258,6 +262,8 @@ class HistoryMovingController extends Controller
                     $r->kondisi ?: 'Baru',
                     $r->gudangAsal?->nama_gudang ?: ($r->pihak_asal ?: '-'),
                     $r->gudangTujuan?->nama_gudang ?: ($r->pihak_asal ?: '-'),
+                    $r->kode_projek ?: '-',   // <-- Tambahan Baru
+                    $r->nama_customer ?: '-', // <-- Tambahan Baru
                     $r->nomor_imc ?: '-',
                     $r->nomor_omc ?: '-',
                     $snText

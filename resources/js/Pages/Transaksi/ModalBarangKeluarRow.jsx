@@ -44,9 +44,6 @@ export default function ModalBarangKeluarRow({
         : 'Standar';
 
     const isProyek = row.sub_jenis === 'BARANG_KE_SITE';
-    const pihakTujuanLabel = isProyek
-        ? 'Site Tujuan / Nama Site / Teknisi *'
-        : 'Keperluan / Departemen *';
 
     const currentNamaBarang = targetBarang 
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
@@ -180,7 +177,7 @@ export default function ModalBarangKeluarRow({
                 </div>
             )}
 
-            {/* 2. Gudang Asal & Tujuan / Departemen */}
+            {/* 2. Gudang Asal, OMC, Proyek (Kode/Customer), & Site/Departemen */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="space-y-2.5">
                     <div className="space-y-1">
@@ -215,37 +212,68 @@ export default function ModalBarangKeluarRow({
                     </div>
                 </div>
 
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                        {pihakTujuanLabel}
-                    </Label>
+                <div className="space-y-2.5">
                     {isProyek ? (
-                        <Input
-                            placeholder="Ketik nama site / teknisi..."
-                            disabled={isProcessing}
-                            value={row.pihak_asal}
-                            onChange={(e) => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
-                            className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                            required
-                        />
+                        <>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kode Proyek</Label>
+                                    <Input
+                                        placeholder="Contoh: PRJ-001"
+                                        disabled={isProcessing}
+                                        value={row.kode_projek || ''}
+                                        onChange={(e) => onFieldChange(rowIdx, 'kode_projek', e.target.value)}
+                                        className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nama Customer</Label>
+                                    <Input
+                                        placeholder="Nama Customer..."
+                                        disabled={isProcessing}
+                                        value={row.nama_customer || ''}
+                                        onChange={(e) => onFieldChange(rowIdx, 'nama_customer', e.target.value)}
+                                        className="h-8 text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                                    Site Tujuan / Nama Site / Teknisi *
+                                </Label>
+                                <Input
+                                    placeholder="Ketik nama site / teknisi..."
+                                    disabled={isProcessing}
+                                    value={row.pihak_asal}
+                                    onChange={(e) => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
+                                    className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
+                                    required
+                                />
+                            </div>
+                        </>
                     ) : (
-                        <HybridDropdown
-                            value={row.pihak_asal || 'General Affair'}
-                            options={LIST_KEPERLUAN_PATEN}
-                            allowCustom={false}
-                            onChange={(val) => onFieldChange(rowIdx, 'pihak_asal', val)}
-                            placeholder="Pilih Departemen..."
-                            searchPlaceholder="Cari Departemen..."
-                            disabled={isProcessing}
-                            inputClassName="h-8 text-xs font-semibold"
-                        />
+                        <div className="space-y-1">
+                            <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                                Keperluan / Departemen *
+                            </Label>
+                            <HybridDropdown
+                                value={row.pihak_asal || 'General Affair'}
+                                options={LIST_KEPERLUAN_PATEN}
+                                allowCustom={false}
+                                onChange={(val) => onFieldChange(rowIdx, 'pihak_asal', val)}
+                                placeholder="Pilih Departemen..."
+                                searchPlaceholder="Cari Departemen..."
+                                disabled={isProcessing}
+                                inputClassName="h-8 text-xs font-semibold"
+                            />
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* 3. Detail Barang, Kuantitas, dan Spesifikasi (Tata Letak 2 Baris Lega) */}
+            {/* 3. Detail Barang, Kuantitas, dan Spesifikasi */}
             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                {/* BARIS 1: KODE PPL (4/12) & NAMA BARANG (8/12 - LEGA DAN LEBAR) */}
+                {/* BARIS 1: KODE PPL (4/12) & NAMA BARANG (8/12) */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                     <div className="sm:col-span-4 space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
@@ -386,7 +414,7 @@ export default function ModalBarangKeluarRow({
                 </div>
             </div>
 
-            {/* 4. SELEKTOR KHUSUS NON-SN: CARD KONDISI + STEPPER DI KARTU (TANPA TOMBOL PILIH OTOMATIS) */}
+            {/* 4. SELEKTOR KHUSUS NON-SN: CARD KONDISI + STEPPER DI KARTU */}
             {!isWajibSn && targetBarang && (
                 <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -401,7 +429,7 @@ export default function ModalBarangKeluarRow({
                         </div>
                     </div>
 
-                    {/* Toolbar Pencarian Bersih Tanpa Tombol Pilih Otomatis */}
+                    {/* Toolbar Pencarian */}
                     <div className="relative w-full sm:w-72">
                         <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <Input
@@ -442,7 +470,6 @@ export default function ModalBarangKeluarRow({
                                                 : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400'
                                         }`}
                                     >
-                                        {/* Klik Kartu Langsung Menambah 1 Unit */}
                                         <div 
                                             className="flex items-start justify-between gap-1.5 cursor-pointer select-none"
                                             onClick={() => {
@@ -475,7 +502,6 @@ export default function ModalBarangKeluarRow({
                                             </span>
                                         </div>
 
-                                        {/* Stepper Kuantitas Kartu */}
                                         <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80">
                                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                                 Tersedia: <strong>{b.max_stock}</strong>

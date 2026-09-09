@@ -20,6 +20,10 @@ return new class extends Migration
             $table->string('nomor_omc')->nullable()->index();
             $table->string('pihak_asal')->nullable();
             
+            // --- Kolom Tambahan Baru ---
+            $table->string('kode_projek')->nullable()->index();
+            $table->string('nama_customer')->nullable();
+            
             $table->foreignId('gudang_asal_id')->nullable()->constrained('gudangs')->nullOnDelete();
             $table->foreignId('gudang_tujuan_id')->nullable()->constrained('gudangs')->nullOnDelete();
             $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
@@ -39,7 +43,7 @@ return new class extends Migration
             $table->foreignId('barang_id')->constrained('barangs')->cascadeOnDelete();
             $table->integer('qty');
             $table->decimal('harga', 15, 2)->nullable()->default(0);
-            $table->string('kondisi')->default('Baru'); // <-- Mendukung Baru, Bekas, Rusak
+            $table->string('kondisi')->default('Baru');
             $table->timestamps();
         });
 

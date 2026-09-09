@@ -26,6 +26,8 @@ class TransaksiBarangKeluarController extends Controller
                 'items.*.nomor_omc'         => 'required|string|max:100',
                 'items.*.nomor_imc'         => 'nullable|string|max:100',
                 'items.*.pihak_asal'        => 'required|string|max:255',
+                'items.*.kode_projek'       => 'nullable|string|max:100', // <-- Tambahan Baru
+                'items.*.nama_customer'     => 'nullable|string|max:255', // <-- Tambahan Baru
                 'items.*.gudang_asal_id'    => 'required|exists:gudangs,id',
                 'items.*.barang_id'         => 'required|exists:barangs,id',
                 'items.*.qty'               => 'required|integer|min:1|max:50',
@@ -41,7 +43,6 @@ class TransaksiBarangKeluarController extends Controller
                         'PEMAKAIAN_INTERNAL' => 'TRX-OUT-INT',
                         default              => 'TRX-KELUAR',
                     };
-
                     $randomSuffix = strtoupper(Str::random(4));
                     $noTransaksi  = $prefix . '-' . date('YmdHis') . '-' . $randomSuffix;
                     $barangId     = (int) $item['barang_id'];
@@ -58,6 +59,7 @@ class TransaksiBarangKeluarController extends Controller
                         $firstSn = BarangSerial::where('barang_id', $barangId)
                             ->where('serial_number', trim($serials[0]))
                             ->first();
+
                         if ($firstSn && !empty($firstSn->kondisi)) {
                             $kondisiFix = ucfirst(strtolower($firstSn->kondisi));
                         }
@@ -77,7 +79,7 @@ class TransaksiBarangKeluarController extends Controller
                         throw new \Exception("Jumlah Serial Number untuk barang '{$barang->nama_barang}' harus tepat {$qty} unit.");
                     }
 
-                    // 2. Simpan Header Transaksi Keluar (nomor_imc dari batch barang masuk tersimpan)
+                    // 2. Simpan Header Transaksi Keluar
                     $transaksi = Transaksi::create([
                         'no_transaksi'     => $noTransaksi,
                         'jenis_transaksi'  => 'KELUAR',
@@ -87,6 +89,8 @@ class TransaksiBarangKeluarController extends Controller
                         'nomor_omc'        => $item['nomor_omc'],
                         'nomor_imc'        => !empty($item['nomor_imc']) ? trim($item['nomor_imc']) : null,
                         'pihak_asal'       => $item['pihak_asal'],
+                        'kode_projek'      => !empty($item['kode_projek']) ? trim($item['kode_projek']) : null,   // <-- Tambahan Baru
+                        'nama_customer'    => !empty($item['nama_customer']) ? trim($item['nama_customer']) : null, // <-- Tambahan Baru
                         'gudang_asal_id'   => $gudangAsalId,
                         'gudang_tujuan_id' => null,
                         'pic_user_id'      => $request->user()->id,
@@ -155,12 +159,14 @@ class TransaksiBarangKeluarController extends Controller
         $transaksi = Transaksi::with(['details'])->findOrFail($id);
 
         $validated = $request->validate([
-            'tanggal'    => 'required|date',
-            'kondisi'    => 'nullable|string|max:50',
-            'nomor_omc'  => 'required|string|max:100',
-            'nomor_imc'  => 'nullable|string|max:100',
-            'pihak_asal' => 'required|string|max:255',
-            'keterangan' => 'nullable|string|max:500',
+            'tanggal'       => 'required|date',
+            'kondisi'       => 'nullable|string|max:50',
+            'nomor_omc'     => 'required|string|max:100',
+            'nomor_imc'     => 'nullable|string|max:100',
+            'pihak_asal'    => 'required|string|max:255',
+            'kode_projek'   => 'nullable|string|max:100', // <-- Tambahan Baru
+            'nama_customer' => 'nullable|string|max:255', // <-- Tambahan Baru
+            'keterangan'    => 'nullable|string|max:500',
         ]);
 
         $kondisiFix = !empty($validated['kondisi']) && $validated['kondisi'] !== '-' 
@@ -169,12 +175,14 @@ class TransaksiBarangKeluarController extends Controller
 
         DB::transaction(function () use ($transaksi, $validated, $kondisiFix) {
             $transaksi->update([
-                'tanggal'    => $validated['tanggal'],
-                'kondisi'    => $kondisiFix,
-                'nomor_omc'  => $validated['nomor_omc'],
-                'nomor_imc'  => $validated['nomor_imc'] ?? $transaksi->nomor_imc,
-                'pihak_asal' => $validated['pihak_asal'],
-                'keterangan' => $validated['keterangan'] ?? $transaksi->keterangan,
+                'tanggal'       => $validated['tanggal'],
+                'kondisi'       => $kondisiFix,
+                'nomor_omc'     => $validated['nomor_omc'],
+                'nomor_imc'     => $validated['nomor_imc'] ?? $transaksi->nomor_imc,
+                'pihak_asal'    => $validated['pihak_asal'],
+                'kode_projek'   => $validated['kode_projek'] ?? $transaksi->kode_projek,     // <-- Tambahan Baru
+                'nama_customer' => $validated['nama_customer'] ?? $transaksi->nama_customer, // <-- Tambahan Baru
+                'keterangan'    => $validated['keterangan'] ?? $transaksi->keterangan,
             ]);
 
             foreach ($transaksi->details as $detail) {
