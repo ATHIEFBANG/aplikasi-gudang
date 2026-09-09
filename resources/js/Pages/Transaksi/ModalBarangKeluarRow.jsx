@@ -239,7 +239,7 @@ export default function ModalBarangKeluarRow({
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                    Site Tujuan / Nama Site / Teknisi *
+                                    Site Tujuan *
                                 </Label>
                                 <Input
                                     placeholder="Ketik nama site / teknisi..."
