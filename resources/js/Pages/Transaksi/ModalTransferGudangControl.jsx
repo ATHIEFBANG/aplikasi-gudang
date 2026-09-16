@@ -66,12 +66,14 @@ export function useModalTransferGudangControl({
         }
     }, [isOpen, isEditMode, selectedItem, barangs, gudangs, createEmptyRow]);
 
+    // Optimalisasi: Mencegah eksekusi komputasi jika modal tertutup
     const gudangOptions = useMemo(() => {
+        if (!isOpen) return [];
         return gudangs.map(g => ({ value: g.nama_gudang, label: g.nama_gudang, id: g.id }));
-    }, [gudangs]);
+    }, [isOpen, gudangs]);
 
     const getBarangPplOptions = useCallback((row) => {
-        if (!row.gudang_asal_id) return [];
+        if (!isOpen || !row.gudang_asal_id) return [];
         return barangs
             .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
             .map(b => {
@@ -107,10 +109,10 @@ export function useModalTransferGudangControl({
                     )
                 };
             });
-    }, [barangs, getBarangStockInWarehouse]);
+    }, [isOpen, barangs, getBarangStockInWarehouse]);
 
     const getBarangNamaOptions = useCallback((row) => {
-        if (!row.gudang_asal_id) return [];
+        if (!isOpen || !row.gudang_asal_id) return [];
         return barangs
             .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
             .map(b => {
@@ -131,7 +133,7 @@ export function useModalTransferGudangControl({
                     )
                 };
             });
-    }, [barangs, getBarangStockInWarehouse]);
+    }, [isOpen, barangs, getBarangStockInWarehouse]);
 
     const handleRowFieldChange = (idx, field, value) => {
         setRows(prev => {
@@ -302,6 +304,7 @@ export function useModalTransferGudangControl({
 
         router[method](targetUrl, payload, {
             preserveScroll: true,
+            only: ['transaksis', 'filters'], // Partial Reload Inertia
             onSuccess: () => {
                 setIsProcessing(false);
                 onClose();

@@ -68,6 +68,7 @@ export default function TabTransaksi({
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
+    // Optimalisasi Partial Reload dengan Inertia 'only'
     const fetchFilteredData = (jenis, search, order, itemsPerPage, page = 1) => {
         setSelectedIds([]);
         router.get(
@@ -83,6 +84,7 @@ export default function TabTransaksi({
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
+                only: ['transaksis', 'filters'], // Mencegah reload data master
                 onStart: () => setIsProcessing(true),
                 onFinish: () => setIsProcessing(false)
             }
@@ -142,6 +144,7 @@ export default function TabTransaksi({
             onConfirm: () => {
                 router.post('/transaksi/bulk-delete', { ids: selectedIds }, {
                     preserveScroll: true,
+                    only: ['transaksis', 'filters'],
                     onStart: () => setIsProcessing(true),
                     onSuccess: () => setSelectedIds([]),
                     onFinish: () => setIsProcessing(false)
@@ -161,6 +164,7 @@ export default function TabTransaksi({
             onConfirm: () => {
                 router.post('/transaksi/reset', {}, {
                     preserveScroll: true,
+                    only: ['transaksis', 'filters'],
                     onStart: () => setIsProcessing(true),
                     onSuccess: () => setSelectedIds([]),
                     onFinish: () => setIsProcessing(false)
@@ -367,7 +371,11 @@ export default function TabTransaksi({
                                     variant={link.active ? "default" : "outline"}
                                     size="sm"
                                     disabled={!link.url || isProcessing}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true, preserveScroll: true })}
+                                    onClick={() => link.url && router.get(link.url, {}, { 
+                                        preserveState: true, 
+                                        preserveScroll: true,
+                                        only: ['transaksis', 'filters'] // Partial Reload Pagination
+                                    })}
                                     className={`h-8 min-w-[32px] px-2 text-xs font-semibold dark:border-slate-800 ${
                                         link.active ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                                     }`}

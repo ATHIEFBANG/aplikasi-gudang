@@ -72,7 +72,10 @@ export function useModalBarangKeluarControl({
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
+    // Optimalisasi: Tidak melakukan komputasi stok bertingkat jika modal tidak terbuka
     const gudangOptions = useMemo(() => {
+        if (!isOpen) return [];
+
         return gudangs.map(g => {
             let baru  = g.stok_baru;
             let bekas = g.stok_bekas;
@@ -127,7 +130,7 @@ export function useModalBarangKeluarControl({
                 )
             };
         });
-    }, [gudangs, barangs]);
+    }, [isOpen, gudangs, barangs]);
 
     const getBarangPplOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
@@ -359,7 +362,6 @@ export function useModalBarangKeluarControl({
                 };
             }
 
-            // Total Qty otomatis mengikuti jumlah seluruh kartu terpilih
             let totalUnit = Object.values(selections).reduce((acc, curr) => acc + (curr.qty || 0), 0);
             if (maxTotalStock > 0 && totalUnit > maxTotalStock) {
                 totalUnit = maxTotalStock;
@@ -558,6 +560,7 @@ export function useModalBarangKeluarControl({
         const method = isEditMode ? 'put' : 'post';
         router[method](targetUrl, payload, {
             preserveScroll: true,
+            only: ['transaksis', 'filters'],
             onSuccess: () => {
                 setIsProcessing(false);
                 onClose();
