@@ -93,21 +93,19 @@ export default function CrudTable({
                         if (rawSub === 'BARANG_KE_SITE') displayLabel = 'PROYEK';
                         else if (rawSub === 'PEMAKAIAN_INTERNAL') displayLabel = 'NON PROYEK';
 
-                        const badgeColor = {
-                            PEMBELIAN: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-                            PEMINJAMAN: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-                            PENGEMBALIAN: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-                            BARANG_KE_SITE: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-                            PEMAKAIAN_INTERNAL: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+                        const textColor = {
+                            PEMBELIAN: 'text-emerald-600 dark:text-emerald-400',
+                            PEMINJAMAN: 'text-rose-600 dark:text-rose-400',
+                            PENGEMBALIAN: 'text-amber-600 dark:text-amber-400',
+                            BARANG_KE_SITE: 'text-rose-600 dark:text-rose-400',
+                            PEMAKAIAN_INTERNAL: 'text-purple-600 dark:text-purple-400',
+                            TRANSFER_GUDANG: 'text-blue-600 dark:text-blue-400',
                         };
 
                         return (
-                            <Badge 
-                                variant="outline"
-                                className={`${badgeColor[rawSub] || 'bg-slate-500/10 text-slate-600 border-slate-500/20'} text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide`}
-                            >
+                            <span className={`text-xs font-bold uppercase tracking-wide ${textColor[rawSub] || 'text-slate-600 dark:text-slate-400'}`}>
                                 {displayLabel}
-                            </Badge>
+                            </span>
                         );
                     }
                     case 'kode_projek':

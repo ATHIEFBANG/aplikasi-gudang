@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 
 export function useModalTransferGudangControl({
@@ -66,11 +66,62 @@ export function useModalTransferGudangControl({
         }
     }, [isOpen, isEditMode, selectedItem, barangs, gudangs, createEmptyRow]);
 
-    // Optimalisasi: Mencegah eksekusi komputasi jika modal tertutup
+    // Opsi Gudang dengan Rincian Informasi Stok (Baru, Bekas, Rusak)
     const gudangOptions = useMemo(() => {
         if (!isOpen) return [];
-        return gudangs.map(g => ({ value: g.nama_gudang, label: g.nama_gudang, id: g.id }));
-    }, [isOpen, gudangs]);
+        return gudangs.map(g => {
+            let baru  = g.stok_baru;
+            let bekas = g.stok_bekas;
+            let rusak = g.stok_rusak;
+
+            if (baru === undefined || bekas === undefined || rusak === undefined) {
+                let countBaru = 0;
+                let countBekas = 0;
+                let countRusak = 0;
+                barangs.forEach(b => {
+                    if (b.is_wajib_sn) {
+                        (b.serials || []).forEach(s => {
+                            if (String(s.gudang_id) === String(g.id) && s.status === 'IN_WAREHOUSE') {
+                                const k = String(s.kondisi || 'Baru').toUpperCase();
+                                if (k === 'RUSAK') countRusak++;
+                                else if (k.includes('BEKAS') || k.includes('SECOND')) countBekas++;
+                                else countBaru++;
+                            }
+                        });
+                    } else {
+                        const stokRec = (b.stoks || []).find(st => String(st.gudang_id) === String(g.id));
+                        if (stokRec && stokRec.jumlah > 0) {
+                            countBaru += parseInt(stokRec.jumlah, 10);
+                        }
+                    }
+                });
+                baru  = countBaru;
+                bekas = countBekas;
+                rusak = countRusak;
+            }
+
+            return {
+                value: g.nama_gudang,
+                label: g.nama_gudang,
+                id: g.id,
+                subLabel: (
+                    <div className="flex items-center gap-1.5 text-[8.5px] leading-none mt-0.5 font-sans">
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            {baru} Baru
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
+                        <span className="font-bold text-amber-500 dark:text-amber-400">
+                            {bekas} Bekas
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
+                        <span className="font-bold text-rose-500 dark:text-rose-400">
+                            {rusak} Rusak
+                        </span>
+                    </div>
+                )
+            };
+        });
+    }, [isOpen, gudangs, barangs]);
 
     const getBarangPplOptions = useCallback((row) => {
         if (!isOpen || !row.gudang_asal_id) return [];
@@ -203,7 +254,6 @@ export function useModalTransferGudangControl({
             const selections = { ...(currentRow.non_sn_selections || {}) };
             const targetBarang = barangs.find(b => String(b.id) === String(currentRow.barang_id));
             const maxTotalStock = getBarangStockInWarehouse(targetBarang, currentRow.gudang_asal_id);
-
             let safeQty = parseInt(nextQty, 10);
             if (isNaN(safeQty) || safeQty <= 0) {
                 delete selections[batchKey];
@@ -215,17 +265,14 @@ export function useModalTransferGudangControl({
                     qty: safeQty
                 };
             }
-
             let totalUnit = Object.values(selections).reduce((acc, curr) => acc + (curr.qty || 0), 0);
             if (maxTotalStock > 0 && totalUnit > maxTotalStock) {
                 totalUnit = maxTotalStock;
             }
-
             const kondisiParts = [];
             Object.values(selections).forEach(s => {
                 kondisiParts.push(`${s.qty} ${s.kondisi}`);
             });
-
             updated[rowIdx] = {
                 ...currentRow,
                 non_sn_selections: selections,
@@ -287,7 +334,6 @@ export function useModalTransferGudangControl({
                 return;
             }
         }
-
         setIsProcessing(true);
         const targetUrl = isEditMode ? `/transaksi/${selectedItem.id}` : '/transaksi/transfer';
         const method = isEditMode ? 'put' : 'post';
@@ -301,10 +347,9 @@ export function useModalTransferGudangControl({
                 qty: parseInt(rows[0].qty, 10) || 1,
             }
             : { items: rows };
-
         router[method](targetUrl, payload, {
             preserveScroll: true,
-            only: ['transaksis', 'filters'], // Partial Reload Inertia
+            only: ['transaksis', 'filters'],
             onSuccess: () => {
                 setIsProcessing(false);
                 onClose();

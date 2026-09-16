@@ -20,7 +20,7 @@ export default function Modal({
     submitLabel = 'Simpan',
     cancelLabel = 'Batal',
     isProcessing = false,
-    maxWidth = 'sm:max-w-xl',
+    maxWidth = 'sm:max-w-2xl', // Diperluas ke 2xl agar form grid tidak bertabrakan
     showFooter = true,
     headerExtra,
     onPaste,
@@ -28,11 +28,9 @@ export default function Modal({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && !isProcessing && onClose?.()}>
             <DialogContent 
-                /* Menambahkan select-text dan mengaktifkan penanganan paste bebas */
-                className={`${maxWidth} max-h-[85vh] h-auto flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 select-text`}
+                className={`w-[95vw] sm:w-full ${maxWidth} max-h-[85vh] h-auto flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 select-text`}
                 onPaste={onPaste}
                 onOpenAutoFocus={(e) => {
-                    // Mencegah focus trap mengunci event clipboard saat modal terbuka
                     e.preventDefault();
                 }}
             >
@@ -56,7 +54,7 @@ export default function Modal({
                 )}
 
                 {/* SCROLLABLE BODY / ISI FORM */}
-                <div className="flex-1 overflow-y-auto py-3 pr-1 select-text">
+                <div className="flex-1 overflow-y-auto py-4 px-1 w-full min-w-0 select-text">
                     {children}
                 </div>
 
