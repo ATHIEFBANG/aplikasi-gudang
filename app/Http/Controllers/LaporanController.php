@@ -130,9 +130,9 @@ class LaporanController extends Controller
             })
             ->selectRaw("
                 td.barang_id,
-                SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) = 'BARU' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) = 'BAIK' THEN td.qty ELSE 0 END) as keluar_baru,
                 SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%' THEN td.qty ELSE 0 END) as keluar_bekas,
-                SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' THEN td.qty ELSE 0 END) as keluar_rusak
+                SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' THEN td.qty ELSE 0 END) as keluar_rusak,
+                SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' THEN td.qty ELSE 0 END) as keluar_baru
             ")
             ->groupBy('td.barang_id')
             ->get()
@@ -223,9 +223,15 @@ class LaporanController extends Controller
             }
 
             // Rincian mutasi keluar bulan berjalan
-            $keluarBaru  = (int) ($kKeluarData?->keluar_baru ?? 0);
             $keluarBekas = (int) ($kKeluarData?->keluar_bekas ?? 0);
             $keluarRusak = (int) ($kKeluarData?->keluar_rusak ?? 0);
+            $keluarBaru  = (int) ($kKeluarData?->keluar_baru ?? 0);
+
+            // Fallback: pastikan total rincian keluar selalu presisi dengan total keluarBulan
+            $totalKondisiKeluar = $keluarBaru + $keluarBekas + $keluarRusak;
+            if ($keluarBulan > $totalKondisiKeluar) {
+                $keluarBaru += ($keluarBulan - $totalKondisiKeluar);
+            }
 
             if ($kondisi && $kondisi !== 'ALL') {
                 $kondisiUpper = strtoupper($kondisi);

@@ -7,7 +7,6 @@ import HybridDropdown from '@/components/HybridDropdown';
 import Toolbar from '@/components/Toolbar';
 import TabelRekonsiliasi from './TabelRekonsiliasi';
 import { 
-    Boxes,
     FileSpreadsheet,
     Filter,
     Search,
@@ -333,12 +332,6 @@ export default function LaporanIndex({
                         onZoomOut={handleZoomOut}
                         onResetZoom={handleResetZoom}
                         onFitZoom={handleFitZoom}
-                        leftContent={
-                            <div className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded-xl border border-blue-200/60 dark:border-blue-900/40 text-xs font-bold font-mono">
-                                <Boxes className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                <span>Rekonsiliasi Saldo Stok ({laporanStok.length} SKU)</span>
-                            </div>
-                        }
                     />
 
                     {/* Sub-Header: Informasi Konteks & Kolom Pencarian */}
