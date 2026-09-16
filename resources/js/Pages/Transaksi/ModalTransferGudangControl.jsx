@@ -23,18 +23,19 @@ export function useModalTransferGudangControl({
         return barang.is_wajib_sn ? snCount : Math.max(stokQty, snCount);
     }, []);
 
+    // UPDATE: gudang_asal_id & gudang_tujuan_id di-set kosong saat modal baru dibuka
     const createEmptyRow = useCallback(() => ({
         tanggal: new Date().toISOString().slice(0, 10),
         nomor_omc: '',
         nomor_imc: '',
         kondisi: 'Baru',
-        gudang_asal_id: gudangs[0]?.id ? String(gudangs[0].id) : '',
-        gudang_tujuan_id: gudangs[1]?.id ? String(gudangs[1].id) : (gudangs[0]?.id ? String(gudangs[0].id) : ''),
+        gudang_asal_id: '',
+        gudang_tujuan_id: '',
         barang_id: '',
         qty: 1,
         serials: [],
         non_sn_selections: {}
-    }), [gudangs]);
+    }), []);
 
     const [rows, setRows] = useState([createEmptyRow()]);
 

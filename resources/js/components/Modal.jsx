@@ -20,7 +20,7 @@ export default function Modal({
     submitLabel = 'Simpan',
     cancelLabel = 'Batal',
     isProcessing = false,
-    maxWidth = 'sm:max-w-2xl', // Diperluas ke 2xl agar form grid tidak bertabrakan
+    maxWidth = 'sm:max-w-2xl',
     showFooter = true,
     headerExtra,
     onPaste,
@@ -28,9 +28,11 @@ export default function Modal({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && !isProcessing && onClose?.()}>
             <DialogContent 
-                className={`w-[95vw] sm:w-full ${maxWidth} max-h-[85vh] h-auto flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 select-text`}
+                tabIndex={-1}
+                className={`w-[95vw] sm:w-full ${maxWidth} max-h-[85vh] h-auto flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 select-text outline-none`}
                 onPaste={onPaste}
                 onOpenAutoFocus={(e) => {
+                    // Membatalkan auto-focus ke input pertama (mencegah dropdown terbuka sendiri)
                     e.preventDefault();
                 }}
             >
