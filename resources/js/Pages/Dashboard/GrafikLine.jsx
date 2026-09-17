@@ -47,7 +47,15 @@ export default function GrafikLineKondisi({ data = [] }) {
                 <div className="w-full h-[340px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={data} margin={{ top: 22, right: 15, left: -20, bottom: 65 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" opacity={0.25} />
+                            {/* Garis titik-titik dibuat hitam pekat, tebal, dan jelas */}
+                            <CartesianGrid 
+                                strokeDasharray="4 4" 
+                                vertical={false} 
+                                stroke="#000000" 
+                                strokeWidth={1.5} 
+                                opacity={1} 
+                            />
+                            
                             <XAxis
                                 dataKey="name"
                                 interval={0}
@@ -78,7 +86,7 @@ export default function GrafikLineKondisi({ data = [] }) {
                             />
                             <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} unit="%" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                             <Tooltip
-                                cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '3 3' }}
+                                cursor={{ stroke: '#000000', strokeWidth: 1.5, strokeDasharray: '3 3' }}
                                 content={({ active, payload }) => {
                                     if (!active || !payload?.length) return null;
                                     const d = payload[0].payload;

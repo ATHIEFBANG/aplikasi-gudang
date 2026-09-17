@@ -47,7 +47,9 @@ export default function GrafikBatangLogistik({ data = [] }) {
                 <div className="w-full h-[320px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data} barGap={2} margin={{ top: 15, right: 15, left: -20, bottom: 45 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" opacity={0.25} />
+                            {/* Garis hitam tebal putus-putus */}
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#000000" strokeWidth={2} />
+                            
                             <XAxis
                                 dataKey="name"
                                 interval={0}

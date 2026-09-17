@@ -15,40 +15,42 @@ export default function StatistikGudang({ kpi = {} }) {
             value: totalBarang.toLocaleString('id-ID'),
             desc: 'Item SKU terdaftar',
             icon: Package,
-            iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-            valColor: 'text-slate-900 dark:text-white',
+            // Warna latar belakang pekat untuk tema terang, dan sedikit lebih gelap untuk tema gelap.
+            cardBg: 'bg-blue-600 border-blue-600 dark:bg-blue-700 dark:border-blue-700/50',
+            // Teks nilai putih untuk kontras terbaik.
+            valColor: 'text-white',
         },
         {
             title: 'TOTAL BARANG MASUK',
             value: totalBarangMasuk.toLocaleString('id-ID'),
             desc: 'Unit masuk operasional',
             icon: ArrowDownCircle,
-            iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-            valColor: 'text-emerald-600 dark:text-emerald-400',
+            cardBg: 'bg-emerald-600 border-emerald-600 dark:bg-emerald-700 dark:border-emerald-700/50',
+            valColor: 'text-white',
         },
         {
             title: 'TOTAL TRANSFER GUDANG',
             value: totalTransfer.toLocaleString('id-ID'),
             desc: 'Unit terdistribusi antar-hub',
             icon: ArrowLeftRight,
-            iconBg: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
-            valColor: 'text-sky-600 dark:text-sky-400',
+            cardBg: 'bg-sky-600 border-sky-600 dark:bg-sky-700 dark:border-sky-700/50',
+            valColor: 'text-white',
         },
         {
             title: 'TOTAL BARANG KELUAR',
             value: totalBarangKeluar.toLocaleString('id-ID'),
             desc: 'Unit keluar operasional',
             icon: ArrowUpRight,
-            iconBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-            valColor: 'text-rose-600 dark:text-rose-400',
+            cardBg: 'bg-rose-600 border-rose-600 dark:bg-rose-700 dark:border-rose-700/50',
+            valColor: 'text-white',
         },
         {
             title: 'TOTAL NILAI ASET GUDANG',
             value: `Rp ${Number(totalNilaiAset).toLocaleString('id-ID')}`,
             desc: 'Akumulasi nilai beli aset fisik',
             icon: Coins,
-            iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-            valColor: 'text-amber-600 dark:text-amber-400',
+            cardBg: 'bg-amber-600 border-amber-600 dark:bg-amber-700 dark:border-amber-700/50',
+            valColor: 'text-white',
         },
     ];
 
@@ -59,16 +61,18 @@ export default function StatistikGudang({ kpi = {} }) {
                 return (
                     <Card 
                         key={idx} 
-                        className={`bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 rounded-xl shadow-xs flex flex-col justify-between ${
+                        className={`${card.cardBg} rounded-xl shadow-xs flex flex-col justify-between transition-all ${
                             idx === cards.length - 1 ? 'col-span-2 md:col-span-1' : ''
                         }`}
                     >
                         <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3.5 px-4">
-                            <CardTitle className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
+                            {/* Judul abu-abu terang untuk kontras di atas latar belakang pekat */}
+                            <CardTitle className="text-[10px] font-bold text-slate-100 uppercase tracking-wider truncate">
                                 {card.title}
                             </CardTitle>
-                            <div className={`p-1.5 rounded-lg ${card.iconBg}`}>
-                                <Icon className="h-4 w-4" />
+                            {/* Ikon Lucide berwarna putih untuk kontras, tanpa latar belakang ikon tipis */}
+                            <div className="p-0"> 
+                                <Icon className="h-4 w-4 text-white" />
                             </div>
                         </CardHeader>
                         <CardContent className="px-4 pb-3.5">
@@ -78,7 +82,8 @@ export default function StatistikGudang({ kpi = {} }) {
                             >
                                 {card.value}
                             </div>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 truncate">
+                            {/* Deskripsi abu-abu terang untuk kontras di atas latar belakang pekat */}
+                            <p className="text-[10px] text-slate-100 mt-1 truncate opacity-90">
                                 {card.desc}
                             </p>
                         </CardContent>

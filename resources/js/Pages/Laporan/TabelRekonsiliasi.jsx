@@ -37,7 +37,7 @@ function RincianKeluarDropdown({ item }) {
 
     return (
         <div className="relative inline-block text-left" ref={dropdownRef}>
-            {/* Tombol Angka Teks Biasa (Tanpa Card / Box Background) */}
+            {/* Tombol Angka Teks Biasa */}
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
@@ -170,13 +170,30 @@ export default function TabelRekonsiliasi({
     }, []);
 
     return (
-        <Tabel
-            data={dataList}
-            columns={formattedColumns}
-            getItemId={getItemId}
-            getRowNumber={getRowNumber}
-            zoomLevel={zoomLevel}
-            emptyMessage="Tidak ada data rekonsiliasi stok pada periode ini."
-        />
+        <div className="w-full custom-blue-header-wrapper">
+            {/* Inject CSS paksa langsung ke elemen DOM tabel */}
+            <style jsx>{`
+                .custom-blue-header-wrapper table thead,
+                .custom-blue-header-wrapper table thead tr,
+                .custom-blue-header-wrapper table thead th,
+                .custom-blue-header-wrapper table tr:first-child th {
+                    background-color: #1557f6 !important;
+                    color: #ffffff !important;
+                    border-color: #1043c7 !important;
+                }
+                .custom-blue-header-wrapper table thead th * {
+                    color: #ffffff !important;
+                }
+            `}</style>
+
+            <Tabel
+                data={dataList}
+                columns={formattedColumns}
+                getItemId={getItemId}
+                getRowNumber={getRowNumber}
+                zoomLevel={zoomLevel}
+                emptyMessage="Tidak ada data rekonsiliasi stok pada periode ini."
+            />
+        </div>
     );
 }
