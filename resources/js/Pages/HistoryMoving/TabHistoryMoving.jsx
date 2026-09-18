@@ -144,8 +144,21 @@ export default function TabHistoryMoving({
                 </div>
             </div>
 
-            {/* 3. Tabel Data Dinamis */}
-            <div className="w-full overflow-x-auto relative border-b border-slate-200 dark:border-slate-800">
+            {/* 3. Tabel Data Dinamis dengan Warna Header Biru Solid */}
+            <div className="w-full overflow-x-auto relative border-b border-slate-200 dark:border-slate-800 custom-blue-header-wrapper">
+                <style jsx>{`
+                    .custom-blue-header-wrapper table thead,
+                    .custom-blue-header-wrapper table thead tr,
+                    .custom-blue-header-wrapper table thead th {
+                        background-color: #1557f6 !important;
+                        color: #ffffff !important;
+                        border-color: #1043c7 !important;
+                    }
+                    .custom-blue-header-wrapper table thead th * {
+                        color: #ffffff !important;
+                    }
+                `}</style>
+
                 <Tabel
                     data={dataList}
                     columns={columns}
