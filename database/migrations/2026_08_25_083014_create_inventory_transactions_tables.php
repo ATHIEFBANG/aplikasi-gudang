@@ -15,14 +15,14 @@ return new class extends Migration
             $table->enum('jenis_transaksi', ['MASUK', 'KELUAR', 'TRANSFER', 'PINJAM', 'KEMBALI']);
             $table->string('sub_jenis')->nullable()->index();
             $table->date('tanggal')->index();
-            $table->string('kondisi')->nullable()->default('Baru');
+            $table->string('kondisi')->nullable()->default('Baru')->index();
             $table->string('nomor_imc')->nullable()->index();
             $table->string('nomor_omc')->nullable()->index();
-            $table->string('pihak_asal')->nullable();
+            $table->string('pihak_asal')->nullable()->index();
             
             // --- Kolom Tambahan Baru ---
             $table->string('kode_projek')->nullable()->index();
-            $table->string('nama_customer')->nullable();
+            $table->string('nama_customer')->nullable()->index();
             
             $table->foreignId('gudang_asal_id')->nullable()->constrained('gudangs')->nullOnDelete();
             $table->foreignId('gudang_tujuan_id')->nullable()->constrained('gudangs')->nullOnDelete();
@@ -33,7 +33,10 @@ return new class extends Migration
             $table->enum('status', ['DRAFT', 'COMPLETED', 'CANCELLED'])->default('COMPLETED')->index();
             $table->timestamps();
             
+            // Indeks Komposit untuk Pengurutan & Filter Rentang Tanggal Cepat
+            $table->index(['tanggal', 'id']);
             $table->index(['jenis_transaksi', 'tanggal']);
+            $table->index(['gudang_asal_id', 'gudang_tujuan_id']);
         });
 
         // 2. Detail Item Transaksi
@@ -43,8 +46,12 @@ return new class extends Migration
             $table->foreignId('barang_id')->constrained('barangs')->cascadeOnDelete();
             $table->integer('qty');
             $table->decimal('harga', 15, 2)->nullable()->default(0);
-            $table->string('kondisi')->default('Baru');
+            $table->string('kondisi')->default('Baru')->index();
             $table->timestamps();
+
+            // Indeks Komposit untuk JOIN & Filter Detail
+            $table->index(['transaksi_id', 'barang_id']);
+            $table->index(['barang_id', 'kondisi']);
         });
 
         // 3. Detail Serial Number Transaksi
@@ -53,6 +60,9 @@ return new class extends Migration
             $table->foreignId('transaksi_detail_id')->constrained('transaksi_details')->cascadeOnDelete();
             $table->foreignId('barang_serial_id')->constrained('barang_serials')->cascadeOnDelete();
             $table->timestamps();
+
+            // Indeks Komposit Pencocokan SN
+            $table->index(['transaksi_detail_id', 'barang_serial_id']);
         });
 
         // 4. Log Audit Stok
@@ -69,6 +79,7 @@ return new class extends Migration
             $table->timestamps();
             
             $table->index(['barang_id', 'gudang_id']);
+            $table->index(['transaksi_id', 'created_at']);
         });
     }
 

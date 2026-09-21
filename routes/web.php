@@ -7,7 +7,9 @@ use App\Http\Controllers\HistoryMovingController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransaksiController;
+use App\Http\Controllers\TransaksiBarangMasukController;
 use App\Http\Controllers\TransaksiBarangKeluarController;
+use App\Http\Controllers\TransaksiTransferController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -35,22 +37,31 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{id}', 'destroy')->name('destroy');
     });
 
-    // TRANSAKSI BARANG MASUK & GLOBAL
-    Route::prefix('transaksi')->name('transaksi.')->controller(TransaksiController::class)->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::get('/export', 'export')->name('export');
-        Route::post('/reset', 'reset')->name('reset');
-        Route::post('/bulk-delete', 'bulkDelete')->name('bulk-delete');
+    // ACTION: BARANG MASUK (INBOUND)
+    Route::prefix('transaksi-masuk')->name('transaksi.masuk.')->controller(TransaksiBarangMasukController::class)->group(function () {
         Route::post('/', 'store')->name('store');
-        Route::post('/transfer', 'storeTransfer')->name('transfer.store');
         Route::put('/{id}', 'update')->name('update');
-        Route::delete('/{id}', 'destroy')->name('destroy');
     });
 
-    // TRANSAKSI BARANG KELUAR (OUTBOUND)
+    // ACTION: BARANG KELUAR (OUTBOUND)
     Route::prefix('transaksi-keluar')->name('transaksi.keluar.')->controller(TransaksiBarangKeluarController::class)->group(function () {
         Route::post('/', 'store')->name('store');
         Route::put('/{id}', 'update')->name('update');
+    });
+
+    // ACTION: TRANSFER GUDANG
+    Route::prefix('transaksi-transfer')->name('transaksi.transfer.')->controller(TransaksiTransferController::class)->group(function () {
+        Route::post('/', 'store')->name('store');
+    });
+
+    // HALAMAN UTAMA TRANSAKSI STOK & MANAGEMENT (READ / EXPORT / DELETE / FETCH SERIALS)
+    Route::prefix('transaksi')->name('transaksi.')->controller(TransaksiController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/barangs/{barangId}/serials', 'getSerialsByBarang')->name('barangs.serials');
+        Route::get('/export', 'export')->name('export');
+        Route::post('/reset', 'reset')->name('reset');
+        Route::post('/bulk-delete', 'bulkDelete')->name('bulk-delete');
+        Route::delete('/{id}', 'destroy')->name('destroy');
     });
 
     // HISTORY MOVING (PELACAKAN MUTASI & RIWAYAT PERJALANAN BARANG)

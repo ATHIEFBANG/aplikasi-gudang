@@ -3,7 +3,7 @@ import Modal from '@/components/Modal';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, PlusCircle } from 'lucide-react';
+import { AlertCircle, PlusCircle, ClipboardPaste } from 'lucide-react';
 import ModalBarangMasukRow from './ModalBarangMasukRow';
 import { useModalBarangMasukControl, MAX_ROWS_LIMIT } from './ModalBarangMasukControl';
 
@@ -29,6 +29,7 @@ export default function ModalBarangMasuk({
         handleBarangChange,
         handleQtyChange,
         handleManualSerialChange,
+        handleBulkPasteExcel,
         handleSubmitForm,
     } = useModalBarangMasukControl({
         isOpen,
@@ -50,12 +51,35 @@ export default function ModalBarangMasuk({
             isProcessing={isProcessing}
             headerExtra={
                 !isEditMode && (
-                    <Badge 
-                        variant="secondary" 
-                        className="bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-[11px] font-mono font-bold px-2.5 py-0.5"
-                    >
-                        {rows.length} / {MAX_ROWS_LIMIT} Baris
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                                try {
+                                    const text = await navigator.clipboard.readText();
+                                    if (!text || !text.trim()) {
+                                        alert('Clipboard kosong. Silakan salin (Ctrl+C) data tabel dari Excel terlebih dahulu.');
+                                        return;
+                                    }
+                                    handleBulkPasteExcel(text);
+                                } catch (err) {
+                                    alert('Gagal mengakses clipboard. Pastikan izin clipboard diizinkan pada browser Anda.');
+                                }
+                            }}
+                            className="h-7 text-xs gap-1.5 cursor-pointer bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 font-semibold"
+                        >
+                            <ClipboardPaste className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Paste dari Excel</span>
+                        </Button>
+                        <Badge 
+                            variant="secondary" 
+                            className="bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-[11px] font-mono font-bold px-2.5 py-1"
+                        >
+                            {rows.length} / {MAX_ROWS_LIMIT} Baris
+                        </Badge>
+                    </div>
                 )
             }
         >
@@ -63,7 +87,7 @@ export default function ModalBarangMasuk({
                 <Alert className="shrink-0 mb-3 bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 p-2.5 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                     <AlertDescription className="text-[11px] leading-relaxed">
-                        <strong>Pencatatan Inbound:</strong> Catat stok masuk dari <strong>Pembelian</strong>, <strong>Peminjaman</strong>, atau <strong>Pengembalian</strong> barang.
+                        <strong>Pencatatan Inbound:</strong> Catat stok masuk dari <strong>Pembelian</strong>, <strong>Peminjaman</strong>, atau <strong>Pengembalian</strong> barang. Anda dapat mengetik manual atau menggunakan tombol <strong>Paste dari Excel</strong> di pojok kanan atas.
                     </AlertDescription>
                 </Alert>
             )}

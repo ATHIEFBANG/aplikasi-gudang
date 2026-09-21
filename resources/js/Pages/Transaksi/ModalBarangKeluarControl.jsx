@@ -31,7 +31,7 @@ export function useModalBarangKeluarControl({
     const [isProcessing, setIsProcessing] = useState(false);
     const [snSearches, setSnSearches] = useState({});
 
-    // Kalkulasi Stok Fisik: Menghitung total transaksi masuk riil di gudang jika data stoks belum sinkron
+    // Kalkulasi Stok Fisik: Menghitung total stok riil di gudang
     const getBarangStockInWarehouse = useCallback((barang, gudangId) => {
         if (!barang || !gudangId) return 0;
         if (barang.is_wajib_sn) {
@@ -72,7 +72,6 @@ export function useModalBarangKeluarControl({
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
-    // Optimalisasi: Tidak melakukan komputasi stok bertingkat jika modal tidak terbuka
     const gudangOptions = useMemo(() => {
         if (!isOpen) return [];
 
@@ -292,8 +291,26 @@ export function useModalBarangKeluarControl({
     };
 
     const handleBarangChange = (rowIdx, newBarangId) => {
-        const targetBarang = barangs.find(b => String(b.id) === String(newBarangId));
-        
+        if (!newBarangId) {
+            setRows(prev => {
+                const updated = [...prev];
+                updated[rowIdx] = {
+                    ...updated[rowIdx],
+                    barang_id: '',
+                    qty: 1,
+                    serials: [],
+                    nomor_imc: '',
+                    kondisi: 'Baru',
+                    non_sn_selections: {}
+                };
+                return updated;
+            });
+            return;
+        }
+
+        const targetBarang = barangs.find(b => String(b.id) === String(newBarangId) || b.kode_barang?.toLowerCase() === String(newBarangId).toLowerCase());
+        const realId = targetBarang ? String(targetBarang.id) : '';
+
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
@@ -303,7 +320,7 @@ export function useModalBarangKeluarControl({
 
             updated[rowIdx] = {
                 ...currentRow,
-                barang_id: String(newBarangId),
+                barang_id: realId,
                 qty: currentQty,
                 serials: [],
                 nomor_imc: '',
@@ -367,49 +384,6 @@ export function useModalBarangKeluarControl({
                 totalUnit = maxTotalStock;
             }
 
-            const kondisiParts = [];
-            const imcParts = [];
-            Object.values(selections).forEach(s => {
-                kondisiParts.push(`${s.qty} ${s.kondisi}`);
-                if (s.nomor_imc && !imcParts.includes(s.nomor_imc)) {
-                    imcParts.push(s.nomor_imc);
-                }
-            });
-
-            updated[rowIdx] = {
-                ...currentRow,
-                non_sn_selections: selections,
-                qty: totalUnit > 0 ? totalUnit : 1,
-                kondisi: kondisiParts.length > 0 ? kondisiParts.join(', ') : 'Baru',
-                nomor_imc: imcParts.join(', ')
-            };
-
-            return updated;
-        });
-    };
-
-    // Handler Pilih Otomatis Batch Non-SN
-    const handleAutoSelectNonSnBatches = (rowIdx, batches, targetQty) => {
-        setRows(prev => {
-            const updated = [...prev];
-            const currentRow = updated[rowIdx];
-            const selections = {};
-            let remaining = targetQty || 1;
-
-            for (const b of batches) {
-                if (remaining <= 0) break;
-                const allocate = Math.min(remaining, b.max_stock);
-                if (allocate > 0) {
-                    selections[b.key] = {
-                        nomor_imc: b.nomor_imc,
-                        kondisi: b.kondisi,
-                        qty: allocate
-                    };
-                    remaining -= allocate;
-                }
-            }
-
-            const totalUnit = Object.values(selections).reduce((acc, curr) => acc + (curr.qty || 0), 0);
             const kondisiParts = [];
             const imcParts = [];
             Object.values(selections).forEach(s => {
@@ -585,7 +559,6 @@ export function useModalBarangKeluarControl({
         handleBarangChange,
         handleQtyChange,
         handleNonSnBatchQtyChange,
-        handleAutoSelectNonSnBatches,
         handleToggleTransferSn,
         handleAutoSelectTransferSns,
         handleClearTransferSns,

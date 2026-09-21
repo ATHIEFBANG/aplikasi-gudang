@@ -9,8 +9,8 @@ import {
 
 export const KONDISI_OPTIONS = [
     { value: 'ALL', label: 'Semua Kondisi' },
-    { value: 'Baru', label: 'Baru' },
-    { value: 'Bekas', label: 'Bekas' },
+    { value: 'Baru', label: 'Baru / Baik' },
+    { value: 'Bekas', label: 'Bekas / Second' },
     { value: 'Rusak', label: 'Rusak' },
 ];
 
@@ -42,7 +42,24 @@ export function useHistoryMovingControl({
     const handleFitZoom = () => setZoomLevel(75);
     const toggleSort = () => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
 
-    // Eksekusi Permintaan Filter ke Server
+    // Synchronize state local when props update
+    useEffect(() => {
+        if (filters) {
+            if (filters.search !== undefined) setSearch(filters.search || '');
+            if (filters.jenis !== undefined) setJenis(filters.jenis || 'ALL');
+            if (filters.gudang_id !== undefined) setGudangId(filters.gudang_id || 'ALL');
+            if (filters.barang_id !== undefined) setBarangId(filters.barang_id || 'ALL');
+            if (filters.kondisi !== undefined) setKondisi(filters.kondisi || 'ALL');
+            if (filters.start_date !== undefined) setStartDate(filters.start_date || '');
+            if (filters.end_date !== undefined) setEndDate(filters.end_date || '');
+            if (filters.per_page !== undefined) {
+                setPerPage(filters.per_page);
+                setPerPageInput(filters.per_page);
+            }
+        }
+    }, [filters?.search, filters?.jenis, filters?.gudang_id, filters?.barang_id, filters?.kondisi, filters?.start_date, filters?.end_date, filters?.per_page]);
+
+    // Eksekusi Permintaan Filter ke Server (dengan Partial Reloads 'only')
     const fetchFilteredData = useCallback((searchVal, jenisVal, gudangVal, barangVal, kondisiVal, startVal, endVal, perPageVal, page = 1) => {
         router.get(
             '/history-moving',
@@ -61,13 +78,14 @@ export function useHistoryMovingControl({
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
+                only: ['movings', 'filters'], // SANGAT PENTING: Mengurangi payload JSON secara drastis
                 onStart: () => setIsProcessing(true),
                 onFinish: () => setIsProcessing(false)
             }
         );
     }, []);
 
-    // Debounce Pencarian Kata Kunci
+    // Debounce Pencarian Kata Kunci (Hanya terpicu saat search berubah)
     const isMounted = useRef(false);
     useEffect(() => {
         if (!isMounted.current) {
@@ -78,7 +96,7 @@ export function useHistoryMovingControl({
             fetchFilteredData(search, jenis, gudangId, barangId, kondisi, startDate, endDate, perPage, 1);
         }, 400);
         return () => clearTimeout(timer);
-    }, [search, fetchFilteredData, jenis, gudangId, barangId, kondisi, startDate, endDate, perPage]);
+    }, [search]); // isolated to search state only
 
     const handleFilterChange = (key, val) => {
         let newSearch = search;
@@ -97,6 +115,12 @@ export function useHistoryMovingControl({
         if (key === 'end_date') { setEndDate(val); newEndDate = val; }
 
         fetchFilteredData(newSearch, newJenis, newGudangId, newBarangId, newKondisi, newStartDate, newEndDate, perPage, 1);
+    };
+
+    const handleDateRangeApply = (s, e) => {
+        setStartDate(s);
+        setEndDate(e);
+        fetchFilteredData(search, jenis, gudangId, barangId, kondisi, s, e, perPage, 1);
     };
 
     const handlePerPageSubmit = () => {
@@ -138,13 +162,15 @@ export function useHistoryMovingControl({
 
     const gudangOptions = useMemo(() => [
         { value: 'ALL', label: 'Semua Gudang' },
-        ...gudangs.map((g) => ({ value: String(g.id), label: g.nama_gudang }))
+        ...(Array.isArray(gudangs) ? gudangs.map((g) => ({
+            value: String(g.id),
+            label: `${g.kode_gudang ? g.kode_gudang + ' - ' : ''}${g.nama_gudang}`
+        })) : [])
     ], [gudangs]);
 
-    // Opsi Barang: Nama Barang sebagai label utama, Kode PPL sebagai sub-teks
     const barangOptions = useMemo(() => [
         { value: 'ALL', label: 'Semua Barang' },
-        ...barangs.map((b) => {
+        ...(Array.isArray(barangs) ? barangs.map((b) => {
             const nama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
             return {
                 value: String(b.id),
@@ -155,12 +181,12 @@ export function useHistoryMovingControl({
                     </span>
                 ) : null
             };
-        })
+        }) : [])
     ], [barangs]);
 
     const activeGudangLabel = useMemo(() => {
         if (gudangId === 'ALL') return 'Semua Titik Gudang';
-        const found = gudangs.find((g) => String(g.id) === String(gudangId));
+        const found = (gudangs || []).find((g) => String(g.id) === String(gudangId));
         return found ? found.nama_gudang : 'Gudang Terpilih';
     }, [gudangId, gudangs]);
 
@@ -177,7 +203,7 @@ export function useHistoryMovingControl({
             key: 'tanggal',
             label: 'TANGGAL',
             render: (item) => (
-                <span className="font-mono text-xs text-slate-500 whitespace-nowrap">
+                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     {item.tanggal ? String(item.tanggal).split('T')[0] : '-'}
                 </span>
             )
@@ -276,7 +302,7 @@ export function useHistoryMovingControl({
                         <Badge variant="outline" className="font-mono font-bold text-xs bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
                             {detail.qty || 0}
                         </Badge>
-                        <span className="text-xs text-slate-500 font-medium">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                             {b.deskripsi || 'Unit'}
                         </span>
                     </div>
@@ -410,6 +436,7 @@ export function useHistoryMovingControl({
         activeGudangLabel,
         isFiltered,
         handleFilterChange,
+        handleDateRangeApply,
         handleResetFilters,
         handleExportCSV
     };

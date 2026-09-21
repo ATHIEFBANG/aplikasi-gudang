@@ -162,7 +162,7 @@ export default function HistoryMovingIndex({
                         />
                     </div>
 
-                    {/* Filter Kondisi Fisik (Diperlebar ke w-40 agar teks 'Semua Kondisi' tidak terpotong) */}
+                    {/* Filter Kondisi Fisik */}
                     <div className="w-40">
                         <HybridDropdown
                             value={kondisi}
@@ -175,7 +175,7 @@ export default function HistoryMovingIndex({
                         />
                     </div>
 
-                    {/* Filter Rentang Tanggal Ramping */}
+                    {/* Filter Rentang Tanggal */}
                     <div className="relative" ref={dateDropdownRef}>
                         <button
                             type="button"
@@ -205,7 +205,6 @@ export default function HistoryMovingIndex({
                                     </button>
                                 </div>
 
-                                {/* Preset Cepat */}
                                 <div className="flex flex-wrap gap-1">
                                     <button
                                         type="button"
@@ -274,7 +273,7 @@ export default function HistoryMovingIndex({
                         )}
                     </div>
 
-                    {/* Tombol Reset Filter */}
+                    {/* Reset Filter */}
                     {isFiltered && (
                         <button
                             type="button"

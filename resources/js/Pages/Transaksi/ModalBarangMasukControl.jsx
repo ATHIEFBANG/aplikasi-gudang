@@ -9,6 +9,52 @@ export const CATEGORIES_MASUK = [
     { id: 'PENGEMBALIAN', label: 'Pengembalian', icon: RotateCcw },
 ];
 
+// Helper parsing teks tabel dari clipboard Excel
+const parseClipboardText = (text) => {
+    if (!text) return [];
+    return text
+        .split(/\r?\n/)
+        .map(row => row.split('\t').map(cell => {
+            if (!cell) return '';
+            return cell
+                .replace(/[\u00a0\r\n]/g, ' ')
+                .replace(/^"(.*)"$/, '$1')
+                .trim();
+        }))
+        .filter(row => row.some(cell => cell.length > 0));
+};
+
+// Helper Konversi Tanggal Excel ke Format ISO (YYYY-MM-DD)
+const formatToISODate = (rawStr) => {
+    if (!rawStr || rawStr === '-' || rawStr.trim() === '') {
+        return new Date().toISOString().slice(0, 10);
+    }
+
+    const cleanStr = String(rawStr).trim();
+
+    // 1. Format YYYY-MM-DD / YYYY/MM/DD
+    const ymdMatch = cleanStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (ymdMatch) {
+        const [, y, m, d] = ymdMatch;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    // 2. Format DD/MM/YYYY / DD-MM-YYYY / DD.MM.YYYY
+    const dmyMatch = cleanStr.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})/);
+    if (dmyMatch) {
+        const [, d, m, y] = dmyMatch;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    // 3. Fallback Parser
+    const parsedDate = new Date(cleanStr);
+    if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.toISOString().slice(0, 10);
+    }
+
+    return new Date().toISOString().slice(0, 10);
+};
+
 export function useModalBarangMasukControl({
     isOpen,
     isEditMode = false,
@@ -47,7 +93,6 @@ export function useModalBarangMasukControl({
         return (suppliers || []).map(s => s.nama_supplier || s);
     }, [suppliers]);
 
-    // Opsi Kode PPL untuk HybridDropdown (value dan label diset ke kode_barang agar seragam)
     const getBarangPplOptionsForRow = useCallback(() => {
         return barangs.map(b => ({
             value: b.kode_barang,
@@ -56,7 +101,6 @@ export function useModalBarangMasukControl({
         }));
     }, [barangs]);
 
-    // Opsi Nama Barang untuk HybridDropdown
     const getBarangNamaOptionsForRow = useCallback(() => {
         return barangs.map(b => {
             const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
@@ -81,7 +125,7 @@ export function useModalBarangMasukControl({
                 setRows([{
                     id: selectedItem.id,
                     sub_jenis: selectedItem.sub_jenis || 'PEMBELIAN',
-                    tanggal: selectedItem.tanggal ? String(selectedItem.tanggal).split('T')[0] : new Date().toISOString().slice(0, 10),
+                    tanggal: formatToISODate(selectedItem.tanggal),
                     nomor_imc: selectedItem.nomor_imc || '',
                     pihak_asal: selectedItem.pihak_asal || '',
                     gudang_tujuan_id: selectedItem.gudang_tujuan_id ? String(selectedItem.gudang_tujuan_id) : '',
@@ -137,14 +181,12 @@ export function useModalBarangMasukControl({
         });
     };
 
-    // Handler Utama Pemilihan Barang (Mengatasi bug tombol X / clear dan pemilihan fleksibel)
     const handleBarangChange = (rowIdx, newBarangId) => {
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
 
             if (!newBarangId) {
-                // Jika tombol X diklik / dikosongkan
                 updated[rowIdx] = {
                     ...currentRow,
                     barang_id: '',
@@ -199,6 +241,195 @@ export function useModalBarangMasukControl({
             currentSerials[snIdx] = val;
             updated[rowIdx] = { ...updated[rowIdx], serials: currentSerials };
             return updated;
+        });
+    };
+
+    const handleBulkPasteExcel = (pastedText) => {
+        const parsedRows = parseClipboardText(pastedText);
+        if (parsedRows.length === 0) return;
+
+        let missingCount = 0;
+        let rowsToProcess = [...parsedRows];
+
+        const firstRowJoin = rowsToProcess[0].join(' ').toUpperCase();
+        const isHeaderRow = ['KODE', 'PPL', 'BARANG', 'QTY', 'QUANTITY', 'IMC', 'SUPPLIER', 'VENDOR', 'ASAL', 'HARGA', 'SERIAL', 'NO TRANSAKSI'].some(
+            keyword => firstRowJoin.includes(keyword)
+        );
+
+        let colIndexMap = {
+            subJenis: -1,
+            kodePpl: -1,
+            namaBarang: -1,
+            tanggal: -1,
+            qty: -1,
+            harga: -1,
+            kondisi: -1,
+            nomorImc: -1,
+            pihakAsal: -1,
+            gudangTujuan: -1,
+            serials: -1,
+        };
+
+        if (isHeaderRow) {
+            const headerRow = rowsToProcess[0];
+            headerRow.forEach((colHeader, idx) => {
+                const h = colHeader.toUpperCase().trim();
+                if (h.includes('SUB JENIS') || h.includes('JENIS TRANSAKSI')) colIndexMap.subJenis = idx;
+                else if (h.includes('PPL') || h.includes('KODE')) colIndexMap.kodePpl = idx;
+                else if (h.includes('NAMA BARANG') || h.includes('BARANG')) colIndexMap.namaBarang = idx;
+                else if (h.includes('TANGGAL')) colIndexMap.tanggal = idx;
+                else if (h.includes('QTY') || h.includes('QUANTITY') || h.includes('JUMLAH')) colIndexMap.qty = idx;
+                else if (h.includes('HARGA SATUAN') || h.includes('HARGA')) colIndexMap.harga = idx;
+                else if (h.includes('KONDISI')) colIndexMap.kondisi = idx;
+                else if (h.includes('IMC')) colIndexMap.nomorImc = idx;
+                else if (h.includes('GUDANG ASAL') || h.includes('PIHAK ASAL') || h.includes('SUPPLIER') || h.includes('VENDOR')) colIndexMap.pihakAsal = idx;
+                else if (h.includes('GUDANG TUJUAN') || h.includes('SITE') || h.includes('PENERIMA')) colIndexMap.gudangTujuan = idx;
+                else if (h.includes('SERIAL')) colIndexMap.serials = idx;
+            });
+            rowsToProcess.shift();
+        }
+
+        if (rowsToProcess.length === 0) return;
+
+        const normalizedBarangs = barangs.map(b => {
+            const cleanKode = (b.kode_barang || '').toUpperCase().replace(/\s+/g, '');
+            const cleanNama = (b.nama_barang || '').toLowerCase().trim();
+            const comboNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ').toLowerCase().trim();
+            return { ...b, cleanKode, cleanNama, comboNama };
+        });
+
+        const mappedRows = rowsToProcess.map((cols) => {
+            let rawSubJenis = 'PEMBELIAN';
+            let rawKodePpl = '';
+            let rawNamaBarang = '';
+            let rawTanggal = '';
+            let rawQty = '1';
+            let rawHarga = '';
+            let rawKondisi = 'Baru';
+            let rawNomorImc = '';
+            let rawPihakAsal = '';
+            let rawGudangTujuan = '';
+            let rawSerialsText = '';
+
+            if (isHeaderRow) {
+                if (colIndexMap.subJenis !== -1 && cols[colIndexMap.subJenis]) rawSubJenis = cols[colIndexMap.subJenis];
+                if (colIndexMap.kodePpl !== -1 && cols[colIndexMap.kodePpl]) rawKodePpl = cols[colIndexMap.kodePpl];
+                if (colIndexMap.namaBarang !== -1 && cols[colIndexMap.namaBarang]) rawNamaBarang = cols[colIndexMap.namaBarang];
+                if (colIndexMap.tanggal !== -1 && cols[colIndexMap.tanggal]) rawTanggal = cols[colIndexMap.tanggal];
+                if (colIndexMap.qty !== -1 && cols[colIndexMap.qty]) rawQty = cols[colIndexMap.qty];
+                if (colIndexMap.harga !== -1 && cols[colIndexMap.harga]) rawHarga = cols[colIndexMap.harga];
+                if (colIndexMap.kondisi !== -1 && cols[colIndexMap.kondisi]) rawKondisi = cols[colIndexMap.kondisi];
+                if (colIndexMap.nomorImc !== -1 && cols[colIndexMap.nomorImc]) rawNomorImc = cols[colIndexMap.nomorImc];
+                if (colIndexMap.pihakAsal !== -1 && cols[colIndexMap.pihakAsal]) rawPihakAsal = cols[colIndexMap.pihakAsal];
+                if (colIndexMap.gudangTujuan !== -1 && cols[colIndexMap.gudangTujuan]) rawGudangTujuan = cols[colIndexMap.gudangTujuan];
+                if (colIndexMap.serials !== -1 && cols[colIndexMap.serials]) rawSerialsText = cols[colIndexMap.serials];
+            } else {
+                if (cols.length >= 10) {
+                    rawKodePpl = cols[2] || '';
+                    rawNamaBarang = cols[3] || '';
+                    rawTanggal = cols[6] || '';
+                    rawQty = cols[7] || '1';
+                    rawHarga = cols[8] || '';
+                    rawKondisi = cols[10] || 'Baru';
+                    rawNomorImc = cols[11] || '';
+                    rawPihakAsal = cols[15] || '';
+                    rawGudangTujuan = cols[16] || '';
+                    rawSerialsText = cols[17] || '';
+                } else {
+                    rawKodePpl = cols[0] || '';
+                    rawQty = cols[1] || '1';
+                    rawNomorImc = cols[2] || '';
+                    rawPihakAsal = cols[3] || '';
+                }
+            }
+
+            const finalTanggal = formatToISODate(rawTanggal);
+
+            let cleanSubJenis = 'PEMBELIAN';
+            const upperSub = rawSubJenis.toUpperCase();
+            if (upperSub.includes('PEMINJAMAN')) cleanSubJenis = 'PEMINJAMAN';
+            else if (upperSub.includes('PENGEMBALIAN')) cleanSubJenis = 'PENGEMBALIAN';
+
+            const searchKode = rawKodePpl.toUpperCase().replace(/\s+/g, '');
+            const searchNama = rawNamaBarang.toLowerCase().trim();
+
+            let targetBarang = null;
+            if (searchKode) {
+                targetBarang = normalizedBarangs.find(b => b.cleanKode === searchKode);
+            }
+            if (!targetBarang && searchNama) {
+                targetBarang = normalizedBarangs.find(b => b.cleanNama === searchNama || b.comboNama === searchNama);
+            }
+
+            if (!targetBarang && (rawKodePpl || rawNamaBarang)) {
+                missingCount++;
+            }
+
+            let parsedQty = parseInt(String(rawQty).replace(/[^0-9]/g, ''), 10);
+            if (isNaN(parsedQty) || parsedQty < 1) parsedQty = 1;
+            if (parsedQty > 10) parsedQty = 10;
+
+            let parsedHarga = '';
+            if (rawHarga && rawHarga !== '-') {
+                const cleanPriceStr = String(rawHarga).replace(/[^0-9]/g, '');
+                if (cleanPriceStr) {
+                    parsedHarga = cleanPriceStr;
+                }
+            }
+
+            let cleanKondisi = 'Baru';
+            const upperKondisi = rawKondisi.toUpperCase().trim();
+            if (upperKondisi.includes('BEKAS') || upperKondisi.includes('SECOND')) cleanKondisi = 'Bekas';
+            else if (upperKondisi.includes('RUSAK')) cleanKondisi = 'Rusak';
+
+            let targetGudangId = gudangs[0]?.id ? String(gudangs[0].id) : '';
+            if (rawGudangTujuan && rawGudangTujuan !== '-') {
+                const foundG = gudangs.find(g => 
+                    g.nama_gudang.toLowerCase().trim() === rawGudangTujuan.toLowerCase().trim() ||
+                    rawGudangTujuan.toLowerCase().includes(g.nama_gudang.toLowerCase().trim())
+                );
+                if (foundG) targetGudangId = String(foundG.id);
+            }
+
+            const isSn = Boolean(targetBarang?.is_wajib_sn);
+            let extractedSerials = [];
+            if (isSn && rawSerialsText && rawSerialsText !== '-') {
+                extractedSerials = rawSerialsText
+                    .split(',')
+                    .map(s => s.replace(/\s*\([^)]*\)/g, '').trim())
+                    .filter(Boolean);
+            }
+
+            let finalSerials = [];
+            if (isSn) {
+                finalSerials = extractedSerials.slice(0, parsedQty);
+                while (finalSerials.length < parsedQty) {
+                    finalSerials.push('');
+                }
+            }
+
+            return {
+                sub_jenis: cleanSubJenis,
+                tanggal: finalTanggal,
+                nomor_imc: rawNomorImc === '-' ? '' : rawNomorImc,
+                pihak_asal: (rawPihakAsal && rawPihakAsal !== '-') ? rawPihakAsal : (suppliers[0]?.nama_supplier || suppliers[0] || ''),
+                gudang_tujuan_id: targetGudangId,
+                barang_id: targetBarang ? String(targetBarang.id) : '',
+                qty: parsedQty,
+                harga: parsedHarga,
+                kondisi: cleanKondisi,
+                serials: finalSerials
+            };
+        });
+
+        if (missingCount > 0) {
+            alert(`⚠️ Terdapat ${missingCount} baris dengan Kode PPL/Barang yang tidak terdeteksi di Master Data.\n\nBaris tersebut tetap dimasukkan. Silakan pilih barang manual pada baris terkait.`);
+        }
+
+        setRows(prev => {
+            const isFirstRowEmpty = prev.length === 1 && !prev[0].barang_id && !prev[0].nomor_imc && !prev[0].pihak_asal;
+            const baseRows = isFirstRowEmpty ? [] : prev;
+            return [...baseRows, ...mappedRows].slice(0, MAX_ROWS_LIMIT);
         });
     };
 
@@ -267,7 +498,8 @@ export function useModalBarangMasukControl({
                 }))
             };
 
-        const targetUrl = isEditMode ? `/transaksi/${selectedItem.id}` : '/transaksi';
+        // TARGET URL DISESUAIKAN KE ENDPOINT BARANG MASUK (/transaksi-masuk)
+        const targetUrl = isEditMode ? `/transaksi-masuk/${selectedItem.id}` : '/transaksi-masuk';
         const method = isEditMode ? 'put' : 'post';
 
         router[method](targetUrl, payload, {
@@ -294,6 +526,7 @@ export function useModalBarangMasukControl({
         handleBarangChange,
         handleQtyChange,
         handleManualSerialChange,
+        handleBulkPasteExcel,
         handleSubmitForm,
     };
 }

@@ -64,9 +64,12 @@ class BarangController extends Controller
     public function store(Request $request)
     {
         if ($request->has('items') && is_array($request->items)) {
+            // Naikkan limit waktu eksekusi khusus untuk proses simpan massal / paste excel
+            set_time_limit(120);
+
             $validated = $request->validate([
                 'items'               => 'required|array|min:1',
-                'items.*.kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang',
+                'items.*.kode_barang' => 'required|string|min:8|max:100',
                 'items.*.brand'       => 'required|string|max:255',
                 'items.*.tipe'        => 'required|string|max:255',
                 'items.*.kategori'    => 'required|string|max:255',
@@ -79,35 +82,61 @@ class BarangController extends Controller
                 'items.*.is_wajib_pn' => 'boolean',
             ]);
 
-            DB::transaction(function () use ($validated) {
-                foreach ($validated['items'] as $item) {
-                    $isWajibSn = (bool) ($item['is_wajib_sn'] ?? false);
-                    $isWajibPn = (bool) ($item['is_wajib_pn'] ?? false);
-                    $partNumber = !empty($item['part_number']) ? trim($item['part_number']) : null;
-                    $namaBarang = trim(
-                        $item['nama_barang'] 
-                        ?? ($isWajibPn && $partNumber ? $partNumber : "{$item['brand']} {$item['tipe']}")
-                    );
-                    $satuan = trim($item['satuan'] ?? $item['deskripsi'] ?? '');
+            $now = now();
+            $records = [];
+            $processedKodes = [];
 
-                    Barang::create([
-                        'kode_barang' => trim($item['kode_barang']),
-                        'nama_barang' => $namaBarang,
-                        'kategori'    => trim($item['kategori']),
-                        'brand'       => trim($item['brand']),
-                        'tipe'        => trim($item['tipe']),
-                        'part_number' => $partNumber,
-                        'min_stock'   => $item['min_stock'] ?? 0,
-                        'is_wajib_sn' => $isWajibSn,
-                        'is_wajib_pn' => $isWajibPn,
-                        'deskripsi'   => $satuan !== '' ? $satuan : null,
-                    ]);
+            foreach ($validated['items'] as $item) {
+                $kode = trim($item['kode_barang']);
+                
+                // Cegah duplikasi item dengan kode PPL sama di dalam payload yang disalin bersamaan
+                if (in_array(strtolower($kode), $processedKodes, true)) {
+                    continue;
                 }
-            });
+                $processedKodes[] = strtolower($kode);
 
-            return redirect()->back()->with('success', count($validated['items']) . ' Master Barang PPL berhasil ditambahkan.');
+                $isWajibSn  = (bool) ($item['is_wajib_sn'] ?? false);
+                $isWajibPn  = (bool) ($item['is_wajib_pn'] ?? false);
+                $partNumber = !empty($item['part_number']) ? trim($item['part_number']) : null;
+                $namaBarang = trim(
+                    $item['nama_barang'] 
+                    ?? ($isWajibPn && $partNumber ? $partNumber : "{$item['brand']} {$item['tipe']}")
+                );
+                $satuan = trim($item['satuan'] ?? $item['deskripsi'] ?? '');
+
+                $records[] = [
+                    'kode_barang' => $kode,
+                    'nama_barang' => $namaBarang,
+                    'kategori'    => trim($item['kategori']),
+                    'brand'       => trim($item['brand']),
+                    'tipe'        => trim($item['tipe']),
+                    'part_number' => $partNumber,
+                    'min_stock'   => $item['min_stock'] ?? 0,
+                    'is_wajib_sn' => $isWajibSn,
+                    'is_wajib_pn' => $isWajibPn,
+                    'deskripsi'   => $satuan !== '' ? $satuan : null,
+                    'created_at'  => $now,
+                    'updated_at'  => $now,
+                ];
+            }
+
+            if (!empty($records)) {
+                DB::transaction(function () use ($records) {
+                    // Diproses per-100 baris menggunakan upsert agar eksekusi SQL cuma 4-5 kali
+                    foreach (array_chunk($records, 100) as $chunk) {
+                        Barang::upsert(
+                            $chunk,
+                            ['kode_barang'],
+                            ['nama_barang', 'kategori', 'brand', 'tipe', 'part_number', 'min_stock', 'is_wajib_sn', 'is_wajib_pn', 'deskripsi', 'updated_at']
+                        );
+                    }
+                });
+            }
+
+            return redirect()->back()->with('success', count($records) . ' Master Barang PPL berhasil diproses.');
         }
 
+        // Jalur simpan single manual
         $validated = $request->validate([
             'kode_barang' => 'required|string|min:8|max:100|unique:barangs,kode_barang',
             'brand'       => 'required|string|max:255',
@@ -122,8 +151,8 @@ class BarangController extends Controller
             'is_wajib_pn' => 'boolean',
         ]);
 
-        $isWajibSn = $request->boolean('is_wajib_sn');
-        $isWajibPn = $request->boolean('is_wajib_pn');
+        $isWajibSn  = $request->boolean('is_wajib_sn');
+        $isWajibPn  = $request->boolean('is_wajib_pn');
         $partNumber = $request->filled('part_number') ? trim($request->part_number) : null;
         $namaBarang = trim(
             $validated['nama_barang'] 
@@ -164,8 +193,8 @@ class BarangController extends Controller
             'is_wajib_pn' => 'boolean',
         ]);
 
-        $isWajibSn = $request->boolean('is_wajib_sn');
-        $isWajibPn = $request->boolean('is_wajib_pn');
+        $isWajibSn  = $request->boolean('is_wajib_sn');
+        $isWajibPn  = $request->boolean('is_wajib_pn');
         $partNumber = $request->filled('part_number') ? trim($request->part_number) : null;
         $namaBarang = trim(
             $validated['nama_barang'] 

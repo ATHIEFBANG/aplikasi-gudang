@@ -27,7 +27,9 @@ class Barang extends Model
 
     public function getTotalStokAttribute(): int
     {
-        return (int) $this->stoks()->sum('jumlah');
+        // Menggunakan koleksi memori ($this->stoks) tanpa tanda kurung
+        // Mencegah N+1 query SQL berulang yang memicu timeout
+        return (int) $this->stoks->sum('jumlah');
     }
 
     public function serials(): HasMany

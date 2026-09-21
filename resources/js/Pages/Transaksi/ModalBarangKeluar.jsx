@@ -30,7 +30,6 @@ export default function ModalBarangKeluar({
         handleBarangChange,
         handleQtyChange,
         handleNonSnBatchQtyChange,
-        handleAutoSelectNonSnBatches,
         handleToggleTransferSn,
         handleAutoSelectTransferSns,
         handleClearTransferSns,
@@ -61,7 +60,7 @@ export default function ModalBarangKeluar({
                 !isEditMode && (
                     <Badge 
                         variant="secondary" 
-                        className="bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-900 text-[11px] font-mono font-bold px-2.5 py-0.5"
+                        className="bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-[11px] font-mono font-bold px-2.5 py-1"
                     >
                         {rows.length} / {MAX_ROWS_LIMIT} Baris
                     </Badge>
@@ -72,7 +71,7 @@ export default function ModalBarangKeluar({
                 <Alert className="shrink-0 mb-3 bg-rose-50/60 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/40 text-rose-700 dark:text-rose-300 p-2.5 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
                     <AlertDescription className="text-[11px] leading-relaxed">
-                        <strong>Pencatatan Outbound:</strong> Pengeluaran barang akan otomatis memotong stok fisik di <strong>Gudang Asal</strong> dan mengubah status Serial Number menjadi <strong>IN_USE</strong>.
+                        <strong>Pencatatan Outbound:</strong> Pengeluaran barang akan otomatis memotong stok fisik di <strong>Gudang Asal</strong> dan mengubah status Serial Number menjadi <strong>IN_USE</strong>. Silakan pilih gudang, barang, serta unit Serial Number secara akurat.
                     </AlertDescription>
                 </Alert>
             )}
@@ -108,7 +107,6 @@ export default function ModalBarangKeluar({
                             onBarangChange={handleBarangChange}
                             onQtyChange={handleQtyChange}
                             onNonSnBatchQtyChange={handleNonSnBatchQtyChange}
-                            onAutoSelectNonSnBatches={handleAutoSelectNonSnBatches}
                             onSnSearchChange={handleSnSearchChange}
                             onToggleTransferSn={handleToggleTransferSn}
                             onAutoSelectTransferSns={handleAutoSelectTransferSns}
