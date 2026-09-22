@@ -13,13 +13,15 @@ export default function ModalBarangKeluar({
     isEditMode = false,
     selectedItem = null,
     gudangs = [],
-    barangs = []
+    barangs = [],
+    transaksiMasuks = []
 }) {
     const {
         isProcessing,
         rows,
         snSearches,
         setSnSearches,
+        inboundList,
         gudangOptions,
         getBarangPplOptionsForRow,
         getBarangNamaOptionsForRow,
@@ -41,6 +43,7 @@ export default function ModalBarangKeluar({
         selectedItem,
         gudangs,
         barangs,
+        transaksiMasuks,
         onClose
     });
 
@@ -96,6 +99,7 @@ export default function ModalBarangKeluar({
                             isProcessing={isProcessing}
                             barangs={barangs}
                             gudangs={gudangs}
+                            inboundList={inboundList}
                             gudangOptions={gudangOptions}
                             pplOptions={pplOptions}
                             namaOptions={namaOptions}

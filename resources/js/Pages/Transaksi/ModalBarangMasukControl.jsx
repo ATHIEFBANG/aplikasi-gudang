@@ -435,6 +435,19 @@ export function useModalBarangMasukControl({
 
     const handleSubmitForm = (e) => {
         e?.preventDefault();
+
+        // Set pelacak Serial Number yang sedang diinput pada form ini (mencegah duplikat internal)
+        const usedSerialsInForm = new Set();
+
+        // Set pelacak Serial Number yang sudah ada di Database / Master Data
+        const existingDatabaseSerials = new Set();
+        barangs.forEach(b => {
+            (b.serials || []).forEach(s => {
+                const snVal = (s.serial_number || s).toString().trim().toLowerCase();
+                if (snVal) existingDatabaseSerials.add(snVal);
+            });
+        });
+
         for (let i = 0; i < rows.length; i++) {
             const r = rows[i];
             const rowNum = i + 1;
@@ -464,10 +477,31 @@ export function useModalBarangMasukControl({
                     alert(`Baris #${rowNum}: Jumlah Serial Number (${r.serials.length}) harus sesuai dengan Quantity (${r.qty} unit).`);
                     return;
                 }
-                const emptySnIndex = r.serials.findIndex(sn => !sn || !sn.trim());
-                if (emptySnIndex !== -1) {
-                    alert(`Baris #${rowNum}: Serial Number unit ke-${emptySnIndex + 1} wajib terisi.`);
-                    return;
+
+                // 🔍 Validasi Tiap Unit Serial Number
+                for (let snIdx = 0; snIdx < r.serials.length; snIdx++) {
+                    const rawSn = r.serials[snIdx];
+                    const cleanSn = (rawSn || '').trim();
+
+                    if (!cleanSn) {
+                        alert(`Baris #${rowNum}: Serial Number unit ke-${snIdx + 1} wajib terisi.`);
+                        return;
+                    }
+
+                    const lowerSn = cleanSn.toLowerCase();
+
+                    // 1. Cek duplikat di dalam form yang sama
+                    if (usedSerialsInForm.has(lowerSn)) {
+                        alert(`Baris #${rowNum}: Serial Number "${cleanSn}" ganda / sudah digunakan pada form ini.`);
+                        return;
+                    }
+                    usedSerialsInForm.add(lowerSn);
+
+                    // 2. Cek duplikat terhadap database / master data
+                    if (existingDatabaseSerials.has(lowerSn)) {
+                        alert(`Baris #${rowNum}: Serial Number "${cleanSn}" sudah terdaftar di sistem. Harap gunakan Serial Number yang unik.`);
+                        return;
+                    }
                 }
             }
         }
@@ -498,15 +532,17 @@ export function useModalBarangMasukControl({
                 }))
             };
 
-        // TARGET URL DISESUAIKAN KE ENDPOINT BARANG MASUK (/transaksi-masuk)
         const targetUrl = isEditMode ? `/transaksi-masuk/${selectedItem.id}` : '/transaksi-masuk';
         const method = isEditMode ? 'put' : 'post';
 
         router[method](targetUrl, payload, {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setIsProcessing(false);
-                onClose();
+                // 💡 Hanya tutup modal jika tidak ada error dari flash session backend
+                if (!page.props.flash?.error) {
+                    onClose();
+                }
             },
             onError: () => setIsProcessing(false),
             onFinish: () => setIsProcessing(false)

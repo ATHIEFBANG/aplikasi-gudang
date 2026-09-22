@@ -31,14 +31,19 @@ export default function ModalTransferGudangRow({
     onToggleSn,
     onClearSns
 }) {
-    const targetBarang = barangs.find(b => String(b.id) === String(row.barang_id));
-    const isWajibSn = Boolean(targetBarang?.is_wajib_sn);
-    const isWajibPn = Boolean(targetBarang?.is_wajib_pn);
+    const targetBarang = useMemo(() => {
+        if (!row.barang_id) return null;
+        return barangs.find(b => String(b.id) === String(row.barang_id)) || null;
+    }, [barangs, row.barang_id]);
+
+    const isWajibSn = Boolean(targetBarang?.is_wajib_sn === true || targetBarang?.is_wajib_sn === 1 || targetBarang?.is_wajib_sn === '1');
+    const isWajibPn = Boolean(targetBarang?.is_wajib_pn === true || targetBarang?.is_wajib_pn === 1 || targetBarang?.is_wajib_pn === '1');
+    
     const currentNamaBarang = targetBarang 
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
         : '';
 
-    // Grouping Non-SN Batches by condition for Transfer
+    // Grouping Non-SN Batches
     const groupedNonSnBatches = useMemo(() => {
         if (isWajibSn || !targetBarang || !row.gudang_asal_id) return [];
         const details = targetBarang.transaksi_details || targetBarang.transaksiDetails || [];
@@ -129,7 +134,7 @@ export default function ModalTransferGudangRow({
                             value={gudangs.find(g => String(g.id) === String(row.gudang_asal_id))?.nama_gudang || ''}
                             options={gudangOptions}
                             onChange={(val, selectedOpt) => {
-                                const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase())?.id;
+                                const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase() === String(val).toLowerCase())?.id;
                                 onFieldChange(rowIdx, 'gudang_asal_id', targetId ? String(targetId) : '');
                             }}
                             placeholder="Pilih Gudang Asal..."
@@ -156,7 +161,7 @@ export default function ModalTransferGudangRow({
                             value={gudangs.find(g => String(g.id) === String(row.gudang_tujuan_id))?.nama_gudang || ''}
                             options={gudangOptions}
                             onChange={(val, selectedOpt) => {
-                                const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase() === val.toLowerCase())?.id;
+                                const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase() === String(val).toLowerCase())?.id;
                                 onFieldChange(rowIdx, 'gudang_tujuan_id', targetId ? String(targetId) : '');
                             }}
                             placeholder="Pilih Gudang Penerima..."
@@ -190,12 +195,11 @@ export default function ModalTransferGudangRow({
                                     onBarangChange(rowIdx, '');
                                     return;
                                 }
-                                const cleanKode = String(selectedOpt?.value || val).split(' ')[0].trim().toLowerCase();
-                                const foundId = selectedOpt?.id || barangs.find(b => 
-                                    b.kode_barang.toLowerCase() === cleanKode || 
-                                    b.kode_barang.toLowerCase() === String(val).trim().toLowerCase()
+                                const targetId = selectedOpt?.id || barangs.find(b => 
+                                    String(b.id) === String(selectedOpt?.id) ||
+                                    String(b.kode_barang).toLowerCase() === String(val).toLowerCase()
                                 )?.id;
-                                if (foundId) onBarangChange(rowIdx, foundId);
+                                if (targetId) onBarangChange(rowIdx, String(targetId));
                             }}
                             placeholder={
                                 !row.gudang_asal_id
@@ -217,11 +221,11 @@ export default function ModalTransferGudangRow({
                                     onBarangChange(rowIdx, '');
                                     return;
                                 }
-                                const foundId = selectedOpt?.id || barangs.find(b => {
-                                    const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang;
-                                    return fullName.toLowerCase() === String(val).trim().toLowerCase();
+                                const targetId = selectedOpt?.id || barangs.find(b => {
+                                    const fullName = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
+                                    return fullName.toLowerCase() === String(val).trim().toLowerCase() || String(b.id) === String(selectedOpt?.id);
                                 })?.id;
-                                if (foundId) onBarangChange(rowIdx, foundId);
+                                if (targetId) onBarangChange(rowIdx, String(targetId));
                             }}
                             placeholder={
                                 !row.gudang_asal_id
@@ -307,7 +311,7 @@ export default function ModalTransferGudangRow({
                 </div>
             </div>
 
-            {/* Selektor Non-SN dengan Stepper di Kartu untuk Transfer */}
+            {/* Selektor Non-SN */}
             {!isWajibSn && targetBarang && !isEditMode && (
                 <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                     <div className="flex flex-wrap items-center justify-between gap-2">

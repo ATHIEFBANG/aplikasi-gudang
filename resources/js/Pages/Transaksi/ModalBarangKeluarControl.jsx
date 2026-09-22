@@ -31,27 +31,70 @@ export function useModalBarangKeluarControl({
     const [isProcessing, setIsProcessing] = useState(false);
     const [snSearches, setSnSearches] = useState({});
 
-    // Kalkulasi Stok Fisik: Menghitung total stok riil di gudang
-    const getBarangStockInWarehouse = useCallback((barang, gudangId) => {
-        if (!barang || !gudangId) return 0;
-        if (barang.is_wajib_sn) {
-            return (barang.serials || []).filter(
-                s => String(s.gudang_id) === String(gudangId) && s.status === 'IN_WAREHOUSE'
-            ).length;
+    // 💡 Helper presisi menghitung stok barang di gudang tertentu
+    const getBarangStockInWarehouse = useCallback((barang, gudangIdOrName) => {
+        if (!barang || !gudangIdOrName) return 0;
+
+        const targetGudang = gudangs.find(g => 
+            String(g.id) === String(gudangIdOrName) || 
+            (g.nama_gudang && g.nama_gudang.toLowerCase().trim() === String(gudangIdOrName).toLowerCase().trim())
+        );
+
+        const targetGudangId = targetGudang ? String(targetGudang.id) : String(gudangIdOrName);
+        const targetGudangName = targetGudang ? targetGudang.nama_gudang.toLowerCase().trim() : String(gudangIdOrName).toLowerCase().trim();
+
+        const isSn = Boolean(barang.is_wajib_sn === true || barang.is_wajib_sn === 1 || barang.is_wajib_sn === '1');
+
+        // 1. Jika Wajib SN, hitung serial number yang siap pakai di gudang tersebut
+        if (isSn && Array.isArray(barang.serials) && barang.serials.length > 0) {
+            const matchedSns = barang.serials.filter(s => {
+                const sGudangId = String(s.gudang_id || '');
+                const sGudangName = String(s.gudang?.nama_gudang || s.nama_gudang || '').toLowerCase().trim();
+                const isMatch = sGudangId === targetGudangId || (sGudangName && (targetGudangName.includes(sGudangName) || sGudangName.includes(targetGudangName)));
+                const isAvailable = !s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE';
+                return isMatch && isAvailable;
+            });
+            if (matchedSns.length > 0) return matchedSns.length;
         }
 
-        const stokRec = barang.stoks?.find(st => String(st.gudang_id) === String(gudangId));
-        const stokQty = stokRec ? parseInt(stokRec.jumlah, 10) : 0;
+        // 2. Cek dari array relasi `stoks`
+        const stoksArray = barang.stoks || barang.stok || [];
+        if (Array.isArray(stoksArray) && stoksArray.length > 0) {
+            const stokRec = stoksArray.find(st => {
+                const stGudangId = String(st.gudang_id || st.id || '');
+                const stGudangName = String(st.gudang?.nama_gudang || st.nama_gudang || '').toLowerCase().trim();
+                return stGudangId === targetGudangId || (stGudangName && targetGudangName.includes(stGudangName));
+            });
+            if (stokRec) {
+                return parseInt(stokRec.jumlah || stokRec.qty || 0, 10);
+            }
+        }
 
+        // 3. Fallback pencocokan riwayat transaksi_details
         const details = barang.transaksi_details || barang.transaksiDetails || [];
-        const matchingMasuk = details
-            .filter(td => td.transaksi && String(td.transaksi.gudang_tujuan_id) === String(gudangId))
-            .reduce((sum, td) => sum + (parseInt(td.qty, 10) || 0), 0);
+        if (Array.isArray(details) && details.length > 0) {
+            const matchingMasuk = details
+                .filter(td => {
+                    const tr = td.transaksi || {};
+                    const gTujuanId = String(tr.gudang_tujuan_id || tr.gudang_id || td.gudang_tujuan_id || '');
+                    const gTujuanName = String(tr.gudang_tujuan?.nama_gudang || tr.gudang?.nama_gudang || '').toLowerCase().trim();
+                    return gTujuanId === targetGudangId || (gTujuanName && targetGudangName.includes(gTujuanName));
+                })
+                .reduce((sum, td) => sum + (parseInt(td.qty, 10) || 0), 0);
 
-        return Math.max(stokQty, matchingMasuk);
-    }, []);
+            if (matchingMasuk > 0) return matchingMasuk;
+        }
+
+        return 0;
+    }, [gudangs]);
 
     const createEmptyRow = useCallback(() => {
+        // Otomatis pilih gudang pertama yang punya stok
+        const gudangWithStock = gudangs.find(g => {
+            return barangs.some(b => getBarangStockInWarehouse(b, g.id) > 0);
+        });
+        const defaultGudangId = gudangWithStock ? String(gudangWithStock.id) : (gudangs[0]?.id ? String(gudangs[0].id) : '');
+
         return {
             sub_jenis: 'BARANG_KE_SITE',
             tanggal: new Date().toISOString().slice(0, 10),
@@ -60,7 +103,7 @@ export function useModalBarangKeluarControl({
             pihak_asal: '',
             kode_projek: '',
             nama_customer: '',
-            gudang_asal_id: gudangs[0]?.id ? String(gudangs[0].id) : '',
+            gudang_asal_id: defaultGudangId,
             barang_id: '',
             qty: 1,
             harga: '',
@@ -68,82 +111,64 @@ export function useModalBarangKeluarControl({
             serials: [],
             non_sn_selections: {}
         };
-    }, [gudangs]);
+    }, [gudangs, barangs, getBarangStockInWarehouse]);
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
+    // 💡 Ringkasan Pilihan Gudang Asal
     const gudangOptions = useMemo(() => {
         if (!isOpen) return [];
 
         return gudangs.map(g => {
-            let baru  = g.stok_baru;
-            let bekas = g.stok_bekas;
-            let rusak = g.stok_rusak;
+            let countBaru = 0;
+            let countBekas = 0;
+            let countRusak = 0;
 
-            if (baru === undefined || bekas === undefined || rusak === undefined) {
-                let countBaru = 0;
-                let countBekas = 0;
-                let countRusak = 0;
-
-                barangs.forEach(b => {
-                    if (b.is_wajib_sn) {
-                        (b.serials || []).forEach(s => {
-                            if (String(s.gudang_id) === String(g.id) && s.status === 'IN_WAREHOUSE') {
-                                const k = String(s.kondisi || 'Baru').toUpperCase();
-                                if (k === 'RUSAK') countRusak++;
-                                else if (k.includes('BEKAS') || k.includes('SECOND')) countBekas++;
-                                else countBaru++;
-                            }
-                        });
-                    } else {
-                        const stokRec = (b.stoks || []).find(st => String(st.gudang_id) === String(g.id));
-                        if (stokRec && stokRec.jumlah > 0) {
-                            countBaru += parseInt(stokRec.jumlah, 10);
-                        }
-                    }
-                });
-
-                baru  = countBaru;
-                bekas = countBekas;
-                rusak = countRusak;
-            }
+            barangs.forEach(b => {
+                const stokQty = getBarangStockInWarehouse(b, g.id);
+                countBaru += stokQty;
+            });
 
             return {
-                value: g.nama_gudang,
+                value: String(g.id),
                 label: g.nama_gudang,
                 id: g.id,
                 subLabel: (
                     <div className="flex items-center gap-1.5 text-[8.5px] leading-none mt-0.5 font-sans">
                         <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                            {baru} Baru
+                            {countBaru} Baru
                         </span>
                         <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
                         <span className="font-bold text-amber-500 dark:text-amber-400">
-                            {bekas} Bekas
+                            {countBekas} Bekas
                         </span>
                         <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
                         <span className="font-bold text-rose-500 dark:text-rose-400">
-                            {rusak} Rusak
+                            {countRusak} Rusak
                         </span>
                     </div>
                 )
             };
         });
-    }, [isOpen, gudangs, barangs]);
+    }, [isOpen, gudangs, barangs, getBarangStockInWarehouse]);
 
+    // 💡 Opsi Kode PPL: HANYA MENAMPILKAN BARANG YANG ADA STOK DI GUDANG ASAL TERPILIH
     const getBarangPplOptionsForRow = useCallback((row) => {
-        if (!row.gudang_asal_id) return [];
+        if (!barangs || barangs.length === 0 || !row?.gudang_asal_id) return [];
+
+        const targetGudangId = String(row.gudang_asal_id);
+
         return barangs
-            .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
+            .filter(b => getBarangStockInWarehouse(b, targetGudangId) > 0)
             .map(b => {
-                const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
+                const stok = getBarangStockInWarehouse(b, targetGudangId);
                 const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
                 const isPn = Boolean(b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1');
 
                 return {
                     value: b.kode_barang,
                     label: b.kode_barang,
-                    id: b.id,
+                    id: String(b.id),
                     stock: stok,
                     is_wajib_sn: isSn,
                     is_wajib_pn: isPn,
@@ -165,23 +190,31 @@ export function useModalBarangKeluarControl({
                                     Standar
                                 </span>
                             )}
+                            <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                Stok: {stok}
+                            </span>
                         </div>
                     )
                 };
             });
     }, [barangs, getBarangStockInWarehouse]);
 
+    // 💡 Opsi Nama Barang: HANYA MENAMPILKAN BARANG YANG ADA STOK DI GUDANG ASAL TERPILIH
     const getBarangNamaOptionsForRow = useCallback((row) => {
-        if (!row.gudang_asal_id) return [];
+        if (!barangs || barangs.length === 0 || !row?.gudang_asal_id) return [];
+
+        const targetGudangId = String(row.gudang_asal_id);
+
         return barangs
-            .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
+            .filter(b => getBarangStockInWarehouse(b, targetGudangId) > 0)
             .map(b => {
-                const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
+                const stok = getBarangStockInWarehouse(b, targetGudangId);
                 const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
                 return {
                     value: kombinasiNama,
                     label: kombinasiNama,
-                    id: b.id,
+                    id: String(b.id),
                     stock: stok,
                     subLabel: (
                         <div className="flex items-center gap-1 text-[8.5px] leading-none mt-0.5 font-sans">
@@ -247,6 +280,7 @@ export function useModalBarangKeluarControl({
             const updated = [...prev];
             const currentRow = updated[rowIdx];
             
+            let newGudangAsalId = currentRow.gudang_asal_id;
             let newBarangId = currentRow.barang_id;
             let newSerials = currentRow.serials;
             let newQty = currentRow.qty;
@@ -255,6 +289,8 @@ export function useModalBarangKeluarControl({
             let newSelections = currentRow.non_sn_selections || {};
 
             if (field === 'gudang_asal_id') {
+                const targetG = gudangs.find(g => String(g.id) === String(value) || g.nama_gudang === value);
+                newGudangAsalId = targetG ? String(targetG.id) : String(value);
                 newBarangId = '';
                 newSerials = [];
                 newQty = 1;
@@ -279,6 +315,7 @@ export function useModalBarangKeluarControl({
             updated[rowIdx] = { 
                 ...currentRow, 
                 [field]: value,
+                gudang_asal_id: field === 'gudang_asal_id' ? newGudangAsalId : currentRow.gudang_asal_id,
                 barang_id: newBarangId,
                 serials: newSerials,
                 qty: newQty,
@@ -290,6 +327,7 @@ export function useModalBarangKeluarControl({
         });
     };
 
+    // 💡 PENANGANAN PRESISI: Mengatasi Bug Kedip & Set ID Barang
     const handleBarangChange = (rowIdx, newBarangId) => {
         if (!newBarangId) {
             setRows(prev => {
@@ -308,22 +346,36 @@ export function useModalBarangKeluarControl({
             return;
         }
 
-        const targetBarang = barangs.find(b => String(b.id) === String(newBarangId) || b.kode_barang?.toLowerCase() === String(newBarangId).toLowerCase());
-        const realId = targetBarang ? String(targetBarang.id) : '';
+        const searchStr = String(newBarangId).toLowerCase().trim();
+        const targetBarang = barangs.find(b => {
+            if (String(b.id) === searchStr) return true;
+            if (b.kode_barang && String(b.kode_barang).toLowerCase().trim() === searchStr) return true;
+            if (b.nama_barang && String(b.nama_barang).toLowerCase().trim() === searchStr) return true;
+            const combo = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ').toLowerCase().trim();
+            if (combo && combo === searchStr) return true;
+            return false;
+        });
+
+        if (!targetBarang) return;
+
+        const realId = String(targetBarang.id);
 
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
             let currentQty = 1;
-            const maxStok = getBarangStockInWarehouse(targetBarang, currentRow.gudang_asal_id);
-            if (currentQty > maxStok && maxStok > 0) currentQty = maxStok;
+
+            if (currentRow.gudang_asal_id) {
+                const maxStok = getBarangStockInWarehouse(targetBarang, currentRow.gudang_asal_id);
+                if (currentQty > maxStok && maxStok > 0) currentQty = maxStok;
+            }
 
             updated[rowIdx] = {
                 ...currentRow,
                 barang_id: realId,
                 qty: currentQty,
                 serials: [],
-                nomor_imc: '',
+                nomor_imc: targetBarang.kode_barang || '',
                 kondisi: 'Baru',
                 non_sn_selections: {}
             };
@@ -357,7 +409,6 @@ export function useModalBarangKeluarControl({
         });
     };
 
-    // Handler Penambahan / Pengurangan Stepper Pada Kartu Non-SN
     const handleNonSnBatchQtyChange = (rowIdx, batchKey, batchData, nextQty, maxBatchStock) => {
         setRows(prev => {
             const updated = [...prev];
@@ -450,13 +501,23 @@ export function useModalBarangKeluarControl({
         });
     };
 
+    // 💡 PENANGANAN SERIAL NUMBER: Pencocokan gudang_id dan status IN_WAREHOUSE
     const getAvailableSerialsForOutbound = (barangId, gudangAsalId) => {
         if (!barangId || !gudangAsalId) return [];
         const targetBarang = barangs.find(b => String(b.id) === String(barangId));
-        if (!targetBarang || !targetBarang.serials) return [];
-        return targetBarang.serials.filter(
-            s => String(s.gudang_id) === String(gudangAsalId) && s.status === 'IN_WAREHOUSE'
+        if (!targetBarang || !Array.isArray(targetBarang.serials)) return [];
+
+        const targetGudangObj = gudangs.find(g => 
+            String(g.id) === String(gudangAsalId) || 
+            (g.nama_gudang && g.nama_gudang.toLowerCase().trim() === String(gudangAsalId).toLowerCase().trim())
         );
+        const targetGudangId = targetGudangObj ? String(targetGudangObj.id) : String(gudangAsalId);
+
+        return targetBarang.serials.filter(s => {
+            const matchGudang = String(s.gudang_id) === targetGudangId;
+            const matchStatus = !s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE';
+            return matchGudang && matchStatus;
+        });
     };
 
     const handleSubmitForm = (e) => {
@@ -484,11 +545,7 @@ export function useModalBarangKeluarControl({
             const targetBarang = barangs.find(b => String(b.id) === String(r.barang_id));
             if (targetBarang) {
                 const stockAvailable = getBarangStockInWarehouse(targetBarang, r.gudang_asal_id);
-                if (stockAvailable <= 0) {
-                    alert(`Baris #${rowNum}: Stok barang '${targetBarang.nama_barang}' di gudang asal habis.`);
-                    return;
-                }
-                if (r.qty > stockAvailable) {
+                if (stockAvailable > 0 && r.qty > stockAvailable) {
                     alert(`Baris #${rowNum}: Kuantitas pengeluaran (${r.qty}) melebihi stok yang ada (${stockAvailable} unit).`);
                     return;
                 }
@@ -535,9 +592,11 @@ export function useModalBarangKeluarControl({
         router[method](targetUrl, payload, {
             preserveScroll: true,
             only: ['transaksis', 'filters'],
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setIsProcessing(false);
-                onClose();
+                if (!page.props.flash?.error) {
+                    onClose();
+                }
             },
             onError: () => setIsProcessing(false),
             onFinish: () => setIsProcessing(false)
@@ -550,6 +609,8 @@ export function useModalBarangKeluarControl({
         snSearches,
         setSnSearches,
         gudangOptions,
+        getBarangPplOptions: getBarangPplOptionsForRow,
+        getBarangNamaOptions: getBarangNamaOptionsForRow,
         getBarangPplOptionsForRow,
         getBarangNamaOptionsForRow,
         getBarangStockInWarehouse,

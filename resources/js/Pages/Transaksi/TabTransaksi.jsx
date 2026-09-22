@@ -4,6 +4,7 @@ import CrudTable from './CrudTable';
 import ModalBarangMasuk from './ModalBarangMasuk';
 import ModalBarangKeluar from './ModalBarangKeluar';
 import ModalTransferGudang from './ModalTransferGudang';
+import { Toast } from '@/components/ui/Notifikasi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -26,11 +27,14 @@ export default function TabTransaksi({
     barangs = [],
     filters = {}
 }) {
-    const { auth } = usePage().props;
+    const { auth, flash } = usePage().props;
     const userRole = auth?.user?.role || 'view';
     const canWrite = userRole === 'admin' || userRole === 'staff';
     const isAdmin = userRole === 'admin';
     const confirm = useConfirm();
+
+    // 💡 State Toast Notifikasi
+    const [toast, setToast] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
     const [mainTab, setMainTab] = useState(filters?.jenis_transaksi || 'MASUK');
     const [searchTerm, setSearchTerm] = useState(filters?.search || '');
@@ -55,6 +59,25 @@ export default function TabTransaksi({
     const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev - 10, 50));
     const handleResetZoom = () => setZoomLevel(100);
     const handleFitZoom = () => setZoomLevel(75);
+
+    // 💡 Efek penangkap Flash Message dari backend untuk Toast
+    useEffect(() => {
+        if (flash?.error) {
+            setToast({
+                isOpen: true,
+                type: 'error',
+                title: 'Gagal Menyimpan',
+                message: flash.error,
+            });
+        } else if (flash?.success) {
+            setToast({
+                isOpen: true,
+                type: 'success',
+                title: 'Berhasil',
+                message: flash.success,
+            });
+        }
+    }, [flash]);
 
     const isMounted = useRef(false);
     useEffect(() => {
@@ -426,6 +449,16 @@ export default function TabTransaksi({
                 selectedItem={selectedItem}
                 gudangs={gudangs}
                 barangs={barangs}
+            />
+
+            {/* 💡 Toast Notifikasi untuk flash message */}
+            <Toast 
+                isOpen={toast.isOpen}
+                type={toast.type}
+                title={toast.title}
+                message={toast.message}
+                onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+                duration={5000}
             />
         </div>
     );

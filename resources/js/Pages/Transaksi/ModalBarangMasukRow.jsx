@@ -51,12 +51,12 @@ export default function ModalBarangMasukRow({
             case 'PEMBELIAN':
                 return {
                     pihakAsalLabel: 'Asal Barang *',
-                    pihakAsalPlaceholder: 'Ketik asal toko / pembelian...'
+                    pihakAsalPlaceholder: 'Ketik asal Toko / Vendor...'
                 };
             case 'PEMINJAMAN':
                 return {
                     pihakAsalLabel: 'Asal Barang *',
-                    pihakAsalPlaceholder: 'Ketik dari vendor...'
+                    pihakAsalPlaceholder: 'Ketik dari Vendor / Peminjaman...'
                 };
             case 'PENGEMBALIAN':
                 return {
@@ -203,7 +203,7 @@ export default function ModalBarangMasukRow({
                             Nomor IMC (Inbound Material Control) *
                         </Label>
                         <Input
-                            placeholder="ketik nomor IMC..."
+                            placeholder="Ketik Nomor IMC..."
                             disabled={isProcessing}
                             value={row.nomor_imc}
                             onChange={(e) => onFieldChange(rowIdx, 'nomor_imc', e.target.value)}

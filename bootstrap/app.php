@@ -36,11 +36,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {
             if (in_array($response->getStatusCode(), [500, 503, 404, 403])) {
-                if (! config('app.debug')) {
-                    return Inertia::render('Error', ['status' => $response->getStatusCode()])
-                        ->toResponse($request)
-                        ->setStatusCode($response->getStatusCode());
-                }
+                // Selalu render komponen Error.jsx untuk error 500, 503, 404, 403
+                return Inertia::render('Error', ['status' => $response->getStatusCode()])
+                    ->toResponse($request)
+                    ->setStatusCode($response->getStatusCode());
             } elseif ($response->getStatusCode() === 419) {
                 return back()->with([
                     'message' => 'Sesi telah berakhir, silakan coba lagi.',

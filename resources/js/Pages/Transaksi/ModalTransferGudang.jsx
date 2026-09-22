@@ -27,6 +27,7 @@ export default function ModalTransferGudang({
         getBarangStockInWarehouse,
         getBarangPplOptions,
         getBarangNamaOptions,
+        getAvailableSerialsForTransfer,
         handleRowFieldChange,
         handleBarangChange,
         handleQtyChange,
@@ -92,9 +93,8 @@ export default function ModalTransferGudang({
                     const stockInOrigin = targetBarang && row.gudang_asal_id 
                         ? getBarangStockInWarehouse(targetBarang, row.gudang_asal_id) 
                         : null;
-                    const availableSns = (targetBarang?.serials || []).filter(
-                        s => String(s.gudang_id) === String(row.gudang_asal_id) && s.status === 'IN_WAREHOUSE'
-                    );
+                    
+                    const availableSns = getAvailableSerialsForTransfer(row.barang_id, row.gudang_asal_id);
                     const pplOptions = getBarangPplOptions(row);
                     const namaOptions = getBarangNamaOptions(row);
 

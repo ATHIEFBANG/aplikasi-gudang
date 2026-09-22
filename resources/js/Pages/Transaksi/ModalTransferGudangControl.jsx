@@ -15,21 +15,27 @@ export function useModalTransferGudangControl({
     const [snSearches, setSnSearches] = useState({});
     const [nonSnSearches, setNonSnSearches] = useState({});
 
-    // Kalkulasi Stok Fisik di Gudang Asal
+    // 💡 Helper kalkulasi stok fisik murni di Gudang Asal
     const getBarangStockInWarehouse = useCallback((barang, gudangId) => {
         if (!barang || !gudangId) return 0;
-        if (barang.is_wajib_sn) {
-            return (barang.serials || []).filter(
-                s => String(s.gudang_id) === String(gudangId) && s.status === 'IN_WAREHOUSE'
+        
+        const targetGudangId = String(gudangId);
+        const isSn = Boolean(barang.is_wajib_sn === true || barang.is_wajib_sn === 1 || barang.is_wajib_sn === '1');
+
+        if (isSn && Array.isArray(barang.serials)) {
+            return barang.serials.filter(
+                s => String(s.gudang_id) === targetGudangId && 
+                     (!s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE')
             ).length;
         }
 
-        const stokRec = barang.stoks?.find(st => String(st.gudang_id) === String(gudangId));
-        const stokQty = stokRec ? parseInt(stokRec.jumlah, 10) : 0;
+        const stoksArray = barang.stoks || barang.stok || [];
+        const stokRec = stoksArray.find(st => String(st.gudang_id) === targetGudangId);
+        const stokQty = stokRec ? parseInt(stokRec.jumlah || stokRec.qty || 0, 10) : 0;
 
         const details = barang.transaksi_details || barang.transaksiDetails || [];
         const matchingMasuk = details
-            .filter(td => td.transaksi && String(td.transaksi.gudang_tujuan_id) === String(gudangId))
+            .filter(td => td.transaksi && String(td.transaksi.gudang_tujuan_id) === targetGudangId)
             .reduce((sum, td) => sum + (parseInt(td.qty, 10) || 0), 0);
 
         return Math.max(stokQty, matchingMasuk);
@@ -55,29 +61,61 @@ export function useModalTransferGudangControl({
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
+    // 💡 Tambahkan subLabel rincian stok (Baru, Bekas, Rusak) di opsi gudang
     const gudangOptions = useMemo(() => {
         if (!isOpen) return [];
 
-        return gudangs.map(g => ({
-            value: g.nama_gudang,
-            label: g.nama_gudang,
-            id: g.id
-        }));
-    }, [isOpen, gudangs]);
+        return gudangs.map(g => {
+            let countBaru = g.stok_baru !== undefined ? g.stok_baru : 0;
+            let countBekas = g.stok_bekas !== undefined ? g.stok_bekas : 0;
+            let countRusak = g.stok_rusak !== undefined ? g.stok_rusak : 0;
 
+            if (g.stok_baru === undefined) {
+                barangs.forEach(b => {
+                    const stokQty = getBarangStockInWarehouse(b, g.id);
+                    countBaru += stokQty;
+                });
+            }
+
+            return {
+                value: g.nama_gudang,
+                label: g.nama_gudang,
+                id: String(g.id),
+                subLabel: (
+                    <div className="flex items-center gap-1.5 text-[8.5px] leading-none mt-0.5 font-sans">
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            {countBaru} Baru
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
+                        <span className="font-bold text-amber-500 dark:text-amber-400">
+                            {countBekas} Bekas
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-600 text-[7px]">&bull;</span>
+                        <span className="font-bold text-rose-500 dark:text-rose-400">
+                            {countRusak} Rusak
+                        </span>
+                    </div>
+                )
+            };
+        });
+    }, [isOpen, gudangs, barangs, getBarangStockInWarehouse]);
+
+    // Opsi Kode PPL
     const getBarangPplOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
+        const targetGudangId = String(row.gudang_asal_id);
+
         return barangs
-            .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
+            .filter(b => getBarangStockInWarehouse(b, targetGudangId) > 0)
             .map(b => {
-                const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
+                const stok = getBarangStockInWarehouse(b, targetGudangId);
                 const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
                 const isPn = Boolean(b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1');
 
                 return {
                     value: b.kode_barang,
                     label: b.kode_barang,
-                    id: b.id,
+                    id: String(b.id),
                     stock: stok,
                     is_wajib_sn: isSn,
                     is_wajib_pn: isPn,
@@ -87,23 +125,28 @@ export function useModalTransferGudangControl({
                             {isSn && isPn && <span className="text-slate-400">&bull;</span>}
                             {isPn && <span className="text-cyan-600 font-bold">Wajib PN</span>}
                             {!isSn && !isPn && <span className="text-slate-400 font-medium">Standar</span>}
+                            <span className="text-slate-400">&bull;</span>
+                            <span className="font-mono font-bold text-emerald-600">Stok: {stok}</span>
                         </div>
                     )
                 };
             });
     }, [barangs, getBarangStockInWarehouse]);
 
+    // Opsi Nama Barang
     const getBarangNamaOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
+        const targetGudangId = String(row.gudang_asal_id);
+
         return barangs
-            .filter(b => getBarangStockInWarehouse(b, row.gudang_asal_id) > 0)
+            .filter(b => getBarangStockInWarehouse(b, targetGudangId) > 0)
             .map(b => {
-                const stok = getBarangStockInWarehouse(b, row.gudang_asal_id);
+                const stok = getBarangStockInWarehouse(b, targetGudangId);
                 const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
                 return {
                     value: kombinasiNama,
                     label: kombinasiNama,
-                    id: b.id,
+                    id: String(b.id),
                     stock: stok,
                     subLabel: (
                         <div className="flex items-center gap-1 text-[8.5px] leading-none mt-0.5 font-sans">
@@ -210,8 +253,19 @@ export function useModalTransferGudangControl({
             return;
         }
 
-        const targetBarang = barangs.find(b => String(b.id) === String(newBarangId) || b.kode_barang?.toLowerCase() === String(newBarangId).toLowerCase());
-        const realId = targetBarang ? String(targetBarang.id) : '';
+        const searchStr = String(newBarangId).toLowerCase().trim();
+        const targetBarang = barangs.find(b => {
+            if (String(b.id) === searchStr) return true;
+            if (b.kode_barang && String(b.kode_barang).toLowerCase().trim() === searchStr) return true;
+            if (b.nama_barang && String(b.nama_barang).toLowerCase().trim() === searchStr) return true;
+            const combo = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ').toLowerCase().trim();
+            if (combo && combo === searchStr) return true;
+            return false;
+        });
+
+        if (!targetBarang) return;
+
+        const realId = String(targetBarang.id);
 
         setRows(prev => {
             const updated = [...prev];
@@ -258,7 +312,6 @@ export function useModalTransferGudangControl({
         });
     };
 
-    // Handler Stepper Non-SN
     const handleNonSnBatchQtyChange = (rowIdx, batchKey, batchData, nextQty, maxBatchStock) => {
         setRows(prev => {
             const updated = [...prev];
@@ -339,9 +392,12 @@ export function useModalTransferGudangControl({
     const getAvailableSerialsForTransfer = (barangId, gudangAsalId) => {
         if (!barangId || !gudangAsalId) return [];
         const targetBarang = barangs.find(b => String(b.id) === String(barangId));
-        if (!targetBarang || !targetBarang.serials) return [];
-        return targetBarang.serials.filter(
-            s => String(s.gudang_id) === String(gudangAsalId) && s.status === 'IN_WAREHOUSE'
+        if (!targetBarang || !Array.isArray(targetBarang.serials)) return [];
+
+        const targetGudangId = String(gudangAsalId);
+        return targetBarang.serials.filter(s => 
+            String(s.gudang_id) === targetGudangId && 
+            (!s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE')
         );
     };
 
