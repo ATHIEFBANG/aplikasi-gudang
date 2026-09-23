@@ -226,7 +226,7 @@ export default function AuthenticatedLayout({ header, children }) {
                 <div className="absolute top-10 left-1/4 w-[600px] h-[600px] bg-blue-600/10 dark:bg-blue-600/15 rounded-full blur-[180px] pointer-events-none animate-pulse duration-1000 print:hidden" />
                 <div className="absolute top-1/3 right-10 w-[550px] h-[550px] bg-amber-500/10 dark:bg-amber-500/15 rounded-full blur-[190px] pointer-events-none print:hidden" />
 
-                {isPageLoading && <Loading message="Memproses Data Gudang..." />}
+                {isPageLoading && <Loading message="Memproses Gudang" />}
 
                 {/* NAVBAR & HEADER */}
                 <header className="sticky top-0 z-50 w-full flex flex-col shadow-lg transition-all duration-300 relative group print:hidden">
