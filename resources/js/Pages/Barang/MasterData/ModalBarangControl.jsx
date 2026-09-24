@@ -11,7 +11,8 @@ export const LIST_SATUAN_PATEN = [
     'Roll',
     'Meter',
     'Box',
-    'Pack'
+    'Pack',
+    'License'
 ];
 
 export function useModalBarangControl({ isOpen, isEditMode, selectedItem, existingOptions, onClose }) {
