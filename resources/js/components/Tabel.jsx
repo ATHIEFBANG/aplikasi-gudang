@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pencil } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import tableWave from '../../images/wave.gif';
 
 export default function Tabel({
     data = [],
@@ -18,13 +19,21 @@ export default function Tabel({
     const isSomeSelected = data.some((item) => selectedIds.includes(getItemId(item))) && !isAllSelected;
 
     return (
-        <div 
+        <div
             className="w-full overflow-x-auto transition-all duration-200 ease-out"
             style={{ zoom: `${zoomLevel}%` }}
         >
             <table className="w-full border-collapse text-left text-xs">
                 <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px] select-none">
+                    <tr
+                        className="border-b border-blue-400/40 text-white font-bold uppercase tracking-wider text-[11px] select-none"
+                        style={{
+                            backgroundImage: `linear-gradient(rgba(3, 15, 35, 0.18), rgba(3, 15, 35, 0.18)), url(${tableWave})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                        }}
+                    >
                         {/* KOLOM AKSI / CHECKBOX */}
                         {(onSelectAll || onSelectRow || onEditRow) && (
                             <th className="py-3 px-3 w-14 text-center">
@@ -32,9 +41,13 @@ export default function Tabel({
                                     {onSelectAll && (
                                         <Checkbox
                                             checked={isAllSelected}
-                                            data-state={isSomeSelected ? "indeterminate" : (isAllSelected ? "checked" : "unchecked")}
+                                            data-state={
+                                                isSomeSelected
+                                                    ? "indeterminate"
+                                                    : (isAllSelected ? "checked" : "unchecked")
+                                            }
                                             onCheckedChange={onSelectAll}
-                                            className="h-4 w-4 rounded-sm border-slate-300 dark:border-slate-600"
+                                            className="h-4 w-4 rounded-sm border-white/70 bg-white/10"
                                         />
                                     )}
                                     <span>Aksi</span>
@@ -44,13 +57,15 @@ export default function Tabel({
 
                         {/* NO URUT */}
                         {getRowNumber && (
-                            <th className="py-3 px-3 w-12 text-center">No</th>
+                            <th className="py-3 px-3 w-12 text-center">
+                                No
+                            </th>
                         )}
 
                         {/* DAFTAR KOLOM */}
                         {columns.map((col) => (
-                            <th 
-                                key={col.key} 
+                            <th
+                                key={col.key}
                                 className={`py-3 px-3 whitespace-nowrap ${col.className || ''}`}
                             >
                                 {col.label}
@@ -62,8 +77,12 @@ export default function Tabel({
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 text-slate-700 dark:text-slate-300">
                     {data.length === 0 ? (
                         <tr>
-                            <td 
-                                colSpan={columns.length + (onSelectAll || onSelectRow || onEditRow ? 1 : 0) + (getRowNumber ? 1 : 0)} 
+                            <td
+                                colSpan={
+                                    columns.length +
+                                    (onSelectAll || onSelectRow || onEditRow ? 1 : 0) +
+                                    (getRowNumber ? 1 : 0)
+                                }
                                 className="py-10 text-center text-xs text-slate-400"
                             >
                                 {emptyMessage}
@@ -78,7 +97,9 @@ export default function Tabel({
                                 <tr
                                     key={id || index}
                                     className={`transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50 ${
-                                        isSelected ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
+                                        isSelected
+                                            ? 'bg-blue-50/50 dark:bg-blue-950/20'
+                                            : ''
                                     }`}
                                 >
                                     {(onSelectAll || onSelectRow || onEditRow) && (
@@ -91,6 +112,7 @@ export default function Tabel({
                                                         className="h-4 w-4 rounded-sm border-slate-300 dark:border-slate-600"
                                                     />
                                                 )}
+
                                                 {onEditRow && (
                                                     <button
                                                         type="button"
@@ -112,11 +134,13 @@ export default function Tabel({
                                     )}
 
                                     {columns.map((col) => (
-                                        <td 
-                                            key={col.key} 
+                                        <td
+                                            key={col.key}
                                             className={`py-2.5 px-3 whitespace-nowrap ${col.cellClassName || ''}`}
                                         >
-                                            {col.render ? col.render(item, index) : (item[col.key] ?? '-')}
+                                            {col.render
+                                                ? col.render(item, index)
+                                                : (item[col.key] ?? '-')}
                                         </td>
                                     ))}
                                 </tr>
