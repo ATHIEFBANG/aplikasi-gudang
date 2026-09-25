@@ -34,8 +34,8 @@ class TransaksiController extends Controller
         // 2. Reset semua stok di tabel `stoks` menjadi 0
         Stok::query()->update(['jumlah' => 0]);
 
-        // 3. Hitung ulang stok murni dari transaksi yang MASIH ADA di database
-        $transaksis = Transaksi::with('details')->get();
+        // 3. Hitung ulang stok murni dari transaksi yang MASIH ADA (Wajib urut tanggal ASC agar min/max akurat)
+        $transaksis = Transaksi::with('details')->orderBy('tanggal', 'asc')->orderBy('id', 'asc')->get();
         foreach ($transaksis as$t) {
             foreach ($t->details as$d) {
                 if ($t->jenis_transaksi === 'MASUK' && $t->gudang_tujuan_id) {$stok = Stok::firstOrCreate(
@@ -71,6 +71,7 @@ class TransaksiController extends Controller
         $this->syncStokAndSerials();
 
         $jenis    =$request->input('jenis_transaksi', 'MASUK');
+        $gudangId =$request->input('gudang_id');
         $search   =$request->input('search');
         $perPage  = (int)$request->input('per_page', 10);
 
@@ -88,6 +89,7 @@ class TransaksiController extends Controller
             ->orderBy('tanggal', $order)
             ->orderBy('id', $order);
 
+        // Filter Berdasarkan Jenis Transaksi
         if ($jenis === 'TRANSFER') {$query->where(function ($q) {$q->where('jenis_transaksi', 'TRANSFER')
                   ->orWhere('sub_jenis', 'TRANSFER_GUDANG');
             });
@@ -98,15 +100,29 @@ class TransaksiController extends Controller
                   ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         }
 
+        // Filter Berdasarkan Gudang
+        if ($gudangId &&$gudangId !== 'ALL') {
+            if ($jenis === 'MASUK') {
+                $query->where('gudang_tujuan_id',$gudangId);
+            } elseif ($jenis === 'KELUAR') {
+                $query->where('gudang_asal_id',$gudangId);
+            } elseif ($jenis === 'TRANSFER') {$query->where(function ($q) use ($gudangId) {
+                    $q->where('gudang_asal_id',$gudangId)
+                      ->orWhere('gudang_tujuan_id', $gudangId);
+                });
+            }
+        }
+
+        // Filter Pencarian Text (Sudah diperbaiki tanpa \%)
         if ($search) {$query->where(function ($q) use ($search) {
-                $q->where('no_transaksi', 'like', "\%{$search}%")
+                $q->where('no_transaksi', 'like', "%{$search}%")
                   ->orWhere('nomor_imc', 'like', "%{$search}%")
                   ->orWhere('nomor_omc', 'like', "%{$search}%")
                   ->orWhere('pihak_asal', 'like', "%{$search}%")
                   ->orWhere('kode_projek', 'like', "%{$search}%")
                   ->orWhere('nama_customer', 'like', "%{$search}%")
                   ->orWhereHas('details.barang', function ($qb) use ($search) {
-                      $qb->where('nama_barang', 'like', "\%{$search}%")
+                      $qb->where('nama_barang', 'like', "%{$search}%")
                          ->orWhere('kode_barang', 'like', "%{$search}%")
                          ->orWhere('brand', 'like', "%{$search}%")
                          ->orWhere('tipe', 'like', "%{$search}%")
@@ -116,48 +132,100 @@ class TransaksiController extends Controller
             });
         }
 
-        // 2. Ringkasan Stok Gudang Presisi
+        // 2. Ringkasan Stok Gudang Presisi (SN + Non-SN)
+        // A. Hitung dari BarangSerial (Barang Wajib SN)
         $snRaw = BarangSerial::whereIn('status', ['IN_WAREHOUSE', 'READY', 'AVAILABLE'])
             ->whereNotNull('gudang_id')
             ->select('gudang_id', 'kondisi', DB::raw('COUNT(*) as total'))
             ->groupBy('gudang_id', 'kondisi')
             ->get();
 
-        $snByGudang = [];
+        $kondisiByGudang = [];
         foreach ($snRaw as$row) {
             $gId =$row->gudang_id;
             $k   = strtoupper(trim($row->kondisi ?? 'BARU'));
-            if (!isset($snByGudang[$gId])) {
-                $snByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+            if (!isset($kondisiByGudang[$gId])) {
+                $kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
             }
-            if (str_contains($k, 'RUSAK')) {$snByGudang[$gId]['rusak'] +=$row->total;
-            } elseif (str_contains($k, 'BEKAS') || str_contains($k, 'SECOND')) {$snByGudang[$gId]['bekas'] +=$row->total;
+            if (str_contains($k, 'RUSAK')) {$kondisiByGudang[$gId]['rusak'] += (int)$row->total;
+            } elseif (str_contains($k, 'BEKAS') || str_contains($k, 'SECOND')) {$kondisiByGudang[$gId]['bekas'] += (int)$row->total;
             } else {
-                $snByGudang[$gId]['baru'] +=$row->total;
+                $kondisiByGudang[$gId]['baru'] += (int)$row->total;
             }
         }
 
+        // B. Hitung Sisa Stok Barang Non-SN berdasarkan Riwayat Kondisi Transaksi (Urut Kronologis)
+        $nonSnBarangIds = Barang::where('is_wajib_sn', false)->pluck('id')->toArray();
+
+        if (!empty($nonSnBarangIds)) {
+            $details = TransaksiDetail::whereIn('barang_id',$nonSnBarangIds)
+                ->whereHas('transaksi')
+                ->join('transaksis', 'transaksis.id', '=', 'transaksi_details.transaksi_id')
+                ->orderBy('transaksis.tanggal', 'asc')
+                ->orderBy('transaksis.id', 'asc')
+                ->select('transaksi_details.*')
+                ->with(['transaksi:id,jenis_transaksi,sub_jenis,gudang_asal_id,gudang_tujuan_id,kondisi as trx_kondisi'])
+                ->get();
+
+            foreach ($details as$d) {
+                $t =$d->transaksi;
+                if (!$t) continue;
+
+                $kondisiRaw = $d->kondisi &&$d->kondisi !== '-' ? $d->kondisi : ($t->trx_kondisi ?? 'Baru');
+                $k          = strtoupper(trim($kondisiRaw));$kKey       = 'baru';
+
+                if (str_contains($k, 'RUSAK')) {$kKey = 'rusak';
+                } elseif (str_contains($k, 'BEKAS') || str_contains($k, 'SECOND')) {$kKey = 'bekas';
+                }
+
+                $qty = (int)$d->qty;
+
+                if ($t->jenis_transaksi === 'MASUK' &&$t->gudang_tujuan_id) {
+                    $gId =$t->gudang_tujuan_id;
+                    if (!isset($kondisiByGudang[$gId])) {
+                        $kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+                    }
+                    $kondisiByGudang[$gId][$kKey] +=$qty;
+                } elseif ($t->jenis_transaksi === 'KELUAR' &&$t->gudang_asal_id) {
+                    $gId =$t->gudang_asal_id;
+                    if (!isset($kondisiByGudang[$gId])) {$kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];                     }$kondisiByGudang[$gId][$kKey] = max(0, $kondisiByGudang[$gId][$kKey] -$qty);
+                } elseif ($t->jenis_transaksi === 'TRANSFER' ||$t->sub_jenis === 'TRANSFER_GUDANG') {
+                    if ($t->gudang_asal_id) {
+                        $gId =$t->gudang_asal_id;
+                        if (!isset($kondisiByGudang[$gId])) {$kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];                         }$kondisiByGudang[$gId][$kKey] = max(0, $kondisiByGudang[$gId][$kKey] -$qty);
+                    }
+                    if ($t->gudang_tujuan_id) {
+                        $gId =$t->gudang_tujuan_id;
+                        if (!isset($kondisiByGudang[$gId])) {
+                            $kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+                        }
+                        $kondisiByGudang[$gId][$kKey] +=$qty;
+                    }
+                }
+            }
+        }
+
+        // C. Gabungkan ke Daftar Gudang
         $stokAllRaw = Stok::select('gudang_id', DB::raw('SUM(jumlah) as total_qty'))
             ->groupBy('gudang_id')
             ->pluck('total_qty', 'gudang_id');
 
         $gudangList = Gudang::where('is_active', true)
             ->get(['id', 'nama_gudang', 'kode_gudang'])
-            ->map(function ($g) use ($snByGudang,$stokAllRaw) {
-                $snData =$snByGudang[$g->id] ?? ['baru' => 0, 'bekas' => 0, 'rusak' => 0];$totalStokFisik = (int) ($stokAllRaw[$g->id] ?? 0);
-                $snTotal =$snData['baru'] + $snData['bekas'] +$snData['rusak'];
+            ->map(function ($g) use ($kondisiByGudang,$stokAllRaw) {
+                $kData          =$kondisiByGudang[$g->id] ?? ['baru' => 0, 'bekas' => 0, 'rusak' => 0];$totalStokFisik = (int) ($stokAllRaw[$g->id] ?? 0);
 
-                if ($snTotal > 0) {$g->stok_baru  = $snData['baru'];$g->stok_bekas = $snData['bekas'];$g->stok_rusak = $snData['rusak'];$g->total_stok = max($totalStokFisik,$snTotal);
-                } else {
-                    $g->stok_baru  =$totalStokFisik;
-                    $g->stok_bekas = 0;
-                    $g->stok_rusak = 0;
-                    $g->total_stok =$totalStokFisik;
-                }
+                $g->stok_baru  = max(0,$kData['baru']);
+                $g->stok_bekas = max(0,$kData['bekas']);
+                $g->stok_rusak = max(0,$kData['rusak']);
+
+                $sumKondisi    =$g->stok_baru + $g->stok_bekas +$g->stok_rusak;
+                $g->total_stok = max($totalStokFisik,$sumKondisi);
+
                 return $g;
             });
 
-        // 3. Master Barang Ringan untuk Modal (Lengkap dengan Relasi Serials & Transaksi)
+        // 3. Master Barang Ringan untuk Modal
         $barangList = Barang::select([
             'id', 
             'kode_barang', 
@@ -231,6 +299,7 @@ class TransaksiController extends Controller
             'barangs'    => $barangList,
             'filters'    => [
                 'jenis_transaksi' => $jenis,
+                'gudang_id'       => $gudangId ?? 'ALL',
                 'search'          => $search ?? '',
                 'order'           => $order,
                 'per_page'        => $perPage,
@@ -335,15 +404,31 @@ class TransaksiController extends Controller
     {
         set_time_limit(180);
 
-        $jenis    = $request->input('jenis_transaksi', 'MASUK');$rawOrder = strtolower((string) $request->input('order', 'desc'));$order    = in_array($rawOrder, ['asc', 'desc'], true) ?$rawOrder : 'desc';
+        $jenis    = $request->input('jenis_transaksi', 'MASUK');$gudangId = $request->input('gudang_id');$rawOrder = strtolower((string) $request->input('order', 'desc'));$order    = in_array($rawOrder, ['asc', 'desc'], true) ?$rawOrder : 'desc';
 
         $query = Transaksi::with(['gudangAsal', 'gudangTujuan', 'details.barang', 'details.serials'])
             ->orderBy('tanggal', $order);
 
-        if ($jenis === 'TRANSFER') {$query->where(fn($q) =>$q->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'));
-        } elseif ($jenis === 'KELUAR') {$query->where('jenis_transaksi', 'KELUAR')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+        if ($jenis === 'TRANSFER') {$query->where(function ($q) {$q->where('jenis_transaksi', 'TRANSFER')
+                  ->orWhere('sub_jenis', 'TRANSFER_GUDANG');
+            });
+        } elseif ($jenis === 'KELUAR') {$query->where('jenis_transaksi', 'KELUAR')
+                  ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         } else {
-            $query->where('jenis_transaksi', 'MASUK')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+            $query->where('jenis_transaksi', 'MASUK')
+                  ->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+        }
+
+        if ($gudangId &&$gudangId !== 'ALL') {
+            if ($jenis === 'MASUK') {
+                $query->where('gudang_tujuan_id',$gudangId);
+            } elseif ($jenis === 'KELUAR') {
+                $query->where('gudang_asal_id',$gudangId);
+            } elseif ($jenis === 'TRANSFER') {$query->where(function ($q) use ($gudangId) {
+                    $q->where('gudang_asal_id',$gudangId)
+                      ->orWhere('gudang_tujuan_id', $gudangId);
+                });
+            }
         }
 
         $transaksis  =$query->get();
