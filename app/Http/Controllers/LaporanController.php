@@ -17,11 +17,12 @@ class LaporanController extends Controller
     public function index(Request $request): Response
     {
         set_time_limit(120);
-        $bulan    = (int) $request->input('bulan', date('n'));
-        $tahun    = (int) $request->input('tahun', date('Y'));
-        $gudangId = $request->input('gudang_id', 'ALL');
-        $kondisi  = $request->input('kondisi', 'ALL');
-        $search   = $request->input('search', '');
+        $bulan             = (int) $request->input('bulan', date('n'));
+        $tahun             = (int) $request->input('tahun', date('Y'));
+        $gudangId          = $request->input('gudang_id', 'ALL');
+        $kondisi           = $request->input('kondisi', 'ALL');
+        $search            = $request->input('search', '');
+        $hanyaAdaTransaksi = filter_var($request->input('hanya_ada_transaksi', false), FILTER_VALIDATE_BOOLEAN);
 
         $startDate = Carbon::create($tahun, $bulan, 1)->startOfMonth()->toDateString();
         $endDate   = Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
@@ -138,7 +139,6 @@ class LaporanController extends Controller
             ->keyBy('barang_id');
 
         // 5. QUERY AGREGASI SISA FISIK KONDISI DARI TRANSAKSI (UNTUK BARANG NON-SN)
-        // PERBAIKAN: Mengutamakan td.kondisi & menerima kondisi '-' (Transfer) sebagai Baru/Baik
         $kondisiNonSn = DB::table('transaksi_details as td')
             ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
             ->where(function ($q) {
@@ -217,7 +217,6 @@ class LaporanController extends Controller
                 $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
                 $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
 
-                // PERBAIKAN: Sinkronkan total fisik non-SN secara presisi dengan stokAkhir
                 $totalFisikNonSn = $kBaru + $kBekas + $kRusak;
                 if ($stokAkhir !== $totalFisikNonSn) {
                     if ($stokAkhir > $totalFisikNonSn) {
@@ -245,7 +244,6 @@ class LaporanController extends Controller
             $keluarRusak = (int) ($kKeluarData?->keluar_rusak ?? 0);
             $keluarBaru  = (int) ($kKeluarData?->keluar_baru ?? 0);
 
-            // Fallback: pastikan total rincian keluar selalu presisi dengan total keluarBulan
             $totalKondisiKeluar = $keluarBaru + $keluarBekas + $keluarRusak;
             if ($keluarBulan > $totalKondisiKeluar) {
                 $keluarBaru += ($keluarBulan - $totalKondisiKeluar);
@@ -292,6 +290,7 @@ class LaporanController extends Controller
             ];
         });
 
+        // 💡 FILTER 1: Kondisi
         if ($kondisi && $kondisi !== 'ALL') {
             $kUpper = strtoupper($kondisi);
             $laporanStok = $laporanStok->filter(function ($item) use ($kUpper) {
@@ -302,15 +301,23 @@ class LaporanController extends Controller
             })->values();
         }
 
+        // 💡 FILTER 2: Hanya Ada Transaksi (Mutasi Aktif)
+        if ($hanyaAdaTransaksi) {
+            $laporanStok = $laporanStok->filter(function ($item) {
+                return ($item['masuk'] > 0) || ($item['keluar'] > 0) || ($item['transfer_in'] > 0) || ($item['transfer_out'] > 0);
+            })->values();
+        }
+
         return Inertia::render('Laporan/Index', [
             'laporanStok' => $laporanStok,
             'gudangs'     => Gudang::where('is_active', true)->get(['id', 'nama_gudang', 'kode_gudang']),
             'filters'     => [
-                'bulan'     => $bulan,
-                'tahun'     => $tahun,
-                'gudang_id' => $gudangId,
-                'kondisi'   => $kondisi,
-                'search'    => $search,
+                'bulan'               => $bulan,
+                'tahun'               => $tahun,
+                'gudang_id'           => $gudangId,
+                'kondisi'             => $kondisi,
+                'search'              => $search,
+                'hanya_ada_transaksi' => $hanyaAdaTransaksi,
             ],
         ]);
     }
@@ -318,10 +325,11 @@ class LaporanController extends Controller
     public function export(Request $request): StreamedResponse
     {
         set_time_limit(180);
-        $bulan    = (int) $request->input('bulan', date('n'));
-        $tahun    = (int) $request->input('tahun', date('Y'));
-        $gudangId = $request->input('gudang_id', 'ALL');
-        $kondisi  = $request->input('kondisi', 'ALL');
+        $bulan             = (int) $request->input('bulan', date('n'));
+        $tahun             = (int) $request->input('tahun', date('Y'));
+        $gudangId          = $request->input('gudang_id', 'ALL');
+        $kondisi           = $request->input('kondisi', 'ALL');
+        $hanyaAdaTransaksi = filter_var($request->input('hanya_ada_transaksi', false), FILTER_VALIDATE_BOOLEAN);
 
         $startDate = Carbon::create($tahun, $bulan, 1)->startOfMonth()->toDateString();
         $endDate   = Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
@@ -469,7 +477,7 @@ class LaporanController extends Controller
             'Expires'             => '0',
         ];
 
-        $callback = function () use ($barangs, $mutasiLalu, $mutasiBulan, $kondisiNonSn, $gudangId, $kondisi, $bulan, $tahun, $gudangName, $monthNames) {
+        $callback = function () use ($barangs, $mutasiLalu, $mutasiBulan, $kondisiNonSn, $gudangId, $kondisi, $hanyaAdaTransaksi, $bulan, $tahun, $gudangName, $monthNames) {
             $file = fopen('php://output', 'w');
             fputs($file, "\xEF\xBB\xBF");
 
@@ -477,6 +485,7 @@ class LaporanController extends Controller
             fputcsv($file, ["Periode", "{$monthNames[$bulan]} {$tahun}"], ';');
             fputcsv($file, ["Lokasi Gudang", $gudangName], ';');
             fputcsv($file, ["Kondisi", $kondisi === 'ALL' ? 'Semua Kondisi' : $kondisi], ';');
+            fputcsv($file, ["Filter Transaksi", $hanyaAdaTransaksi ? 'Hanya Ada Transaksi' : 'Semua Barang'], ';');
             fputcsv($file, ["Tanggal Cetak", date('Y-m-d H:i:s')], ';');
             fputcsv($file, [], ';');
 
@@ -512,6 +521,11 @@ class LaporanController extends Controller
                 
                 $transferNet = ($gudangId !== 'ALL') ? ($trfIn - $trfOut) : 0;
                 $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
+
+                // Jika filter Hanya Ada Transaksi aktif, lewati barang tanpa mutasi
+                if ($hanyaAdaTransaksi && ($masukBulan === 0 && $keluarBulan === 0 && $trfIn === 0 && $trfOut === 0)) {
+                    continue;
+                }
 
                 if ($b->is_wajib_sn) {
                     $serials = $b->serials;

@@ -16,7 +16,6 @@ const REKONSILIASI_COLUMNS = [
     { key: 'grand_total', label: 'GRAND TOTAL' },
 ];
 
-// Sub-komponen Inline Dropdown Rincian Keluar (Tanpa Card/Box)
 function RincianKeluarDropdown({ item }) {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -37,7 +36,6 @@ function RincianKeluarDropdown({ item }) {
 
     return (
         <div className="relative inline-block text-left" ref={dropdownRef}>
-            {/* Tombol Angka Teks Biasa (Tanpa Card / Box Background) */}
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
@@ -47,7 +45,6 @@ function RincianKeluarDropdown({ item }) {
                 <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Menu Dropdown Melayang */}
             {isOpen && (
                 <div className="absolute left-0 mt-1 w-44 rounded-xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 p-2.5 z-40 font-mono text-xs animate-in fade-in zoom-in-95 duration-100">
                     <div className="text-[10px] font-sans font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 pb-1 border-b border-slate-100 dark:border-slate-800">

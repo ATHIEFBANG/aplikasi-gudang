@@ -47,6 +47,7 @@ export default function LaporanIndex({
     const [tahun, setTahun] = useState(String(filters.tahun || 2026));
     const [gudangId, setGudangId] = useState(String(filters.gudang_id || 'ALL'));
     const [kondisi, setKondisi] = useState(String(filters.kondisi || 'ALL'));
+    const [hanyaAdaTransaksi, setHanyaAdaTransaksi] = useState(Boolean(filters.hanya_ada_transaksi));
 
     // State pencarian lokal dan query aktif
     const [searchInput, setSearchInput] = useState(filters.search || '');
@@ -111,6 +112,16 @@ export default function LaporanIndex({
         return list;
     }, [laporanStok, sortOrder]);
 
+    // Perhitungan Otomatis Total Transaksi dari Seluruh Data Terfilter
+    const summaryTotals = useMemo(() => {
+        return sortedList.reduce((acc, item) => {
+            acc.masuk += (item.masuk || 0);
+            acc.keluar += (item.keluar || 0);
+            acc.stokAkhir += (item.stok_akhir || 0);
+            return acc;
+        }, { masuk: 0, keluar: 0, stokAkhir: 0 });
+    }, [sortedList]);
+
     // Client-Side Pagination
     const totalData = sortedList.length;
     const totalPages = Math.ceil(totalData / perPage) || 1;
@@ -126,7 +137,7 @@ export default function LaporanIndex({
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [bulan, tahun, gudangId, kondisi, searchQuery]);
+    }, [bulan, tahun, gudangId, kondisi, hanyaAdaTransaksi, searchQuery]);
 
     const handlePerPageSubmit = () => {
         let val = parseInt(perPageInput, 10);
@@ -138,18 +149,23 @@ export default function LaporanIndex({
     };
 
     const handleFilterChange = (key, val) => {
+        const nextHanyaAdaTrx = key === 'hanya_ada_transaksi' ? val : (hanyaAdaTransaksi ? '1' : '0');
+
         const newParams = {
             bulan,
             tahun,
             gudang_id: gudangId,
             kondisi,
+            hanya_ada_transaksi: nextHanyaAdaTrx,
             search: searchQuery || undefined,
             [key]: val,
         };
+
         if (key === 'bulan') setBulan(val);
         if (key === 'tahun') setTahun(val);
         if (key === 'gudang_id') setGudangId(val);
         if (key === 'kondisi') setKondisi(val);
+        if (key === 'hanya_ada_transaksi') setHanyaAdaTransaksi(val === '1' || val === true);
 
         router.get('/laporan', newParams, {
             preserveState: true,
@@ -168,6 +184,7 @@ export default function LaporanIndex({
             tahun,
             gudang_id: gudangId,
             kondisi,
+            hanya_ada_transaksi: hanyaAdaTransaksi ? '1' : '0',
             search: trimmed || undefined
         }, {
             preserveState: true,
@@ -186,6 +203,7 @@ export default function LaporanIndex({
             tahun,
             gudang_id: gudangId,
             kondisi,
+            hanya_ada_transaksi: hanyaAdaTransaksi ? '1' : '0',
             search: undefined
         }, {
             preserveState: true,
@@ -196,7 +214,7 @@ export default function LaporanIndex({
         });
     };
 
-    const isFiltered = bulan !== String(new Date().getMonth() + 1) || tahun !== '2026' || gudangId !== 'ALL' || kondisi !== 'ALL' || searchQuery !== '';
+    const isFiltered = bulan !== String(new Date().getMonth() + 1) || tahun !== '2026' || gudangId !== 'ALL' || kondisi !== 'ALL' || hanyaAdaTransaksi || searchQuery !== '';
 
     const handleResetFilters = () => {
         const defaultBulan = String(new Date().getMonth() + 1);
@@ -205,6 +223,7 @@ export default function LaporanIndex({
         setTahun(defaultTahun);
         setGudangId('ALL');
         setKondisi('ALL');
+        setHanyaAdaTransaksi(false);
         setSearchInput('');
         setSearchQuery('');
         router.get('/laporan', { 
@@ -212,6 +231,7 @@ export default function LaporanIndex({
             tahun: defaultTahun, 
             gudang_id: 'ALL', 
             kondisi: 'ALL',
+            hanya_ada_transaksi: '0',
             search: undefined
         }, {
             preserveState: true,
@@ -223,7 +243,8 @@ export default function LaporanIndex({
     };
 
     const handleExportCSV = () => {
-        window.open(`/laporan/export?bulan=${bulan}&tahun=${tahun}&gudang_id=${gudangId}&kondisi=${kondisi}&search=${searchQuery}`, '_blank');
+        const trxParam = hanyaAdaTransaksi ? '1' : '0';
+        window.open(`/laporan/export?bulan=${bulan}&tahun=${tahun}&gudang_id=${gudangId}&kondisi=${kondisi}&hanya_ada_transaksi=${trxParam}&search=${searchQuery}`, '_blank');
     };
 
     return (
@@ -307,6 +328,23 @@ export default function LaporanIndex({
                         />
                     </div>
 
+                    {/* Tombol "Hanya Ada Transaksi" */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const nextVal = !hanyaAdaTransaksi;
+                            handleFilterChange('hanya_ada_transaksi', nextVal ? '1' : '0');
+                        }}
+                        disabled={isProcessing}
+                        className={`h-9 px-3.5 rounded-lg text-xs transition-all cursor-pointer border font-semibold ${
+                            hanyaAdaTransaksi
+                                ? 'bg-blue-600 text-white border-blue-600 font-bold'
+                                : 'bg-slate-50 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700/80'
+                        }`}
+                    >
+                        Hanya Ada Transaksi
+                    </button>
+
                     {isFiltered && (
                         <button
                             type="button"
@@ -321,32 +359,60 @@ export default function LaporanIndex({
 
                 {/* 3. Card Container Tabel Utama */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-                    {/* Toolbar Atas */}
-                    <Toolbar
-                        sortOrder={sortOrder}
-                        onToggleSort={toggleSort}
-                        onExport={handleExportCSV}
-                        isProcessing={isProcessing}
-                        zoomLevel={zoomLevel}
-                        onZoomIn={handleZoomIn}
-                        onZoomOut={handleZoomOut}
-                        onResetZoom={handleResetZoom}
-                        onFitZoom={handleFitZoom}
-                    />
+                    
+                    {/* BARIS PALING ATAS: KIRI = Total Teks Biasa (Center Vertikal), KANAN = Toolbar Buttons */}
+                    <div className="px-5 py-0.1 border-b border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/40 dark:bg-slate-900/40">
+                        {/* Total Teks Biasa (Sejajar Vertikal dengan Toolbar Box) */}
+                        <div className="flex flex-wrap items-center gap-2.5 text-xs font-sans text-slate-700 dark:text-slate-300">
+                            <span className="font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[11px]">
+                                Total:
+                            </span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                Masuk <span className="font-mono font-bold ml-0.5">+{summaryTotals.masuk.toLocaleString('id-ID')}</span>
+                            </span>
+                            <span className="text-slate-300 dark:text-slate-700 text-[10px]">&bull;</span>
+                            <span className="font-bold text-rose-600 dark:text-rose-400">
+                                Keluar <span className="font-mono font-bold ml-0.5">-{summaryTotals.keluar.toLocaleString('id-ID')}</span>
+                            </span>
+                            <span className="text-slate-300 dark:text-slate-700 text-[10px]">&bull;</span>
+                            <span className="font-bold text-blue-600 dark:text-blue-400">
+                                Stok Akhir <span className="font-mono font-bold ml-0.5">{summaryTotals.stokAkhir.toLocaleString('id-ID')}</span>
+                            </span>
+                        </div>
+
+                        {/* Toolbar Controls (Zoom, ASC, Export) */}
+                        <div className="shrink-0">
+                            <Toolbar
+                                sortOrder={sortOrder}
+                                onToggleSort={toggleSort}
+                                onExport={handleExportCSV}
+                                isProcessing={isProcessing}
+                                zoomLevel={zoomLevel}
+                                onZoomIn={handleZoomIn}
+                                onZoomOut={handleZoomOut}
+                                onResetZoom={handleResetZoom}
+                                onFitZoom={handleFitZoom}
+                            />
+                        </div>
+                    </div>
 
                     {/* Sub-Header: Informasi Konteks & Kolom Pencarian */}
-                    <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="px-5 py-3.5 bg-slate-50/20 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        {/* Judul & Filter Keterangan */}
                         <div>
                             <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
-                                Daftar Rekonsiliasi Saldo Stok SKU
+                                DAFTAR REKONSILIASI SALDO STOK SKU
                             </span>
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block font-medium">
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-medium mt-1">
                                 Periode: <strong className="text-slate-700 dark:text-slate-300">{activeBulanLabel} {tahun}</strong> &bull; Lokasi: <strong className="text-slate-700 dark:text-slate-300">{activeGudangLabel}</strong> &bull; Kondisi: <strong className="text-slate-700 dark:text-slate-300">{activeKondisiLabel}</strong>
+                                {hanyaAdaTransaksi && (
+                                    <span className="text-blue-600 dark:text-blue-400 font-bold ml-1.5">&bull; Hanya Mutasi Aktif</span>
+                                )}
                             </span>
                         </div>
 
                         {/* Input Pencarian dengan Enter */}
-                        <div className="relative w-full sm:w-60">
+                        <div className="relative w-full sm:w-60 shrink-0">
                             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             <Input
                                 placeholder="Cari barang lalu tekan Enter..."
