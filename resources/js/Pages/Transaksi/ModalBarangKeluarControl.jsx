@@ -115,19 +115,23 @@ export function useModalBarangKeluarControl({
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
-    // 💡 Ringkasan Pilihan Gudang Asal
+    // 💡 Ringkasan Pilihan Gudang Asal (Membaca Angka Baru, Bekas, dan Rusak Secara Dinamis)
     const gudangOptions = useMemo(() => {
         if (!isOpen) return [];
 
         return gudangs.map(g => {
-            let countBaru = 0;
-            let countBekas = 0;
-            let countRusak = 0;
+            // Priority 1: Gunakan properti agregat dari backend jika tersedia
+            let countBaru = g.stok_baru !== undefined ? g.stok_baru : 0;
+            let countBekas = g.stok_bekas !== undefined ? g.stok_bekas : 0;
+            let countRusak = g.stok_rusak !== undefined ? g.stok_rusak : 0;
 
-            barangs.forEach(b => {
-                const stokQty = getBarangStockInWarehouse(b, g.id);
-                countBaru += stokQty;
-            });
+            // Fallback: Jika backend belum menyuplai stok_baru, kalkulasikan via getBarangStockInWarehouse
+            if (g.stok_baru === undefined) {
+                barangs.forEach(b => {
+                    const stokQty = getBarangStockInWarehouse(b, g.id);
+                    countBaru += stokQty;
+                });
+            }
 
             return {
                 value: String(g.id),

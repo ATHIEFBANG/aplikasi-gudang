@@ -113,7 +113,7 @@ class TransaksiController extends Controller
             }
         }
 
-        // Filter Pencarian Text (Sudah diperbaiki tanpa \%)
+        // Filter Pencarian Text
         if ($search) {$query->where(function ($q) use ($search) {
                 $q->where('no_transaksi', 'like', "%{$search}%")
                   ->orWhere('nomor_imc', 'like', "%{$search}%")
@@ -147,14 +147,14 @@ class TransaksiController extends Controller
             if (!isset($kondisiByGudang[$gId])) {
                 $kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
             }
-            if (str_contains($k, 'RUSAK')) {$kondisiByGudang[$gId]['rusak'] += (int)$row->total;
-            } elseif (str_contains($k, 'BEKAS') || str_contains($k, 'SECOND')) {$kondisiByGudang[$gId]['bekas'] += (int)$row->total;
+            if (str_contains($k, 'RUSAK') || str_contains($k, 'DAMAGED')) {$kondisiByGudang[$gId]['rusak'] += (int)$row->total;
+            } elseif (str_contains($k, 'BEKAS') || str_contains($k, 'SECOND') || str_contains($k, 'USED')) {$kondisiByGudang[$gId]['bekas'] += (int)$row->total;
             } else {
                 $kondisiByGudang[$gId]['baru'] += (int)$row->total;
             }
         }
 
-        // B. Hitung Sisa Stok Barang Non-SN berdasarkan Riwayat Kondisi Transaksi (Urut Kronologis)
+        // B. Hitung Sisa Stok Barang Non-SN berdasarkan Riwayat Kondisi Transaksi
         $nonSnBarangIds = Barang::where('is_wajib_sn', false)->pluck('id')->toArray();
 
         if (!empty($nonSnBarangIds)) {
@@ -164,18 +164,19 @@ class TransaksiController extends Controller
                 ->orderBy('transaksis.tanggal', 'asc')
                 ->orderBy('transaksis.id', 'asc')
                 ->select('transaksi_details.*')
-                ->with(['transaksi:id,jenis_transaksi,sub_jenis,gudang_asal_id,gudang_tujuan_id,kondisi as trx_kondisi'])
+                ->with(['transaksi:id,jenis_transaksi,sub_jenis,gudang_asal_id,gudang_tujuan_id,kondisi'])
                 ->get();
 
             foreach ($details as$d) {
                 $t =$d->transaksi;
                 if (!$t) continue;
 
-                $kondisiRaw = $d->kondisi &&$d->kondisi !== '-' ? $d->kondisi : ($t->trx_kondisi ?? 'Baru');
-                $k          = strtoupper(trim($kondisiRaw));$kKey       = 'baru';
+                // Ambil kondisi spesifik detail atau fallback ke transaksi utama
+                $kondisiRaw = ($d->kondisi &&$d->kondisi !== '-') ? $d->kondisi : ($t->kondisi ?? 'Baru');
+                $k          = strtoupper(trim((string) $kondisiRaw));$kKey       = 'baru';
 
-                if (str_contains($k, 'RUSAK')) {$kKey = 'rusak';
-                } elseif (str_contains($k, 'BEKAS') || str_contains($k, 'SECOND')) {$kKey = 'bekas';
+                if (str_contains($k, 'RUSAK') || str_contains($k, 'DAMAGED')) {$kKey = 'rusak';
+                } elseif (str_contains($k, 'BEKAS') || str_contains($k, 'SECOND') || str_contains($k, 'USED')) {$kKey = 'bekas';
                 }
 
                 $qty = (int)$d->qty;
@@ -188,11 +189,13 @@ class TransaksiController extends Controller
                     $kondisiByGudang[$gId][$kKey] +=$qty;
                 } elseif ($t->jenis_transaksi === 'KELUAR' &&$t->gudang_asal_id) {
                     $gId =$t->gudang_asal_id;
-                    if (!isset($kondisiByGudang[$gId])) {$kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];                     }$kondisiByGudang[$gId][$kKey] = max(0, $kondisiByGudang[$gId][$kKey] -$qty);
+                    if (!isset($kondisiByGudang[$gId])) {$kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+                    }$kondisiByGudang[$gId][$kKey] = max(0, $kondisiByGudang[$gId][$kKey] -$qty);
                 } elseif ($t->jenis_transaksi === 'TRANSFER' ||$t->sub_jenis === 'TRANSFER_GUDANG') {
                     if ($t->gudang_asal_id) {
                         $gId =$t->gudang_asal_id;
-                        if (!isset($kondisiByGudang[$gId])) {$kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];                         }$kondisiByGudang[$gId][$kKey] = max(0, $kondisiByGudang[$gId][$kKey] -$qty);
+                        if (!isset($kondisiByGudang[$gId])) {$kondisiByGudang[$gId] = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+                        }$kondisiByGudang[$gId][$kKey] = max(0, $kondisiByGudang[$gId][$kKey] -$qty);
                     }
                     if ($t->gudang_tujuan_id) {
                         $gId =$t->gudang_tujuan_id;
@@ -225,7 +228,45 @@ class TransaksiController extends Controller
                 return $g;
             });
 
-        // 3. Master Barang Ringan untuk Modal
+        // 3. Hitung Matriks Stok Net Per Barang & Per Gudang (Hanya yang Layak Pakai)
+        $stokNetMap = [];$allDetails = TransaksiDetail::whereHas('transaksi')
+            ->join('transaksis', 'transaksis.id', '=', 'transaksi_details.transaksi_id')
+            ->orderBy('transaksis.tanggal', 'asc')
+            ->orderBy('transaksis.id', 'asc')
+            ->select('transaksi_details.*')
+            ->with(['transaksi:id,jenis_transaksi,sub_jenis,gudang_asal_id,gudang_tujuan_id,kondisi'])
+            ->get();
+
+        foreach ($allDetails as$d) {
+            $t =$d->transaksi;
+            if (!$t) continue;
+
+            $bId        =$d->barang_id;
+            $qty        = (int)$d->qty;
+            $kondisiRaw = ($d->kondisi &&$d->kondisi !== '-') ? $d->kondisi : ($t->kondisi ?? 'Baru');
+            $isRusak    = str_contains(strtoupper((string)$kondisiRaw), 'RUSAK');
+
+            if ($t->jenis_transaksi === 'MASUK' &&$t->gudang_tujuan_id) {
+                if (!$isRusak) {
+                    $gId =$t->gudang_tujuan_id;
+                    $stokNetMap[$bId][$gId] = ($stokNetMap[$bId][$gId] ?? 0) +$qty;
+                }
+            } elseif ($t->jenis_transaksi === 'KELUAR' &&$t->gudang_asal_id) {
+                $gId =$t->gudang_asal_id;
+                $stokNetMap[$bId][$gId] = max(0, ($stokNetMap[$bId][$gId] ?? 0) -$qty);
+            } elseif ($t->jenis_transaksi === 'TRANSFER' ||$t->sub_jenis === 'TRANSFER_GUDANG') {
+                if ($t->gudang_asal_id) {
+                    $gId =$t->gudang_asal_id;
+                    $stokNetMap[$bId][$gId] = max(0, ($stokNetMap[$bId][$gId] ?? 0) -$qty);
+                }
+                if ($t->gudang_tujuan_id) {
+                    $gId =$t->gudang_tujuan_id;
+                    $stokNetMap[$bId][$gId] = ($stokNetMap[$bId][$gId] ?? 0) +$qty;
+                }
+            }
+        }
+
+        // 4. Master Barang Ringan untuk Modal
         $barangList = Barang::select([
             'id', 
             'kode_barang', 
@@ -239,7 +280,6 @@ class TransaksiController extends Controller
             'is_wajib_pn'
         ])
         ->with([
-            'stoks:id,barang_id,gudang_id,jumlah',
             'serials' => function($q) {$q->select('id', 'barang_id', 'gudang_id', 'serial_number', 'kondisi', 'status', 'nomer_imc')
                   ->whereIn('status', ['IN_WAREHOUSE', 'READY', 'AVAILABLE']);
             },
@@ -248,49 +288,63 @@ class TransaksiController extends Controller
             }
         ])
         ->get()
-        ->map(fn($b) => [
-            'id'                => $b->id,
-            'kode_barang'       => $b->kode_barang,
-            'nama_barang'       => $b->nama_barang,
-            'part_number'       => $b->part_number,
-            'brand'             => $b->brand,
-            'tipe'              => $b->tipe,
-            'kategori'          => $b->kategori,
-            'deskripsi'         => $b->deskripsi,
-            'is_wajib_sn'       => (bool) $b->is_wajib_sn,
-            'is_wajib_pn'       => (bool) $b->is_wajib_pn,
-            'stoks'             => $b->stoks->map(fn($s) => [
-                'id'        => $s->id,
-                'barang_id' => $s->barang_id,
-                'gudang_id' => $s->gudang_id,
-                'jumlah'    => (int) $s->jumlah,
-            ]),
-            'serials'           => $b->serials->map(fn($s) => [
-                'id'            => $s->id,
-                'barang_id'     => $s->barang_id,
-                'gudang_id'     => $s->gudang_id,
-                'serial_number' => $s->serial_number,
-                'kondisi'       => $s->kondisi,
-                'status'        => $s->status,
-                'nomor_imc'     => $s->nomer_imc,
-            ]),
-            'transaksi_details' => $b->transaksiDetails->map(fn($td) => [
-                'id'           => $td->id,
-                'transaksi_id' => $td->transaksi_id,
-                'barang_id'    => $td->barang_id,
-                'qty'          => (int) $td->qty,
-                'kondisi'      => $td->kondisi,
-                'transaksi'    => $td->transaksi ? [
-                    'id'               => $td->transaksi->id,
-                    'no_transaksi'     => $td->transaksi->no_transaksi,
-                    'jenis_transaksi'  => $td->transaksi->jenis_transaksi,
-                    'sub_jenis'        => $td->transaksi->sub_jenis,
-                    'gudang_asal_id'   => $td->transaksi->gudang_asal_id,
-                    'gudang_tujuan_id' => $td->transaksi->gudang_tujuan_id,
-                    'nomor_imc'        => $td->transaksi->nomor_imc,
-                ] : null,
-            ]),
-        ]);
+        ->map(function ($b) use ($stokNetMap, $gudangList) {$stoksFormatted = $gudangList->map(function ($g) use ($b,$stokNetMap) {
+                if ($b->is_wajib_sn) {
+                    $jumlah =$b->serials
+                        ->where('gudang_id', $g->id)
+                        ->filter(fn($s) => !str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))
+                        ->count();
+                } else {
+                    $jumlah = max(0,$stokNetMap[$b->id][$g->id] ?? 0);
+                }
+
+                return [
+                    'id'        => null,
+                    'barang_id' => $b->id,
+                    'gudang_id' => $g->id,
+                    'jumlah'    => (int) $jumlah,
+                ];
+            });
+
+            return [
+                'id'                => $b->id,
+                'kode_barang'       => $b->kode_barang,
+                'nama_barang'       => $b->nama_barang,
+                'part_number'       => $b->part_number,
+                'brand'             => $b->brand,
+                'tipe'              => $b->tipe,
+                'kategori'          => $b->kategori,
+                'deskripsi'         => $b->deskripsi,
+                'is_wajib_sn'       => (bool) $b->is_wajib_sn,
+                'is_wajib_pn'       => (bool) $b->is_wajib_pn,
+                'stoks'             => $stoksFormatted,
+                'serials'           => $b->serials->map(fn($s) => [
+                    'id'            => $s->id,
+                    'barang_id'     => $s->barang_id,
+                    'gudang_id'     => $s->gudang_id,
+                    'serial_number' => $s->serial_number,
+                    'kondisi'       => $s->kondisi,
+                    'status'        => $s->status,
+                    'nomor_imc'     => $s->nomer_imc,
+                ]),
+                'transaksi_details' => $b->transaksiDetails->map(fn($td) => [
+                    'id'           => $td->id,
+                    'transaksi_id' => $td->transaksi_id,
+                    'barang_id'    => $td->barang_id,
+                    'qty'          => (int) $td->qty,
+                    'kondisi'      => $td->kondisi,
+                    'transaksi'    => $td->transaksi ? [
+                        'id'               => $td->transaksi->id,
+                        'no_transaksi'     => $td->transaksi->no_transaksi,
+                        'jenis_transaksi'  => $td->transaksi->jenis_transaksi,
+                        'sub_jenis'        => $td->transaksi->sub_jenis,
+                        'gudang_asal_id'   => $td->transaksi->gudang_asal_id,
+                        'gudang_tujuan_id' => $td->transaksi->gudang_tujuan_id,
+                        'nomor_imc'        => $td->transaksi->nomor_imc,
+                    ] : null,
+                ]),
+            ];
+        });
 
         return Inertia::render('Transaksi/Index', [
             'transaksis' => $query->paginate($perPage)->withQueryString(),
@@ -313,7 +367,7 @@ class TransaksiController extends Controller
 
         $query = BarangSerial::select('id', 'barang_id', 'gudang_id', 'serial_number', 'kondisi', 'status')
             ->where('barang_id', $barangId)
-            ->where('status', 'IN_WAREHOUSE');
+            ->whereIn('status', ['IN_WAREHOUSE', 'READY', 'AVAILABLE']);
 
         if ($gudangId) {
             $query->where('gudang_id',$gudangId);
