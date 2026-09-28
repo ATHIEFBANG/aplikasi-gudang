@@ -411,7 +411,7 @@ export default function ModalBarangKeluarRow({
                         <div className="flex items-center gap-1.5">
                             <PackageCheck className="w-3.5 h-3.5 text-amber-500" />
                             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                Pilih Kondisi & Batch Stok Barang (Non-SN)
+                                Pilih Barang dari Gudang (Non-SN)
                             </span>
                         </div>
                         <div className="text-[11px] font-mono font-bold text-rose-600 dark:text-rose-400">

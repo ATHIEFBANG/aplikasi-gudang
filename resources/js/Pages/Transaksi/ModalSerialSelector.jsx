@@ -28,7 +28,7 @@ export default function ModalSerialSelector({
                     <QrCode className="w-3.5 h-3.5 text-amber-500" />
                     <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
                         {row.sub_jenis === 'TRANSFER_GUDANG' 
-                            ? 'Pilih Serial Number dari Gudang Asal' 
+                            ? 'Pilih Barang dari Gudang (SN)' 
                             : `Daftar Serial Number (${row.serials.length} Unit) *`
                         }
                     </span>
