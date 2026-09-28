@@ -54,8 +54,7 @@ class TransaksiBarangKeluarController extends Controller
             }
 
             $allCleanSns = array_unique($allCleanSns);
-
-            $barangs = Barang::whereIn('id', $barangIds)->get()->keyBy('id');
+            $barangs     = Barang::whereIn('id', $barangIds)->get()->keyBy('id');
 
             DB::transaction(function () use ($validated, $request, $barangs, $barangIds, $gudangIds, $allCleanSns) {
                 // Pre-lock semua Stok yang terdampak
@@ -65,13 +64,15 @@ class TransaksiBarangKeluarController extends Controller
                     ->get()
                     ->keyBy(fn($s) => $s->barang_id . '_' . $s->gudang_id);
 
-                // Pre-fetch semua Serial Number yang relevan
+                // Pre-fetch Serial Number yang valid & tersedia di Gudang Asal terpilih
                 $serialsMap = collect();
                 if (!empty($allCleanSns)) {
                     $serialsMap = BarangSerial::whereIn('barang_id', $barangIds)
+                        ->whereIn('gudang_id', $gudangIds)
+                        ->whereIn('status', ['IN_WAREHOUSE', 'READY', 'AVAILABLE'])
                         ->whereIn('serial_number', $allCleanSns)
                         ->get()
-                        ->keyBy(fn($s) => $s->barang_id . '_' . trim($s->serial_number));
+                        ->keyBy(fn($s) => $s->barang_id . '_' . $s->gudang_id . '_' . trim($s->serial_number));
                 }
 
                 $now = now();
@@ -102,8 +103,12 @@ class TransaksiBarangKeluarController extends Controller
                         ? ucfirst(strtolower($item['kondisi'])) 
                         : 'Baru';
 
-                    if ($barang->is_wajib_sn && !empty($serials)) {
-                        $firstSnKey = $barangId . '_' . $serials[0];
+                    if ($barang->is_wajib_sn) {
+                        if (count($serials) !== $qty) {
+                            throw new \Exception("Jumlah Serial Number untuk barang '{$barang->nama_barang}' harus tepat {$qty} unit.");
+                        }
+
+                        $firstSnKey = $barangId . '_' . $gudangAsalId . '_' . ($serials[0] ?? '');
                         $firstSn    = $serialsMap->get($firstSnKey);
 
                         if ($firstSn && !empty($firstSn->kondisi)) {
@@ -117,10 +122,6 @@ class TransaksiBarangKeluarController extends Controller
                     if (!$stokAsal || $stokAsal->jumlah < $qty) {
                         $stokTersedia = $stokAsal ? $stokAsal->jumlah : 0;
                         throw new \Exception("Stok barang '{$barang->nama_barang}' di gudang asal tidak mencukupi (Tersedia: {$stokTersedia}, Diminta: {$qty}).");
-                    }
-
-                    if ($barang->is_wajib_sn && count($serials) !== $qty) {
-                        throw new \Exception("Jumlah Serial Number untuk barang '{$barang->nama_barang}' harus tepat {$qty} unit.");
                     }
 
                     // 2. Simpan Header Transaksi Keluar
@@ -166,27 +167,29 @@ class TransaksiBarangKeluarController extends Controller
                         'updated_at'    => $now,
                     ];
 
-                    // 5. Kumpulkan Serial Numbers untuk Batch Update
+                    // 5. Validasi & Kumpulkan Serial Numbers
                     if (!empty($serials)) {
                         foreach ($serials as $sn) {
-                            $snKey        = $barangId . '_' . $sn;
+                            $snKey        = $barangId . '_' . $gudangAsalId . '_' . $sn;
                             $serialRecord = $serialsMap->get($snKey);
 
-                            if ($serialRecord) {
-                                $serialsToUpdateIds[] = $serialRecord->id;
-
-                                $detailSerialsToInsert[] = [
-                                    'transaksi_detail_id' => $detail->id,
-                                    'barang_serial_id'    => $serialRecord->id,
-                                    'created_at'          => $now,
-                                    'updated_at'          => $now,
-                                ];
+                            if (!$serialRecord) {
+                                throw new \Exception("Serial Number '{$sn}' untuk barang '{$barang->nama_barang}' tidak ditemukan di gudang asal atau sudah tidak tersedia.");
                             }
+
+                            $serialsToUpdateIds[] = $serialRecord->id;
+
+                            $detailSerialsToInsert[] = [
+                                'transaksi_detail_id' => $detail->id,
+                                'barang_serial_id'    => $serialRecord->id,
+                                'created_at'          => $now,
+                                'updated_at'          => $now,
+                            ];
                         }
                     }
                 }
 
-                // Execute Bulk SQL Operations (Sangat Cepat)
+                // Update Status Serial Number menjadi IN_USE
                 if (!empty($serialsToUpdateIds)) {
                     BarangSerial::whereIn('id', $serialsToUpdateIds)->update([
                         'gudang_id'  => null,

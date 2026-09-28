@@ -43,56 +43,64 @@ export default function ModalTransferGudangRow({
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
         : '';
 
-    // Grouping Non-SN Batches
-    const groupedNonSnBatches = useMemo(() => {
-        if (isWajibSn || !targetBarang || !row.gudang_asal_id) return [];
-        const details = targetBarang.transaksi_details || targetBarang.transaksiDetails || [];
-        const matching = details.filter(td => {
+    // ModalTransferGudangRow.jsx
+
+const groupedNonSnBatches = useMemo(() => {
+    if (isWajibSn || !targetBarang || !row.gudang_asal_id) return [];
+    const details = targetBarang.transaksi_details || targetBarang.transaksiDetails || [];
+    const matching = details.filter(td => {
+        const trx = td.transaksi;
+        return trx && String(trx.gudang_tujuan_id) === String(row.gudang_asal_id);
+    });
+    const conditionMap = new Map();
+    if (matching.length > 0) {
+        matching.forEach((td) => {
             const trx = td.transaksi;
-            return trx && String(trx.gudang_tujuan_id) === String(row.gudang_asal_id);
+            const imc = trx?.nomor_imc || trx?.no_transaksi || '';
+            const rawK = String(td.kondisi || trx?.kondisi || 'Baru').toUpperCase();
+            let normKondisi = 'Baru';
+            let badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+            if (rawK === 'RUSAK') {
+                normKondisi = 'Rusak';
+                badgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20';
+            } else if (rawK.includes('BEKAS') || rawK.includes('SECOND')) {
+                normKondisi = 'Bekas';
+                badgeClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
+            }
+            if (conditionMap.has(normKondisi)) {
+                const existing = conditionMap.get(normKondisi);
+                existing.max_stock += (parseInt(td.qty, 10) || 1);
+                if (imc && !existing.imcs.includes(imc)) existing.imcs.push(imc);
+            } else {
+                conditionMap.set(normKondisi, {
+                    key: normKondisi,
+                    kondisi: normKondisi,
+                    max_stock: parseInt(td.qty, 10) || 1,
+                    imcs: imc ? [imc] : [],
+                    badgeClass
+                });
+            }
         });
-        const conditionMap = new Map();
-        if (matching.length > 0) {
-            matching.forEach((td) => {
-                const trx = td.transaksi;
-                const imc = trx?.nomor_imc || trx?.no_transaksi || '';
-                const rawK = String(td.kondisi || trx?.kondisi || 'Baru').toUpperCase();
-                let normKondisi = 'Baru';
-                let badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
-                if (rawK === 'RUSAK') {
-                    normKondisi = 'Rusak';
-                    badgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20';
-                } else if (rawK.includes('BEKAS') || rawK.includes('SECOND')) {
-                    normKondisi = 'Bekas';
-                    badgeClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
-                }
-                if (conditionMap.has(normKondisi)) {
-                    const existing = conditionMap.get(normKondisi);
-                    existing.max_stock += (parseInt(td.qty, 10) || 1);
-                    if (imc && !existing.imcs.includes(imc)) existing.imcs.push(imc);
-                } else {
-                    conditionMap.set(normKondisi, {
-                        key: normKondisi,
-                        kondisi: normKondisi,
-                        max_stock: parseInt(td.qty, 10) || 1,
-                        imcs: imc ? [imc] : [],
-                        badgeClass
-                    });
-                }
-            });
-            return Array.from(conditionMap.values()).map(item => ({
+        return Array.from(conditionMap.values()).map(item => {
+            const safeMaxStock = (stockInOrigin !== null && stockInOrigin !== undefined)
+                ? Math.min(item.max_stock, stockInOrigin)
+                : item.max_stock;
+
+            return {
                 ...item,
+                max_stock: safeMaxStock,
                 nomor_imc: item.imcs.length > 0 ? item.imcs.join(', ') : (targetBarang.kode_barang || 'IMC-IN')
-            }));
-        }
-        return [{
-            key: 'Baru',
-            nomor_imc: targetBarang.kode_barang || 'IMC-IN',
-            kondisi: 'Baru',
-            max_stock: stockInOrigin || 1,
-            badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-        }];
-    }, [isWajibSn, targetBarang, row.gudang_asal_id, stockInOrigin]);
+            };
+        });
+    }
+    return [{
+        key: 'Baru',
+        nomor_imc: targetBarang.kode_barang || 'IMC-IN',
+        kondisi: 'Baru',
+        max_stock: stockInOrigin || 0,
+        badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+    }];
+}, [isWajibSn, targetBarang, row.gudang_asal_id, stockInOrigin]);
 
     const filteredBatches = useMemo(() => {
         if (!nonSnSearch.trim()) return groupedNonSnBatches;
@@ -274,7 +282,7 @@ export default function ModalTransferGudangRow({
                             <Input
                                 type="number"
                                 min={1}
-                                max={stockInOrigin || 50}
+                                max={stockInOrigin || 1}
                                 value={row.qty}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => onQtyChange(rowIdx, e.target.value)}
@@ -283,7 +291,7 @@ export default function ModalTransferGudangRow({
                             />
                             <button
                                 type="button"
-                                disabled={stockInOrigin !== null && row.qty >= stockInOrigin}
+                                disabled={stockInOrigin !== null && stockInOrigin !== undefined && row.qty >= stockInOrigin}
                                 onClick={() => onQtyChange(rowIdx, row.qty + 1)}
                                 className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs cursor-pointer disabled:opacity-40 transition-colors"
                             >
@@ -445,6 +453,7 @@ export default function ModalTransferGudangRow({
                 <ModalSerialSelector
                     rowIdx={rowIdx}
                     row={{ ...row, sub_jenis: 'TRANSFER_GUDANG' }}
+                    isProcessing={isProcessing}
                     availableSnsForTransfer={availableSns}
                     snSearch={snSearch}
                     onSnSearchChange={onSnSearchChange}

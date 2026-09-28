@@ -33,9 +33,10 @@ class TransaksiTransferController extends Controller
             'items.*.serials.*'        => 'nullable|string|max:100',
         ]);
 
-        $barangIds   = array_unique(array_column($validated['items'], 'barang_id'));
-        $barangs     = Barang::whereIn('id', $barangIds)->get()->keyBy('id');
-        $allCleanSns = [];
+        $barangIds     = array_unique(array_column($validated['items'], 'barang_id'));
+        $gudangAsalIds = array_unique(array_column($validated['items'], 'gudang_asal_id'));
+        $barangs       = Barang::whereIn('id', $barangIds)->get()->keyBy('id');
+        $allCleanSns   = [];
 
         foreach ($validated['items'] as $item) {
             if (!empty($item['serials']) && is_array($item['serials'])) {
@@ -49,15 +50,18 @@ class TransaksiTransferController extends Controller
         }
         $allCleanSns = array_unique($allCleanSns);
 
-        DB::transaction(function () use ($validated, $request, $barangs, $barangIds, $allCleanSns) {
+        DB::transaction(function () use ($validated, $request, $barangs, $barangIds, $gudangAsalIds, $allCleanSns) {
             $now = now();
 
+            // Pre-fetch Serial Number yang valid & tersedia di Gudang Asal
             $serialsMap = collect();
             if (!empty($allCleanSns)) {
                 $serialsMap = BarangSerial::whereIn('barang_id', $barangIds)
+                    ->whereIn('gudang_id', $gudangAsalIds)
+                    ->whereIn('status', ['IN_WAREHOUSE', 'READY', 'AVAILABLE'])
                     ->whereIn('serial_number', $allCleanSns)
                     ->get()
-                    ->keyBy(fn($s) => $s->barang_id . '_' . trim($s->serial_number));
+                    ->keyBy(fn($s) => $s->barang_id . '_' . $s->gudang_id . '_' . trim($s->serial_number));
             }
 
             $detailSerialsToInsert = [];
@@ -86,7 +90,7 @@ class TransaksiTransferController extends Controller
 
                 if (!$stokAsal || $stokAsal->jumlah < $qty) {
                     $stokTersedia = $stokAsal ? $stokAsal->jumlah : 0;
-                    throw new \Exception("Stok barang '{$barang->nama_barang}' di gudang asal tidak mencukupi (Tersedia: {$stokTersedia}, Diminta: {$qty}).");
+                    throw new \Exception("Stok barang '{$barang?->nama_barang}' di gudang asal tidak mencukupi (Tersedia: {$stokTersedia}, Diminta: {$qty}).");
                 }
 
                 if ($barang && $barang->is_wajib_sn && count($serials) !== $qty) {
@@ -151,23 +155,26 @@ class TransaksiTransferController extends Controller
 
                 if (!empty($serials)) {
                     foreach ($serials as $sn) {
-                        $snKey        = $barangId . '_' . $sn;
+                        $snKey        = $barangId . '_' . $gudangAsalId . '_' . $sn;
                         $serialRecord = $serialsMap->get($snKey);
 
-                        if ($serialRecord) {
-                            $serialsToUpdate[$gudangTujuanId][] = $serialRecord->id;
-
-                            $detailSerialsToInsert[] = [
-                                'transaksi_detail_id' => $detail->id,
-                                'barang_serial_id'    => $serialRecord->id,
-                                'created_at'          => $now,
-                                'updated_at'          => $now,
-                            ];
+                        if (!$serialRecord) {
+                            throw new \Exception("Serial Number '{$sn}' untuk barang '{$barang?->nama_barang}' tidak ditemukan di gudang asal atau tidak tersedia untuk ditransfer.");
                         }
+
+                        $serialsToUpdate[$gudangTujuanId][] = $serialRecord->id;
+
+                        $detailSerialsToInsert[] = [
+                            'transaksi_detail_id' => $detail->id,
+                            'barang_serial_id'    => $serialRecord->id,
+                            'created_at'          => $now,
+                            'updated_at'          => $now,
+                        ];
                     }
                 }
             }
 
+            // Pindahkan lokasi Gudang Serial Number ke Gudang Tujuan
             foreach ($serialsToUpdate as $targetGudangId => $sIds) {
                 BarangSerial::whereIn('id', $sIds)->update([
                     'gudang_id'  => $targetGudangId,
