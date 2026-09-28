@@ -5,6 +5,7 @@ import ModalBarangMasuk from './ModalBarangMasuk';
 import ModalBarangKeluar from './ModalBarangKeluar'; 
 import ModalTransferGudang from './ModalTransferGudang'; 
 import HybridDropdown from '@/components/HybridDropdown';
+import DateRangeFilter from '@/components/DateRangeFilter';
 import { Toast } from '@/components/ui/Notifikasi'; 
 import { Button } from '@/components/ui/button'; 
 import { Input } from '@/components/ui/input'; 
@@ -38,6 +39,8 @@ export default function TabTransaksi({
     const [toast, setToast] = useState({ isOpen: false, type: 'info', title: '', message: '' }); 
     const [mainTab, setMainTab] = useState(filters?.jenis_transaksi || 'MASUK'); 
     const [gudangId, setGudangId] = useState(filters?.gudang_id || 'ALL');
+    const [startDate, setStartDate] = useState(filters?.start_date || '');
+    const [endDate, setEndDate] = useState(filters?.end_date || '');
     const [searchTerm, setSearchTerm] = useState(filters?.search || ''); 
     const [sortOrder, setSortOrder] = useState(filters?.order || 'desc'); 
     const [perPage, setPerPage] = useState(filters?.per_page || 10); 
@@ -92,12 +95,21 @@ export default function TabTransaksi({
             return; 
         } 
         const timer = setTimeout(() => { 
-            fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, perPage, 1); 
+            fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, perPage, 1, startDate, endDate); 
         }, 400); 
         return () => clearTimeout(timer); 
     }, [searchTerm]); 
 
-    const fetchFilteredData = (jenis, selectedGudang, search, order, itemsPerPage, page = 1) => { 
+    const fetchFilteredData = (
+        jenis, 
+        selectedGudang, 
+        search, 
+        order, 
+        itemsPerPage, 
+        page = 1, 
+        start = startDate, 
+        end = endDate
+    ) => { 
         setSelectedIds([]); 
         router.get( 
             '/transaksi', 
@@ -105,6 +117,8 @@ export default function TabTransaksi({
                 jenis_transaksi: jenis, 
                 gudang_id: selectedGudang !== 'ALL' ? selectedGudang : undefined,
                 search: search || undefined, 
+                start_date: start || undefined,
+                end_date: end || undefined,
                 order: order, 
                 per_page: itemsPerPage, 
                 page 
@@ -122,18 +136,30 @@ export default function TabTransaksi({
 
     const handleMainTabChange = (tab) => { 
         setMainTab(tab); 
-        fetchFilteredData(tab, gudangId, searchTerm, sortOrder, perPage, 1); 
+        fetchFilteredData(tab, gudangId, searchTerm, sortOrder, perPage, 1, startDate, endDate); 
     }; 
 
     const handleGudangFilterChange = (val) => {
         setGudangId(val);
-        fetchFilteredData(mainTab, val, searchTerm, sortOrder, perPage, 1);
+        fetchFilteredData(mainTab, val, searchTerm, sortOrder, perPage, 1, startDate, endDate);
+    };
+
+    const handleDateApply = (start, end) => {
+        setStartDate(start);
+        setEndDate(end);
+        fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, perPage, 1, start, end);
+    };
+
+    const handleDateReset = () => {
+        setStartDate('');
+        setEndDate('');
+        fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, perPage, 1, '', '');
     };
 
     const toggleSort = () => { 
         const nextOrder = sortOrder === 'asc' ? 'desc' : 'asc'; 
         setSortOrder(nextOrder); 
-        fetchFilteredData(mainTab, gudangId, searchTerm, nextOrder, perPage, 1); 
+        fetchFilteredData(mainTab, gudangId, searchTerm, nextOrder, perPage, 1, startDate, endDate); 
     }; 
 
     const handlePerPageSubmit = () => { 
@@ -143,7 +169,7 @@ export default function TabTransaksi({
         setPerPageInput(val); 
         if (val !== perPage) { 
             setPerPage(val); 
-            fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, val, 1); 
+            fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, val, 1, startDate, endDate); 
         } 
     }; 
 
@@ -164,7 +190,9 @@ export default function TabTransaksi({
 
     const handleExport = () => { 
         const gudangParam = gudangId !== 'ALL' ? `&gudang_id=${gudangId}` : '';
-        const exportUrl = `/transaksi/export?jenis_transaksi=${mainTab}&order=${sortOrder}${gudangParam}`; 
+        const startParam = startDate ? `&start_date=${startDate}` : '';
+        const endParam = endDate ? `&end_date=${endDate}` : '';
+        const exportUrl = `/transaksi/export?jenis_transaksi=${mainTab}&order=${sortOrder}${gudangParam}${startParam}${endParam}`; 
         window.open(exportUrl, '_blank'); 
     }; 
 
@@ -303,13 +331,22 @@ export default function TabTransaksi({
                 } 
             /> 
 
-            {/* 2. Sub-Header: Title, Filter Gudang, Search, Action Button */} 
+            {/* 2. Sub-Header: Title, Filter Tanggal, Filter Gudang, Search, Action Button */} 
             <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"> 
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider"> 
                     {tabTitles[mainTab] || tabTitles.MASUK} 
                 </span> 
 
                 <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end"> 
+                    {/* FILTER RENTANG TANGGAL */}
+                    <DateRangeFilter
+                        startDate={startDate}
+                        endDate={endDate}
+                        onApply={handleDateApply}
+                        onReset={handleDateReset}
+                        isProcessing={isProcessing}
+                    />
+
                     {/* FILTER GUDANG DROPDOWN */}
                     <div className="w-44 shrink-0">
                         <HybridDropdown
