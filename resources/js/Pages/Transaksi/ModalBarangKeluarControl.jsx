@@ -45,12 +45,16 @@ export function useModalBarangKeluarControl({
 
         if (isSn && Array.isArray(barang.serials)) {
             const matchedSns = barang.serials.filter(s => {
-                if (!s || typeof s !== 'object' || !s.gudang_id) return false;
-                const sGudangId = String(s.gudang_id);
-                const isMatch = sGudangId === targetGudangId;
-                const isAvailable = !s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE';
+                if (!s) return false;
+                if (typeof s === 'string') return true;
+
+                const sGudangId = s.gudang_id ? String(s.gudang_id) : null;
+                const isMatch = !sGudangId || sGudangId === targetGudangId;
+                const statusUpper = String(s.status || '').toUpperCase();
+                const isAvailable = !s.status || ['IN_WAREHOUSE', 'READY', 'AVAILABLE', 'AKTIF'].includes(statusUpper);
                 const k = String(s.kondisi || '').toUpperCase();
                 const isNotRusak = !k.includes('RUSAK') && !k.includes('DAMAGED');
+
                 return isMatch && isAvailable && isNotRusak;
             });
             return matchedSns.length;
@@ -93,58 +97,14 @@ export function useModalBarangKeluarControl({
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
-    // KALKULASI DROPDOWN GUDANG PRESISI (SISA STOK FISIK BERSIH = 25 UNIT)
+    // KALKULASI DROPDOWN GUDANG PRESISI
     const gudangOptions = useMemo(() => {
         if (!isOpen) return [];
 
         return gudangs.map(g => {
-            const targetGudangId = String(g.id);
-            let countBaru = 0;
-            let countBekas = 0;
-            let countRusak = 0;
-
-            barangs.forEach(b => {
-                const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
-
-                if (isSn && Array.isArray(b.serials)) {
-                    // Hitung Serial Number yang Aktif/Tersedia di gudang ini
-                    b.serials.forEach(s => {
-                        if (!s || typeof s !== 'object' || !s.gudang_id) return;
-                        if (String(s.gudang_id) !== targetGudangId) return;
-
-                        const isAvailable = !s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE';
-                        if (!isAvailable) return;
-
-                        const k = String(s.kondisi || '').toUpperCase();
-                        if (k.includes('RUSAK') || k.includes('DAMAGED')) {
-                            countRusak += 1;
-                        } else if (k.includes('BEKAS') || k.includes('SECOND')) {
-                            countBekas += 1;
-                        } else {
-                            countBaru += 1;
-                        }
-                    });
-                } else {
-                    // Barang Non-SN: Ambil Stok Akhir Sisa dari tabel 'stoks'
-                    const stoksArray = b.stoks || b.stok || [];
-                    if (Array.isArray(stoksArray)) {
-                        const stokRec = stoksArray.find(st => String(st.gudang_id || st.id || '') === targetGudangId);
-                        if (stokRec) {
-                            const qtySisa = parseInt(stokRec.jumlah || stokRec.qty || 0, 10);
-                            if (qtySisa > 0) {
-                                const k = String(stokRec.kondisi || b.kondisi || 'Baru').toUpperCase();
-                                if (k.includes('RUSAK') || k.includes('DAMAGED')) {
-                                    countRusak += qtySisa;
-                                } else if (k.includes('BEKAS') || k.includes('SECOND')) {
-                                    countBekas += qtySisa;
-                                } else {
-                                    countBaru += qtySisa;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
+            const countBaru = g.stok_baru ?? 0;
+            const countBekas = g.stok_bekas ?? 0;
+            const countRusak = g.stok_rusak ?? 0;
 
             return {
                 value: String(g.id),
@@ -167,7 +127,7 @@ export function useModalBarangKeluarControl({
                 )
             };
         });
-    }, [isOpen, gudangs, barangs]);
+    }, [isOpen, gudangs]);
 
     const getBarangPplOptionsForRow = useCallback((row) => {
         if (!barangs || barangs.length === 0 || !row?.gudang_asal_id) return [];
@@ -250,7 +210,7 @@ export function useModalBarangKeluarControl({
                 const detail = selectedItem.details?.[0] || {};
                 const targetBarang = barangs.find(b => String(b.id) === String(detail.barang_id));
                 const isSn = Boolean(targetBarang?.is_wajib_sn);
-                const existingSns = detail.serials ? detail.serials.map(s => typeof s === 'string' ? s : (s.serial_number || s)) : [];
+                const existingSns = detail.serials ? detail.serials.map(s => typeof s === 'string' ? s : (s.serial_number || s.sn || s)) : [];
                 setRows([{
                     id: selectedItem.id,
                     sub_jenis: selectedItem.sub_jenis || 'BARANG_KE_SITE',
@@ -536,6 +496,7 @@ export function useModalBarangKeluarControl({
         });
     };
 
+    // FUNGSI PENGAMBIL SERIAL NUMBER OUTBOUND DENGAN PENGECEKAN FLEKSIBEL
     const getAvailableSerialsForOutbound = useCallback((barangId, gudangAsalId) => {
         if (!barangId || !gudangAsalId) return [];
         const targetBarang = barangs.find(b => String(b.id) === String(barangId));
@@ -548,11 +509,16 @@ export function useModalBarangKeluarControl({
         const targetGudangId = targetGudangObj ? String(targetGudangObj.id) : String(gudangAsalId);
 
         return targetBarang.serials.filter(s => {
-            if (!s || typeof s !== 'object' || !s.gudang_id) return false;
-            const matchGudang = String(s.gudang_id) === targetGudangId;
-            const matchStatus = !s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE';
+            if (!s) return false;
+            if (typeof s === 'string') return true;
+
+            const sGudangId = s.gudang_id ? String(s.gudang_id) : null;
+            const matchGudang = !sGudangId || sGudangId === targetGudangId;
+            const statusUpper = String(s.status || '').toUpperCase();
+            const matchStatus = !s.status || ['IN_WAREHOUSE', 'READY', 'AVAILABLE', 'AKTIF'].includes(statusUpper);
             const k = String(s.kondisi || '').toUpperCase();
             const isNotRusak = !k.includes('RUSAK') && !k.includes('DAMAGED');
+
             return matchGudang && matchStatus && isNotRusak;
         });
     }, [barangs, gudangs]);

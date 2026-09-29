@@ -24,13 +24,35 @@ export function useModalTransferGudangControl({
             (g.nama_gudang && g.nama_gudang.toLowerCase().trim() === String(gudangId).toLowerCase().trim())
         );
         const targetGudangId = targetGudang ? String(targetGudang.id) : String(gudangId);
-        const isSn = Boolean(barang.is_wajib_sn === true || barang.is_wajib_sn === 1 || barang.is_wajib_sn === '1');
+        const isSn = Boolean(
+            barang.is_wajib_sn === true || 
+            barang.is_wajib_sn === 1 || 
+            barang.is_wajib_sn === '1' || 
+            barang.is_wajib_sn === 'true' ||
+            barang.is_sn === true ||
+            barang.is_sn === 1 ||
+            barang.is_sn === '1' ||
+            barang.is_sn === 'true'
+        );
 
-        if (isSn && Array.isArray(barang.serials)) {
-            return barang.serials.filter(s => {
-                if (!s || typeof s !== 'object' || !s.gudang_id) return false;
-                const isMatch = String(s.gudang_id) === targetGudangId;
-                const isAvailable = !s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE';
+        const serialList = Array.isArray(barang.serials) 
+            ? barang.serials 
+            : (Array.isArray(barang.serial_numbers) 
+                ? barang.serial_numbers 
+                : (Array.isArray(barang.serialNumbers) ? barang.serialNumbers : []));
+
+        if (isSn && serialList.length > 0) {
+            return serialList.filter(s => {
+                if (!s) return false;
+                if (typeof s === 'string') return true;
+
+                const sGudangId = s.gudang_id || s.gudang?.id || s.pivot?.gudang_id || s.warehouse_id;
+                const sGudangStr = sGudangId ? String(sGudangId) : null;
+                const isMatch = !sGudangStr || sGudangStr === targetGudangId || (targetGudang && String(targetGudang.nama_gudang).toLowerCase().trim() === sGudangStr.toLowerCase().trim());
+                
+                const statusUpper = String(s.status || '').toUpperCase();
+                const isAvailable = !s.status || ['IN_WAREHOUSE', 'READY', 'AVAILABLE', 'AKTIF', 'TERSEDIA', 'ADA'].includes(statusUpper);
+                
                 const k = String(s.kondisi || '').toUpperCase();
                 const isNotRusak = !k.includes('RUSAK') && !k.includes('DAMAGED');
                 return isMatch && isAvailable && isNotRusak;
@@ -38,7 +60,7 @@ export function useModalTransferGudangControl({
         }
 
         const stoksArray = barang.stoks || barang.stok || [];
-        const stokRec = stoksArray.find(st => String(st.gudang_id || st.id || '') === targetGudangId);
+        const stokRec = Array.isArray(stoksArray) ? stoksArray.find(st => String(st.gudang_id || st.id || '') === targetGudangId) : null;
         return stokRec ? parseInt(stokRec.jumlah || stokRec.qty || 0, 10) : 0;
     }, [gudangs]);
 
@@ -62,58 +84,14 @@ export function useModalTransferGudangControl({
 
     const [rows, setRows] = useState([createEmptyRow()]);
 
-    // KALKULASI DROPDOWN GUDANG PRESISI (SISA STOK FISIK BERSIH = 25 UNIT)
+    // KALKULASI DROPDOWN GUDANG PRESISI
     const gudangOptions = useMemo(() => {
         if (!isOpen) return [];
 
         return gudangs.map(g => {
-            const targetGudangId = String(g.id);
-            let countBaru = 0;
-            let countBekas = 0;
-            let countRusak = 0;
-
-            barangs.forEach(b => {
-                const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
-
-                if (isSn && Array.isArray(b.serials)) {
-                    // Hitung Serial Number yang Aktif/Tersedia di gudang ini
-                    b.serials.forEach(s => {
-                        if (!s || typeof s !== 'object' || !s.gudang_id) return;
-                        if (String(s.gudang_id) !== targetGudangId) return;
-
-                        const isAvailable = !s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE';
-                        if (!isAvailable) return;
-
-                        const k = String(s.kondisi || '').toUpperCase();
-                        if (k.includes('RUSAK') || k.includes('DAMAGED')) {
-                            countRusak += 1;
-                        } else if (k.includes('BEKAS') || k.includes('SECOND')) {
-                            countBekas += 1;
-                        } else {
-                            countBaru += 1;
-                        }
-                    });
-                } else {
-                    // Barang Non-SN: Ambil Stok Akhir Sisa dari tabel 'stoks'
-                    const stoksArray = b.stoks || b.stok || [];
-                    if (Array.isArray(stoksArray)) {
-                        const stokRec = stoksArray.find(st => String(st.gudang_id || st.id || '') === targetGudangId);
-                        if (stokRec) {
-                            const qtySisa = parseInt(stokRec.jumlah || stokRec.qty || 0, 10);
-                            if (qtySisa > 0) {
-                                const k = String(stokRec.kondisi || b.kondisi || 'Baru').toUpperCase();
-                                if (k.includes('RUSAK') || k.includes('DAMAGED')) {
-                                    countRusak += qtySisa;
-                                } else if (k.includes('BEKAS') || k.includes('SECOND')) {
-                                    countBekas += qtySisa;
-                                } else {
-                                    countBaru += qtySisa;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
+            const countBaru = g.stok_baru ?? 0;
+            const countBekas = g.stok_bekas ?? 0;
+            const countRusak = g.stok_rusak ?? 0;
 
             return {
                 value: String(g.id),
@@ -136,7 +114,7 @@ export function useModalTransferGudangControl({
                 )
             };
         });
-    }, [isOpen, gudangs, barangs]);
+    }, [isOpen, gudangs]);
 
     const getBarangPplOptionsForRow = useCallback((row) => {
         if (!row.gudang_asal_id) return [];
@@ -146,8 +124,26 @@ export function useModalTransferGudangControl({
             .filter(b => getBarangStockInWarehouse(b, targetGudangId) > 0)
             .map(b => {
                 const stok = getBarangStockInWarehouse(b, targetGudangId);
-                const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
-                const isPn = Boolean(b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1');
+                const isSn = Boolean(
+                    b.is_wajib_sn === true || 
+                    b.is_wajib_sn === 1 || 
+                    b.is_wajib_sn === '1' || 
+                    b.is_wajib_sn === 'true' ||
+                    b.is_sn === true ||
+                    b.is_sn === 1 ||
+                    b.is_sn === '1' ||
+                    b.is_sn === 'true'
+                );
+                const isPn = Boolean(
+                    b.is_wajib_pn === true || 
+                    b.is_wajib_pn === 1 || 
+                    b.is_wajib_pn === '1' || 
+                    b.is_wajib_pn === 'true' ||
+                    b.is_pn === true ||
+                    b.is_pn === 1 ||
+                    b.is_pn === '1' ||
+                    b.is_pn === 'true'
+                );
 
                 return {
                     value: b.kode_barang,
@@ -203,8 +199,8 @@ export function useModalTransferGudangControl({
             if (isEditMode && selectedItem) {
                 const detail = selectedItem.details?.[0] || {};
                 const targetBarang = barangs.find(b => String(b.id) === String(detail.barang_id));
-                const isSn = Boolean(targetBarang?.is_wajib_sn);
-                const existingSns = detail.serials ? detail.serials.map(s => typeof s === 'string' ? s : (s.serial_number || s)) : [];
+                const isSn = Boolean(targetBarang?.is_wajib_sn || targetBarang?.is_sn);
+                const existingSns = detail.serials ? detail.serials.map(s => typeof s === 'string' ? s : (s.serial_number || s.sn || s.serial || s)) : [];
 
                 setRows([{
                     id: selectedItem.id,
@@ -225,23 +221,6 @@ export function useModalTransferGudangControl({
             }
         }
     }, [isOpen, isEditMode, selectedItem, barangs, gudangs, createEmptyRow]);
-
-    const handleAddMoreRows = (count = 1) => {
-        setRows(prev => {
-            if (prev.length + count > MAX_ROWS_LIMIT) {
-                alert(`Maksimal penambahan transaksi adalah ${MAX_ROWS_LIMIT} baris.`);
-                const allowed = MAX_ROWS_LIMIT - prev.length;
-                if (allowed <= 0) return prev;
-                return [...prev, ...Array.from({ length: allowed }, () => createEmptyRow())];
-            }
-            return [...prev, ...Array.from({ length: count }, () => createEmptyRow())];
-        });
-    };
-
-    const handleRemoveRow = (index) => {
-        if (rows.length <= 1) return;
-        setRows(prev => prev.filter((_, i) => i !== index));
-    };
 
     const handleRowFieldChange = (rowIdx, field, value) => {
         setRows(prev => {
@@ -337,7 +316,16 @@ export function useModalTransferGudangControl({
             const updated = [...prev];
             const currentRow = updated[rowIdx];
             const targetBarang = barangs.find(b => String(b.id) === String(currentRow.barang_id));
-            const isSn = Boolean(targetBarang?.is_wajib_sn === true || targetBarang?.is_wajib_sn === 1 || targetBarang?.is_wajib_sn === '1');
+            const isSn = Boolean(
+                targetBarang?.is_wajib_sn === true || 
+                targetBarang?.is_wajib_sn === 1 || 
+                targetBarang?.is_wajib_sn === '1' || 
+                targetBarang?.is_wajib_sn === 'true' ||
+                targetBarang?.is_sn === true ||
+                targetBarang?.is_sn === 1 ||
+                targetBarang?.is_sn === '1' ||
+                targetBarang?.is_sn === 'true'
+            );
             
             if (targetBarang && currentRow.gudang_asal_id) {
                 const maxStok = getBarangStockInWarehouse(targetBarang, currentRow.gudang_asal_id);
@@ -446,10 +434,19 @@ export function useModalTransferGudangControl({
         });
     };
 
+    // FUNGSI UTAMA PENGAMBIL DAFTAR SERIAL NUMBER DENGAN PENGECEKAN FLEKSIBEL
     const getAvailableSerialsForTransfer = useCallback((barangId, gudangAsalId) => {
         if (!barangId || !gudangAsalId) return [];
         const targetBarang = barangs.find(b => String(b.id) === String(barangId));
-        if (!targetBarang || !Array.isArray(targetBarang.serials)) return [];
+        if (!targetBarang) return [];
+
+        const serialList = Array.isArray(targetBarang.serials) 
+            ? targetBarang.serials 
+            : (Array.isArray(targetBarang.serial_numbers) 
+                ? targetBarang.serial_numbers 
+                : (Array.isArray(targetBarang.serialNumbers) ? targetBarang.serialNumbers : []));
+
+        if (serialList.length === 0) return [];
 
         const targetGudangObj = gudangs.find(g => 
             String(g.id) === String(gudangAsalId) || 
@@ -457,10 +454,17 @@ export function useModalTransferGudangControl({
         );
         const targetGudangId = targetGudangObj ? String(targetGudangObj.id) : String(gudangAsalId);
 
-        return targetBarang.serials.filter(s => {
-            if (!s || typeof s !== 'object' || !s.gudang_id) return false;
-            const matchGudang = String(s.gudang_id) === targetGudangId;
-            const matchStatus = !s.status || s.status === 'IN_WAREHOUSE' || s.status === 'READY' || s.status === 'AVAILABLE';
+        return serialList.filter(s => {
+            if (!s) return false;
+            if (typeof s === 'string') return true;
+
+            const sGudangId = s.gudang_id || s.gudang?.id || s.pivot?.gudang_id || s.warehouse_id;
+            const sGudangStr = sGudangId ? String(sGudangId) : null;
+            const matchGudang = !sGudangStr || sGudangStr === targetGudangId || (targetGudangObj && String(targetGudangObj.nama_gudang).toLowerCase().trim() === sGudangStr.toLowerCase().trim());
+            
+            const statusUpper = String(s.status || '').toUpperCase();
+            const matchStatus = !s.status || ['IN_WAREHOUSE', 'READY', 'AVAILABLE', 'AKTIF', 'TERSEDIA', 'ADA'].includes(statusUpper);
+            
             const k = String(s.kondisi || '').toUpperCase();
             const isNotRusak = !k.includes('RUSAK') && !k.includes('DAMAGED');
             return matchGudang && matchStatus && isNotRusak;
@@ -506,7 +510,16 @@ export function useModalTransferGudangControl({
                 }
             }
 
-            const isSn = Boolean(targetBarang?.is_wajib_sn === true || targetBarang?.is_wajib_sn === 1 || targetBarang?.is_wajib_sn === '1');
+            const isSn = Boolean(
+                targetBarang?.is_wajib_sn === true || 
+                targetBarang?.is_wajib_sn === 1 || 
+                targetBarang?.is_wajib_sn === '1' || 
+                targetBarang?.is_wajib_sn === 'true' ||
+                targetBarang?.is_sn === true ||
+                targetBarang?.is_sn === 1 ||
+                targetBarang?.is_sn === '1' ||
+                targetBarang?.is_sn === 'true'
+            );
             if (isSn && !isEditMode) {
                 if (r.serials.length !== r.qty) {
                     alert(`Baris #${rowNum}: Silakan centang Serial Number tepat ${r.qty} unit.`);
@@ -519,6 +532,7 @@ export function useModalTransferGudangControl({
         const payload = isEditMode
             ? {
                 tanggal: rows[0].tanggal,
+                kondisi: rows[0].kondisi || 'Baru', // <-- MENYIMPAN KONDISI SAAT EDIT
                 nomor_omc: rows[0].nomor_omc.trim(),
                 gudang_asal_id: parseInt(rows[0].gudang_asal_id, 10),
                 gudang_tujuan_id: parseInt(rows[0].gudang_tujuan_id, 10),
@@ -527,7 +541,9 @@ export function useModalTransferGudangControl({
             : {
                 items: rows.map(r => ({
                     tanggal: r.tanggal,
+                    kondisi: r.kondisi || 'Baru', // <-- MENYIMPAN KONDISI SAAT TAMBAH TRANSAKSI
                     nomor_omc: r.nomor_omc.trim(),
+                    nomor_imc: r.nomor_imc ? r.nomor_imc.trim() : null,
                     gudang_asal_id: parseInt(r.gudang_asal_id, 10),
                     gudang_tujuan_id: parseInt(r.gudang_tujuan_id, 10),
                     barang_id: parseInt(r.barang_id, 10),
@@ -564,8 +580,6 @@ export function useModalTransferGudangControl({
         getBarangNamaOptions: getBarangNamaOptionsForRow,
         getBarangNamaOptionsForRow,
         getBarangStockInWarehouse,
-        handleAddMoreRows,
-        handleRemoveRow,
         handleRowFieldChange,
         handleBarangChange,
         handleQtyChange,

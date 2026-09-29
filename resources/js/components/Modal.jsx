@@ -32,7 +32,7 @@ export default function Modal({
                 className={`w-[95vw] sm:w-full ${maxWidth} max-h-[85vh] h-auto flex flex-col p-6 gap-0 overflow-hidden bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 select-text outline-none`}
                 onPaste={onPaste}
                 onOpenAutoFocus={(e) => {
-                    // Membatalkan auto-focus ke input pertama (mencegah dropdown terbuka sendiri)
+                    // Mencegah Radix UI memfokuskan input/dropdown pertama secara otomatis saat modal dibuka
                     e.preventDefault();
                 }}
             >

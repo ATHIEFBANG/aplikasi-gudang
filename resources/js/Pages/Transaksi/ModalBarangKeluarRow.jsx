@@ -54,63 +54,62 @@ export default function ModalBarangKeluarRow({
         : '';
 
     // Grouping Batch Stok Non-SN berdasarkan riwayat kondisi di gudang asal
-const groupedNonSnBatches = useMemo(() => {
-    if (isWajibSn || !targetBarang || !row.gudang_asal_id) return [];
-    const details = targetBarang.transaksi_details || targetBarang.transaksiDetails || [];
-    const matching = details.filter(td => {
-        const trx = td.transaksi;
-        return trx && String(trx.gudang_tujuan_id) === String(row.gudang_asal_id);
-    });
-    const conditionMap = new Map();
-    if (matching.length > 0) {
-        matching.forEach((td) => {
+    const groupedNonSnBatches = useMemo(() => {
+        if (isWajibSn || !targetBarang || !row.gudang_asal_id) return [];
+        const details = targetBarang.transaksi_details || targetBarang.transaksiDetails || [];
+        const matching = details.filter(td => {
             const trx = td.transaksi;
-            const imc = trx?.nomor_imc || trx?.no_transaksi || '';
-            const rawK = String(td.kondisi || trx?.kondisi || 'Baru').toUpperCase();
-            let normKondisi = 'Baru';
-            let badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
-            if (rawK === 'RUSAK') {
-                normKondisi = 'Rusak';
-                badgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20';
-            } else if (rawK.includes('BEKAS') || rawK.includes('SECOND')) {
-                normKondisi = 'Bekas';
-                badgeClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
-            }
-            if (conditionMap.has(normKondisi)) {
-                const existing = conditionMap.get(normKondisi);
-                existing.max_stock += (parseInt(td.qty, 10) || 1);
-                if (imc && !existing.imcs.includes(imc)) existing.imcs.push(imc);
-            } else {
-                conditionMap.set(normKondisi, {
-                    key: normKondisi,
-                    kondisi: normKondisi,
-                    max_stock: parseInt(td.qty, 10) || 1,
-                    imcs: imc ? [imc] : [],
-                    badgeClass
-                });
-            }
+            return trx && String(trx.gudang_tujuan_id) === String(row.gudang_asal_id);
         });
-        return Array.from(conditionMap.values()).map(item => {
-            // PERBAIKAN: Batasi max_stock agar tidak melebihi sisa stok fisik murni (stockInOrigin)
-            const safeMaxStock = (stockInOrigin !== null && stockInOrigin !== undefined)
-                ? Math.min(item.max_stock, stockInOrigin)
-                : item.max_stock;
+        const conditionMap = new Map();
+        if (matching.length > 0) {
+            matching.forEach((td) => {
+                const trx = td.transaksi;
+                const imc = trx?.nomor_imc || trx?.no_transaksi || '';
+                const rawK = String(td.kondisi || trx?.kondisi || 'Baru').toUpperCase();
+                let normKondisi = 'Baru';
+                let badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+                if (rawK === 'RUSAK') {
+                    normKondisi = 'Rusak';
+                    badgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20';
+                } else if (rawK.includes('BEKAS') || rawK.includes('SECOND')) {
+                    normKondisi = 'Bekas';
+                    badgeClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
+                }
+                if (conditionMap.has(normKondisi)) {
+                    const existing = conditionMap.get(normKondisi);
+                    existing.max_stock += (parseInt(td.qty, 10) || 1);
+                    if (imc && !existing.imcs.includes(imc)) existing.imcs.push(imc);
+                } else {
+                    conditionMap.set(normKondisi, {
+                        key: normKondisi,
+                        kondisi: normKondisi,
+                        max_stock: parseInt(td.qty, 10) || 1,
+                        imcs: imc ? [imc] : [],
+                        badgeClass
+                    });
+                }
+            });
+            return Array.from(conditionMap.values()).map(item => {
+                const safeMaxStock = (stockInOrigin !== null && stockInOrigin !== undefined)
+                    ? Math.min(item.max_stock, stockInOrigin)
+                    : item.max_stock;
 
-            return {
-                ...item,
-                max_stock: safeMaxStock,
-                nomor_imc: item.imcs.length > 0 ? item.imcs.join(', ') : (targetBarang.kode_barang || 'IMC-IN')
-            };
-        });
-    }
-    return [{
-        key: 'Baru',
-        nomor_imc: targetBarang.kode_barang || 'IMC-IN',
-        kondisi: 'Baru',
-        max_stock: stockInOrigin || 0,
-        badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-    }];
-}, [isWajibSn, targetBarang, row.gudang_asal_id, stockInOrigin]);
+                return {
+                    ...item,
+                    max_stock: safeMaxStock,
+                    nomor_imc: item.imcs.length > 0 ? item.imcs.join(', ') : (targetBarang.kode_barang || 'IMC-IN')
+                };
+            });
+        }
+        return [{
+            key: 'Baru',
+            nomor_imc: targetBarang.kode_barang || 'IMC-IN',
+            kondisi: 'Baru',
+            max_stock: stockInOrigin || 0,
+            badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+        }];
+    }, [isWajibSn, targetBarang, row.gudang_asal_id, stockInOrigin]);
 
     const filteredBatches = useMemo(() => {
         if (!nonSnSearch.trim()) return groupedNonSnBatches;

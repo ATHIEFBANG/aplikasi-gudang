@@ -13,15 +13,13 @@ export default function ModalBarangKeluar({
     isEditMode = false,
     selectedItem = null,
     gudangs = [],
-    barangs = [],
-    transaksiMasuks = []
+    barangs = []
 }) {
     const {
         isProcessing,
         rows,
         snSearches,
         setSnSearches,
-        inboundList,
         gudangOptions,
         getBarangPplOptionsForRow,
         getBarangNamaOptionsForRow,
@@ -33,7 +31,6 @@ export default function ModalBarangKeluar({
         handleQtyChange,
         handleNonSnBatchQtyChange,
         handleToggleTransferSn,
-        handleAutoSelectTransferSns,
         handleClearTransferSns,
         getAvailableSerialsForOutbound,
         handleSubmitForm,
@@ -43,7 +40,6 @@ export default function ModalBarangKeluar({
         selectedItem,
         gudangs,
         barangs,
-        transaksiMasuks,
         onClose
     });
 
@@ -99,7 +95,6 @@ export default function ModalBarangKeluar({
                             isProcessing={isProcessing}
                             barangs={barangs}
                             gudangs={gudangs}
-                            inboundList={inboundList}
                             gudangOptions={gudangOptions}
                             pplOptions={pplOptions}
                             namaOptions={namaOptions}
@@ -113,7 +108,6 @@ export default function ModalBarangKeluar({
                             onNonSnBatchQtyChange={handleNonSnBatchQtyChange}
                             onSnSearchChange={handleSnSearchChange}
                             onToggleTransferSn={handleToggleTransferSn}
-                            onAutoSelectTransferSns={handleAutoSelectTransferSns}
                             onClearTransferSns={handleClearTransferSns}
                         />
                     );

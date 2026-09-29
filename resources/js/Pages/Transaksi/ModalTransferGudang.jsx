@@ -78,6 +78,9 @@ export default function ModalTransferGudang({
                 )
             }
         >
+            {/* Paling Penting: Mencegah auto-focus meloncat ke HybridDropdown Gudang Asal saat modal dibuka */}
+            <button type="button" className="sr-only" autoFocus />
+
             {!isEditMode && (
                 <Alert className="shrink-0 mb-3 bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 p-2.5 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
