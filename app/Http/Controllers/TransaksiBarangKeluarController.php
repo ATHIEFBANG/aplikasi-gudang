@@ -37,25 +37,43 @@ class TransaksiBarangKeluarController extends Controller
                 'items.*.serials.*'         => 'nullable|string|max:100',
             ]);
 
-            $barangIds    = array_unique(array_column($validated['items'], 'barang_id'));
-            $gudangIds    = array_unique(array_column($validated['items'], 'gudang_asal_id'));
-            $allCleanSns  = [];
+            $barangIds   = array_unique(array_column($validated['items'], 'barang_id'));
+            $gudangIds   = array_unique(array_column($validated['items'], 'gudang_asal_id'));
+            $allCleanSns = [];
+            $seenSns     = [];
 
             foreach ($validated['items'] as $item) {
-                if (!empty($item['serials']) && is_array($item['serials'])) {
-                    foreach ($item['serials'] as $s) {
-                        $clean = trim($s);
-                        if ($clean !== '') {
-                            $allCleanSns[] = $clean;
-                        }
+                $serials = array_filter(
+                    array_map('trim', $item['serials'] ?? []),
+                    fn($sn) => $sn !== ''
+                );
+
+                foreach ($serials as $sn) {
+                    $snKey = strtolower($sn);
+
+                    if (isset($seenSns[$snKey])) {
+                        throw new \Exception(
+                            "Serial Number '{$sn}' dipilih lebih dari satu kali dalam transaksi."
+                        );
                     }
+
+                    $seenSns[$snKey] = true;
+                    $allCleanSns[] = $sn;
                 }
             }
 
-            $allCleanSns = array_unique($allCleanSns);
-            $barangs     = Barang::whereIn('id', $barangIds)->get()->keyBy('id');
+            $barangs = Barang::whereIn('id', $barangIds)
+                ->get()
+                ->keyBy('id');
 
-            DB::transaction(function () use ($validated, $request, $barangs, $barangIds, $gudangIds, $allCleanSns) {
+            DB::transaction(function () use (
+                $validated,
+                $request,
+                $barangs,
+                $barangIds,
+                $gudangIds,
+                $allCleanSns
+            ) {
                 $stoks = Stok::whereIn('barang_id', $barangIds)
                     ->whereIn('gudang_id', $gudangIds)
                     ->lockForUpdate()
@@ -63,62 +81,140 @@ class TransaksiBarangKeluarController extends Controller
                     ->keyBy(fn($s) => $s->barang_id . '_' . $s->gudang_id);
 
                 $serialsMap = collect();
+
                 if (!empty($allCleanSns)) {
                     $serialsMap = BarangSerial::whereIn('barang_id', $barangIds)
                         ->whereIn('gudang_id', $gudangIds)
                         ->whereIn('status', ['IN_WAREHOUSE', 'READY', 'AVAILABLE'])
+                        ->where(function ($q) {
+                            $q->whereNull('kondisi')
+                                ->orWhere(function ($q2) {
+                                    $q2->whereRaw(
+                                        "UPPER(kondisi) NOT LIKE ?",
+                                        ['%RUSAK%']
+                                    )->whereRaw(
+                                        "UPPER(kondisi) NOT LIKE ?",
+                                        ['%DAMAGED%']
+                                    );
+                                });
+                        })
                         ->whereIn('serial_number', $allCleanSns)
+                        ->lockForUpdate()
                         ->get()
-                        ->keyBy(fn($s) => $s->barang_id . '_' . $s->gudang_id . '_' . trim($s->serial_number));
+                        ->keyBy(
+                            fn($s) =>
+                                $s->barang_id . '_' .
+                                $s->gudang_id . '_' .
+                                trim($s->serial_number)
+                        );
                 }
 
                 $now = now();
                 $detailSerialsToInsert = [];
-                $serialsToUpdateIds    = [];
-                $stockLogsToInsert     = [];
+                $serialsToUpdateIds = [];
+                $stockLogsToInsert = [];
 
                 foreach ($validated['items'] as $item) {
-                    $subJenis     = $item['sub_jenis'];
-                    $prefix       = match($subJenis) {
+                    $subJenis = $item['sub_jenis'];
+
+                    $prefix = match ($subJenis) {
                         'BARANG_KE_SITE'     => 'TRX-OUT-SITE',
                         'PEMAKAIAN_INTERNAL' => 'TRX-OUT-INT',
                         default              => 'TRX-KELUAR',
                     };
+
                     $randomSuffix = strtoupper(Str::random(4));
-                    $noTransaksi  = $prefix . '-' . date('YmdHis') . '-' . $randomSuffix;
-                    $barangId     = (int) $item['barang_id'];
+                    $noTransaksi = $prefix . '-' . date('YmdHis') . '-' . $randomSuffix;
+
+                    $barangId = (int) $item['barang_id'];
                     $gudangAsalId = (int) $item['gudang_asal_id'];
-                    $qty          = (int) $item['qty'];
-                    $serials      = array_filter(array_map('trim', $item['serials'] ?? []));
+                    $qty = (int) $item['qty'];
+
+                    $serials = array_values(array_filter(
+                        array_map('trim', $item['serials'] ?? []),
+                        fn($sn) => $sn !== ''
+                    ));
 
                     $barang = $barangs->get($barangId);
+
                     if (!$barang) {
-                        throw new \Exception("Data barang dengan ID {$barangId} tidak ditemukan.");
+                        throw new \Exception(
+                            "Data barang dengan ID {$barangId} tidak ditemukan."
+                        );
                     }
 
-                    $kondisiFix = !empty($item['kondisi']) && $item['kondisi'] !== '-' 
-                        ? ucfirst(strtolower($item['kondisi'])) 
+                    $kondisiFix = !empty($item['kondisi']) && $item['kondisi'] !== '-'
+                        ? ucfirst(strtolower($item['kondisi']))
                         : 'Baru';
 
                     if ($barang->is_wajib_sn) {
                         if (count($serials) !== $qty) {
-                            throw new \Exception("Jumlah Serial Number untuk barang '{$barang->nama_barang}' harus tepat {$qty} unit.");
+                            throw new \Exception(
+                                "Jumlah Serial Number untuk barang '{$barang->nama_barang}' harus tepat {$qty} unit."
+                            );
                         }
 
-                        $firstSnKey = $barangId . '_' . $gudangAsalId . '_' . ($serials[0] ?? '');
-                        $firstSn    = $serialsMap->get($firstSnKey);
+                        $selectedSerialRecords = [];
 
-                        if ($firstSn && !empty($firstSn->kondisi)) {
-                            $kondisiFix = ucfirst(strtolower($firstSn->kondisi));
+                        foreach ($serials as $sn) {
+                            $snKey = $barangId . '_' . $gudangAsalId . '_' . $sn;
+                            $serialRecord = $serialsMap->get($snKey);
+
+                            if (!$serialRecord) {
+                                throw new \Exception(
+                                    "Serial Number '{$sn}' untuk barang '{$barang->nama_barang}' tidak tersedia di gudang asal, sudah keluar, atau merupakan barang rusak."
+                                );
+                            }
+
+                            if ((int) $serialRecord->gudang_id !== $gudangAsalId) {
+                                throw new \Exception(
+                                    "Serial Number '{$sn}' tidak berada di gudang asal yang dipilih."
+                                );
+                            }
+
+                            $statusUpper = strtoupper(trim((string) $serialRecord->status));
+
+                            if (!in_array($statusUpper, ['IN_WAREHOUSE', 'READY', 'AVAILABLE'], true)) {
+                                throw new \Exception(
+                                    "Serial Number '{$sn}' tidak dalam status yang dapat dikeluarkan."
+                                );
+                            }
+
+                            $kondisiUpper = strtoupper(trim((string) $serialRecord->kondisi));
+
+                            if (
+                                str_contains($kondisiUpper, 'RUSAK') ||
+                                str_contains($kondisiUpper, 'DAMAGED')
+                            ) {
+                                throw new \Exception(
+                                    "Serial Number '{$sn}' merupakan barang rusak dan tidak dapat dikeluarkan."
+                                );
+                            }
+
+                            $selectedSerialRecords[] = $serialRecord;
+                        }
+
+                        $kondisiList = collect($selectedSerialRecords)
+                            ->map(fn($serial) => ucfirst(strtolower((string) ($serial->kondisi ?: 'Baru'))))
+                            ->unique()
+                            ->values();
+
+                        if ($kondisiList->count() === 1) {
+                            $kondisiFix = $kondisiList->first();
+                        } elseif ($kondisiList->count() > 1) {
+                            $kondisiFix = 'Campuran';
                         }
                     }
 
-                    $stokKey  = $barangId . '_' . $gudangAsalId;
+                    $stokKey = $barangId . '_' . $gudangAsalId;
                     $stokAsal = $stoks->get($stokKey);
 
                     if (!$stokAsal || $stokAsal->jumlah < $qty) {
                         $stokTersedia = $stokAsal ? $stokAsal->jumlah : 0;
-                        throw new \Exception("Stok barang '{$barang->nama_barang}' di gudang asal tidak mencukupi (Tersedia: {$stokTersedia}, Diminta: {$qty}).");
+
+                        throw new \Exception(
+                            "Stok barang '{$barang->nama_barang}' di gudang asal tidak mencukupi (Tersedia: {$stokTersedia}, Diminta: {$qty})."
+                        );
                     }
 
                     $transaksi = Transaksi::create([
@@ -128,10 +224,16 @@ class TransaksiBarangKeluarController extends Controller
                         'tanggal'          => $item['tanggal'],
                         'kondisi'          => $kondisiFix,
                         'nomor_omc'        => $item['nomor_omc'],
-                        'nomor_imc'        => !empty($item['nomor_imc']) ? trim($item['nomor_imc']) : null,
+                        'nomor_imc'        => !empty($item['nomor_imc'])
+                            ? trim($item['nomor_imc'])
+                            : null,
                         'pihak_asal'       => $item['pihak_asal'],
-                        'kode_projek'      => !empty($item['kode_projek']) ? trim($item['kode_projek']) : null,
-                        'nama_customer'    => !empty($item['nama_customer']) ? trim($item['nama_customer']) : null,
+                        'kode_projek'      => !empty($item['kode_projek'])
+                            ? trim($item['kode_projek'])
+                            : null,
+                        'nama_customer'    => !empty($item['nama_customer'])
+                            ? trim($item['nama_customer'])
+                            : null,
                         'gudang_asal_id'   => $gudangAsalId,
                         'gudang_tujuan_id' => null,
                         'pic_user_id'      => $request->user()->id,
@@ -163,11 +265,13 @@ class TransaksiBarangKeluarController extends Controller
 
                     if (!empty($serials)) {
                         foreach ($serials as $sn) {
-                            $snKey        = $barangId . '_' . $gudangAsalId . '_' . $sn;
+                            $snKey = $barangId . '_' . $gudangAsalId . '_' . $sn;
                             $serialRecord = $serialsMap->get($snKey);
 
                             if (!$serialRecord) {
-                                throw new \Exception("Serial Number '{$sn}' untuk barang '{$barang->nama_barang}' tidak ditemukan di gudang asal atau sudah tidak tersedia.");
+                                throw new \Exception(
+                                    "Serial Number '{$sn}' untuk barang '{$barang->nama_barang}' tidak ditemukan di gudang asal atau sudah tidak tersedia."
+                                );
                             }
 
                             $serialsToUpdateIds[] = $serialRecord->id;
@@ -191,7 +295,9 @@ class TransaksiBarangKeluarController extends Controller
                 }
 
                 if (!empty($detailSerialsToInsert)) {
-                    DB::table('transaksi_detail_serials')->insert($detailSerialsToInsert);
+                    DB::table('transaksi_detail_serials')->insert(
+                        $detailSerialsToInsert
+                    );
                 }
 
                 if (!empty($stockLogsToInsert)) {
@@ -199,10 +305,17 @@ class TransaksiBarangKeluarController extends Controller
                 }
             });
 
-            return redirect()->back()->with('success', count($validated['items']) . ' Data pengeluaran barang berhasil dicatat.');
+            return redirect()
+                ->back()
+                ->with(
+                    'success',
+                    count($validated['items']) . ' Data pengeluaran barang berhasil dicatat.'
+                );
         }
 
-        return redirect()->back()->with('error', 'Format data tidak valid.');
+        return redirect()
+            ->back()
+            ->with('error', 'Format data tidak valid.');
     }
 
     public function update(Request $request, int $id)
@@ -220,8 +333,8 @@ class TransaksiBarangKeluarController extends Controller
             'keterangan'    => 'nullable|string|max:500',
         ]);
 
-        $kondisiFix = !empty($validated['kondisi']) && $validated['kondisi'] !== '-' 
-            ? ucfirst(strtolower($validated['kondisi'])) 
+        $kondisiFix = !empty($validated['kondisi']) && $validated['kondisi'] !== '-'
+            ? ucfirst(strtolower($validated['kondisi']))
             : ($transaksi->kondisi !== '-' ? $transaksi->kondisi : 'Baru');
 
         DB::transaction(function () use ($transaksi, $validated, $kondisiFix) {
@@ -243,7 +356,9 @@ class TransaksiBarangKeluarController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Data transaksi keluar berhasil diperbarui.');
+        return redirect()
+            ->back()
+            ->with('success', 'Data transaksi keluar berhasil diperbarui.');
     }
 
     public function cancel(Request $request, int $id)
@@ -252,20 +367,27 @@ class TransaksiBarangKeluarController extends Controller
             $transaksi = Transaksi::with(['details'])->findOrFail($id);
 
             if ($transaksi->status === 'CANCELLED') {
-                throw new \Exception("Transaksi barang keluar ini sudah dibatalkan sebelumnya.");
+                throw new \Exception(
+                    "Transaksi barang keluar ini sudah dibatalkan sebelumnya."
+                );
             }
 
             $now = now();
 
             foreach ($transaksi->details as $detail) {
-                // 1. Kembalikan stok ke Gudang Asal (+qty)
                 $stokAsal = Stok::firstOrCreate(
-                    ['barang_id' => $detail->barang_id, 'gudang_id' => $transaksi->gudang_asal_id],
+                    [
+                        'barang_id' => $detail->barang_id,
+                        'gudang_id' => $transaksi->gudang_asal_id
+                    ],
                     ['jumlah' => 0]
                 );
-                $stokAsal->increment('jumlah', $detail->qty);
 
-                // 2. Kembalikan Serial Number ke Gudang Asal & ganti status ke IN_WAREHOUSE
+                $stokAsal->increment(
+                    'jumlah',
+                    $detail->qty
+                );
+
                 $serialIds = DB::table('transaksi_detail_serials')
                     ->where('transaksi_detail_id', $detail->id)
                     ->pluck('barang_serial_id');
@@ -278,7 +400,6 @@ class TransaksiBarangKeluarController extends Controller
                     ]);
                 }
 
-                // 3. Catat Log Pembatalan Stok
                 StockLog::create([
                     'barang_id'     => $detail->barang_id,
                     'gudang_id'     => $transaksi->gudang_asal_id,
@@ -292,9 +413,16 @@ class TransaksiBarangKeluarController extends Controller
                 ]);
             }
 
-            $transaksi->update(['status' => 'CANCELLED']);
+            $transaksi->update([
+                'status' => 'CANCELLED'
+            ]);
         });
 
-        return redirect()->back()->with('success', 'Barang keluar berhasil dibatalkan dan stok telah dikembalikan.');
+        return redirect()
+            ->back()
+            ->with(
+                'success',
+                'Barang keluar berhasil dibatalkan dan stok telah dikembalikan.'
+            );
     }
 }
