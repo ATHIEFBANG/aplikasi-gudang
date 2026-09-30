@@ -147,9 +147,15 @@ class LaporanController extends Controller
             ->get()
             ->keyBy('barang_id');
 
-        // 5. QUERY AGREGASI SISA FISIK KONDISI (BARU, BEKAS, RUSAK)
-        $gudangFilterSql = $gudangId !== 'ALL' ? (int)$gudangId : null;
-        $kondisiNonSn = DB::table('transaksi_details as td')
+        // 5. QUERY AGREGASI PRESISI SISA FISIK DARI TRANSAKSI (NET BARU, BEKAS, RUSAK)
+        $gudangIdInt = ($gudangId !== 'ALL') ? (int)$gudangId : null;
+        $tujuanCond  = ($gudangId !== 'ALL') ? "AND t.gudang_tujuan_id = {$gudangIdInt}" : "";
+        $asalCond    = ($gudangId !== 'ALL') ? "AND t.gudang_asal_id = {$gudangIdInt}" : "";
+        $trfCase     = ($gudangId !== 'ALL') 
+            ? "CASE WHEN t.gudang_tujuan_id = {$gudangIdInt} THEN td.qty WHEN t.gudang_asal_id = {$gudangIdInt} THEN -td.qty ELSE 0 END"
+            : "0";
+
+        $kondisiAgregat = DB::table('transaksi_details as td')
             ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
             ->where(function ($q) {
                 $q->whereIn('t.status', ['COMPLETED', 'completed'])
@@ -159,64 +165,55 @@ class LaporanController extends Controller
             ->where('t.tanggal', '<=', $endDate)
             ->selectRaw("
                 td.barang_id,
+                
+                -- NET BARU
                 SUM(CASE 
-                     WHEN t.jenis_transaksi = 'MASUK' " . ($gudangFilterSql ? "AND t.gudang_tujuan_id = {$gudangFilterSql}" : "") . " 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%') 
-                          THEN td.qty
-                     WHEN t.jenis_transaksi = 'KELUAR' " . ($gudangFilterSql ? "AND t.gudang_asal_id = {$gudangFilterSql}" : "") . " 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%') 
-                          THEN -td.qty
-                     WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%') 
-                          THEN CASE 
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_tujuan_id = {$gudangFilterSql} THEN td.qty
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_asal_id = {$gudangFilterSql} THEN -td.qty
-                              ELSE 0
-                          END
-                     ELSE 0
-                 END) as net_baru,
+                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' 
+                         AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' 
+                         AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' THEN
+                        CASE 
+                            WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond} THEN td.qty
+                            WHEN t.jenis_transaksi = 'KELUAR' {$asalCond} THEN -td.qty
+                            WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') THEN {$trfCase}
+                            ELSE 0
+                        END
+                    ELSE 0
+                END) as net_baru,
+
+                -- NET BEKAS
                 SUM(CASE 
-                     WHEN t.jenis_transaksi = 'MASUK' " . ($gudangFilterSql ? "AND t.gudang_tujuan_id = {$gudangFilterSql}" : "") . " 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%') 
-                          THEN td.qty
-                     WHEN t.jenis_transaksi = 'KELUAR' " . ($gudangFilterSql ? "AND t.gudang_asal_id = {$gudangFilterSql}" : "") . " 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%') 
-                          THEN -td.qty
-                     WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%') 
-                          THEN CASE 
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_tujuan_id = {$gudangFilterSql} THEN td.qty
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_asal_id = {$gudangFilterSql} THEN -td.qty
-                              ELSE 0
-                          END
-                     ELSE 0
-                 END) as net_bekas,
+                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' 
+                         OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%' THEN
+                        CASE 
+                            WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond} THEN td.qty
+                            WHEN t.jenis_transaksi = 'KELUAR' {$asalCond} THEN -td.qty
+                            WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') THEN {$trfCase}
+                            ELSE 0
+                        END
+                    ELSE 0
+                END) as net_bekas,
+
+                -- NET RUSAK
                 SUM(CASE 
-                     WHEN t.jenis_transaksi = 'MASUK' " . ($gudangFilterSql ? "AND t.gudang_tujuan_id = {$gudangFilterSql}" : "") . " 
-                          AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' 
-                          THEN td.qty
-                     WHEN t.jenis_transaksi = 'KELUAR' " . ($gudangFilterSql ? "AND t.gudang_asal_id = {$gudangFilterSql}" : "") . " 
-                          AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' 
-                          THEN -td.qty
-                     WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') 
-                          AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' 
-                          THEN CASE 
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_tujuan_id = {$gudangFilterSql} THEN td.qty
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_asal_id = {$gudangFilterSql} THEN -td.qty
-                              ELSE 0
-                          END
-                     ELSE 0
-                 END) as net_rusak
+                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' THEN
+                        CASE 
+                            WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond} THEN td.qty
+                            WHEN t.jenis_transaksi = 'KELUAR' {$asalCond} THEN -td.qty
+                            WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') THEN {$trfCase}
+                            ELSE 0
+                        END
+                    ELSE 0
+                END) as net_rusak
             ")
             ->groupBy('td.barang_id')
             ->get()
             ->keyBy('barang_id');
 
         // 6. MAPPING LAPORAN REKONSILIASI STOK
-        $laporanStok = $barangs->map(function ($b) use ($mutasiLalu, $mutasiBulan, $kondisiNonSn, $kondisiKeluar, $gudangId, $kondisi) {
+        $laporanStok = $barangs->map(function ($b) use ($mutasiLalu, $mutasiBulan, $kondisiAgregat, $kondisiKeluar, $gudangId, $kondisi) {
             $lalu        = $mutasiLalu->get($b->id);
             $bulanData   = $mutasiBulan->get($b->id);
-            $kNonSn      = $kondisiNonSn->get($b->id);
+            $kAgregat    = $kondisiAgregat->get($b->id);
             $kKeluarData = $kondisiKeluar->get($b->id);
 
             $masukLalu   = (int) ($lalu?->masuk_lalu ?? 0);
@@ -232,18 +229,60 @@ class LaporanController extends Controller
             $transferNet = ($gudangId !== 'ALL') ? ($trfIn - $trfOut) : 0;
             $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
 
-            // Rincian sisa fisik unit di gudang dengan Rekonsiliasi Otomatis Ke Stok Akhir
-            if ($b->is_wajib_sn) {
-                $serials = $b->serials;
-                $kBaru   = $serials->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK', '-']) || empty($s->kondisi))->count();
-                $kBekas  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS') || str_contains(strtoupper($s->kondisi ?? ''), 'SECOND'))->count();
-                $kRusak  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
+            // Perhitungan Rincian Fisik dari Riwayat Transaksi & Tabel Serial
+            $netBaruTrx  = max(0, (int) ($kAgregat?->net_baru ?? 0));
+            $netBekasTrx = max(0, (int) ($kAgregat?->net_bekas ?? 0));
+            $netRusakTrx = max(0, (int) ($kAgregat?->net_rusak ?? 0));
 
-                $totalSerialCount = $kBaru + $kBekas + $kRusak;
-                if ($stokAkhir > $totalSerialCount) {
-                    $kBaru += ($stokAkhir - $totalSerialCount);
-                } elseif ($stokAkhir < $totalSerialCount) {
-                    $selisih = $totalSerialCount - $stokAkhir;
+            $kBaru  = 0;
+            $kBekas = 0;
+            $kRusak = 0;
+
+            if ($b->is_wajib_sn && $b->serials->count() > 0) {
+                foreach ($b->serials as $s) {
+                    $condUpper = strtoupper($s->kondisi ?? '');
+                    if (str_contains($condUpper, 'BEKAS') || str_contains($condUpper, 'SECOND')) {
+                        $kBekas++;
+                    } elseif (str_contains($condUpper, 'RUSAK')) {
+                        $kRusak++;
+                    } else {
+                        $kBaru++;
+                    }
+                }
+            } else {
+                $kBaru   = $netBaruTrx;
+                $kBekas  = $netBekasTrx;
+                $kRusak  = $netRusakTrx;
+            }
+
+            // Rekonsiliasi Otomatis agar Total Fisik Selalu Sama Dengan Stok Akhir
+            $totalFisikHitung = $kBaru + $kBekas + $kRusak;
+            if ($stokAkhir !== $totalFisikHitung) {
+                if ($totalFisikHitung === 0 && $stokAkhir > 0) {
+                    if ($netBekasTrx > 0) {
+                        $kBekas = $stokAkhir;
+                    } elseif ($netRusakTrx > 0) {
+                        $kRusak = $stokAkhir;
+                    } else {
+                        $kBaru = $stokAkhir;
+                    }
+                } elseif ($stokAkhir > $totalFisikHitung) {
+                    $selisih = $stokAkhir - $totalFisikHitung;
+                    if ($netBekasTrx > $kBekas) {
+                        $addBekas = min($selisih, $netBekasTrx - $kBekas);
+                        $kBekas += $addBekas;
+                        $selisih -= $addBekas;
+                    }
+                    if ($selisih > 0 && $netRusakTrx > $kRusak) {
+                        $addRusak = min($selisih, $netRusakTrx - $kRusak);
+                        $kRusak += $addRusak;
+                        $selisih -= $addRusak;
+                    }
+                    if ($selisih > 0) {
+                        $kBaru += $selisih;
+                    }
+                } elseif ($stokAkhir < $totalFisikHitung) {
+                    $selisih = $totalFisikHitung - $stokAkhir;
                     if ($kBaru >= $selisih) {
                         $kBaru -= $selisih;
                     } else {
@@ -255,32 +294,6 @@ class LaporanController extends Controller
                             $selisih -= $kBekas;
                             $kBekas = 0;
                             $kRusak = max(0, $kRusak - $selisih);
-                        }
-                    }
-                }
-            } else {
-                $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? 0));
-                $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
-                $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
-
-                $totalUsableNonSn = $kBaru + $kBekas + $kRusak;
-                if ($stokAkhir !== $totalUsableNonSn) {
-                    if ($stokAkhir > $totalUsableNonSn) {
-                        $kBaru += ($stokAkhir - $totalUsableNonSn);
-                    } else {
-                        $selisih = $totalUsableNonSn - $stokAkhir;
-                        if ($kBaru >= $selisih) {
-                            $kBaru -= $selisih;
-                        } else {
-                            $selisih -= $kBaru;
-                            $kBaru = 0;
-                            if ($kBekas >= $selisih) {
-                                $kBekas -= $selisih;
-                            } else {
-                                $selisih -= $kBekas;
-                                $kBekas = 0;
-                                $kRusak = max(0, $kRusak - $selisih);
-                            }
                         }
                     }
                 }
@@ -470,8 +483,14 @@ class LaporanController extends Controller
             ->get()
             ->keyBy('barang_id');
 
-        $gudangFilterSql = $gudangId !== 'ALL' ? (int)$gudangId : null;
-        $kondisiNonSn = DB::table('transaksi_details as td')
+        $gudangIdInt = ($gudangId !== 'ALL') ? (int)$gudangId : null;
+        $tujuanCond  = ($gudangId !== 'ALL') ? "AND t.gudang_tujuan_id = {$gudangIdInt}" : "";
+        $asalCond    = ($gudangId !== 'ALL') ? "AND t.gudang_asal_id = {$gudangIdInt}" : "";
+        $trfCase     = ($gudangId !== 'ALL') 
+            ? "CASE WHEN t.gudang_tujuan_id = {$gudangIdInt} THEN td.qty WHEN t.gudang_asal_id = {$gudangIdInt} THEN -td.qty ELSE 0 END"
+            : "0";
+
+        $kondisiAgregat = DB::table('transaksi_details as td')
             ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
             ->where(function ($q) {
                 $q->whereIn('t.status', ['COMPLETED', 'completed'])
@@ -482,53 +501,38 @@ class LaporanController extends Controller
             ->selectRaw("
                 td.barang_id,
                 SUM(CASE 
-                     WHEN t.jenis_transaksi = 'MASUK' " . ($gudangFilterSql ? "AND t.gudang_tujuan_id = {$gudangFilterSql}" : "") . " 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%') 
-                          THEN td.qty
-                     WHEN t.jenis_transaksi = 'KELUAR' " . ($gudangFilterSql ? "AND t.gudang_asal_id = {$gudangFilterSql}" : "") . " 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%') 
-                          THEN -td.qty
-                     WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%') 
-                          THEN CASE 
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_tujuan_id = {$gudangFilterSql} THEN td.qty
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_asal_id = {$gudangFilterSql} THEN -td.qty
-                              ELSE 0
-                          END
-                     ELSE 0
-                 END) as net_baru,
+                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' 
+                         AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' 
+                         AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' THEN
+                        CASE 
+                            WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond} THEN td.qty
+                            WHEN t.jenis_transaksi = 'KELUAR' {$asalCond} THEN -td.qty
+                            WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') THEN {$trfCase}
+                            ELSE 0
+                        END
+                    ELSE 0
+                END) as net_baru,
                 SUM(CASE 
-                     WHEN t.jenis_transaksi = 'MASUK' " . ($gudangFilterSql ? "AND t.gudang_tujuan_id = {$gudangFilterSql}" : "") . " 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%') 
-                          THEN td.qty
-                     WHEN t.jenis_transaksi = 'KELUAR' " . ($gudangFilterSql ? "AND t.gudang_asal_id = {$gudangFilterSql}" : "") . " 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%') 
-                          THEN -td.qty
-                     WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') 
-                          AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%') 
-                          THEN CASE 
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_tujuan_id = {$gudangFilterSql} THEN td.qty
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_asal_id = {$gudangFilterSql} THEN -td.qty
-                              ELSE 0
-                          END
-                     ELSE 0
-                 END) as net_bekas,
+                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' 
+                         OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%' THEN
+                        CASE 
+                            WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond} THEN td.qty
+                            WHEN t.jenis_transaksi = 'KELUAR' {$asalCond} THEN -td.qty
+                            WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') THEN {$trfCase}
+                            ELSE 0
+                        END
+                    ELSE 0
+                END) as net_bekas,
                 SUM(CASE 
-                     WHEN t.jenis_transaksi = 'MASUK' " . ($gudangFilterSql ? "AND t.gudang_tujuan_id = {$gudangFilterSql}" : "") . " 
-                          AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' 
-                          THEN td.qty
-                     WHEN t.jenis_transaksi = 'KELUAR' " . ($gudangFilterSql ? "AND t.gudang_asal_id = {$gudangFilterSql}" : "") . " 
-                          AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' 
-                          THEN -td.qty
-                     WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') 
-                          AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' 
-                          THEN CASE 
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_tujuan_id = {$gudangFilterSql} THEN td.qty
-                              WHEN '{$gudangId}' != 'ALL' AND t.gudang_asal_id = {$gudangFilterSql} THEN -td.qty
-                              ELSE 0
-                          END
-                     ELSE 0
-                 END) as net_rusak
+                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' THEN
+                        CASE 
+                            WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond} THEN td.qty
+                            WHEN t.jenis_transaksi = 'KELUAR' {$asalCond} THEN -td.qty
+                            WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') THEN {$trfCase}
+                            ELSE 0
+                        END
+                    ELSE 0
+                END) as net_rusak
             ")
             ->groupBy('td.barang_id')
             ->get()
@@ -550,7 +554,7 @@ class LaporanController extends Controller
             'Expires'             => '0',
         ];
 
-        $callback = function () use ($barangs, $mutasiLalu, $mutasiBulan, $kondisiNonSn, $gudangId, $kondisi, $hanyaAdaTransaksi, $bulan, $tahun, $gudangName, $monthNames) {
+        $callback = function () use ($barangs, $mutasiLalu, $mutasiBulan, $kondisiAgregat, $gudangId, $kondisi, $hanyaAdaTransaksi, $bulan, $tahun, $gudangName, $monthNames) {
             $file = fopen('php://output', 'w');
             fputs($file, "\xEF\xBB\xBF");
 
@@ -581,7 +585,7 @@ class LaporanController extends Controller
             foreach ($barangs as $b) {
                 $lalu      = $mutasiLalu->get($b->id);
                 $bulanData = $mutasiBulan->get($b->id);
-                $kNonSn    = $kondisiNonSn->get($b->id);
+                $kAgregat  = $kondisiAgregat->get($b->id);
 
                 $masukLalu  = (int) ($lalu?->masuk_lalu ?? 0);
                 $keluarLalu = (int) ($lalu?->keluar_lalu ?? 0);
@@ -600,17 +604,58 @@ class LaporanController extends Controller
                     continue;
                 }
 
-                if ($b->is_wajib_sn) {
-                    $serials = $b->serials;
-                    $kBaru   = $serials->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK', '-']) || empty($s->kondisi))->count();
-                    $kBekas  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS') || str_contains(strtoupper($s->kondisi ?? ''), 'SECOND'))->count();
-                    $kRusak  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
+                $netBaruTrx  = max(0, (int) ($kAgregat?->net_baru ?? 0));
+                $netBekasTrx = max(0, (int) ($kAgregat?->net_bekas ?? 0));
+                $netRusakTrx = max(0, (int) ($kAgregat?->net_rusak ?? 0));
 
-                    $totalSerialCount = $kBaru + $kBekas + $kRusak;
-                    if ($stokAkhir > $totalSerialCount) {
-                        $kBaru += ($stokAkhir - $totalSerialCount);
-                    } elseif ($stokAkhir < $totalSerialCount) {
-                        $selisih = $totalSerialCount - $stokAkhir;
+                $kBaru  = 0;
+                $kBekas = 0;
+                $kRusak = 0;
+
+                if ($b->is_wajib_sn && $b->serials->count() > 0) {
+                    foreach ($b->serials as $s) {
+                        $condUpper = strtoupper($s->kondisi ?? '');
+                        if (str_contains($condUpper, 'BEKAS') || str_contains($condUpper, 'SECOND')) {
+                            $kBekas++;
+                        } elseif (str_contains($condUpper, 'RUSAK')) {
+                            $kRusak++;
+                        } else {
+                            $kBaru++;
+                        }
+                    }
+                } else {
+                    $kBaru   = $netBaruTrx;
+                    $kBekas  = $netBekasTrx;
+                    $kRusak  = $netRusakTrx;
+                }
+
+                $totalFisikHitung = $kBaru + $kBekas + $kRusak;
+                if ($stokAkhir !== $totalFisikHitung) {
+                    if ($totalFisikHitung === 0 && $stokAkhir > 0) {
+                        if ($netBekasTrx > 0) {
+                            $kBekas = $stokAkhir;
+                        } elseif ($netRusakTrx > 0) {
+                            $kRusak = $stokAkhir;
+                        } else {
+                            $kBaru = $stokAkhir;
+                        }
+                    } elseif ($stokAkhir > $totalFisikHitung) {
+                        $selisih = $stokAkhir - $totalFisikHitung;
+                        if ($netBekasTrx > $kBekas) {
+                            $addBekas = min($selisih, $netBekasTrx - $kBekas);
+                            $kBekas += $addBekas;
+                            $selisih -= $addBekas;
+                        }
+                        if ($selisih > 0 && $netRusakTrx > $kRusak) {
+                            $addRusak = min($selisih, $netRusakTrx - $kRusak);
+                            $kRusak += $addRusak;
+                            $selisih -= $addRusak;
+                        }
+                        if ($selisih > 0) {
+                            $kBaru += $selisih;
+                        }
+                    } elseif ($stokAkhir < $totalFisikHitung) {
+                        $selisih = $totalFisikHitung - $stokAkhir;
                         if ($kBaru >= $selisih) {
                             $kBaru -= $selisih;
                         } else {
@@ -622,32 +667,6 @@ class LaporanController extends Controller
                                 $selisih -= $kBekas;
                                 $kBekas = 0;
                                 $kRusak = max(0, $kRusak - $selisih);
-                            }
-                        }
-                    }
-                } else {
-                    $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? 0));
-                    $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
-                    $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
-
-                    $totalUsableNonSn = $kBaru + $kBekas + $kRusak;
-                    if ($stokAkhir !== $totalUsableNonSn) {
-                        if ($stokAkhir > $totalUsableNonSn) {
-                            $kBaru += ($stokAkhir - $totalUsableNonSn);
-                        } else {
-                            $selisih = $totalUsableNonSn - $stokAkhir;
-                            if ($kBaru >= $selisih) {
-                                $kBaru -= $selisih;
-                            } else {
-                                $selisih -= $kBaru;
-                                $kBaru = 0;
-                                if ($kBekas >= $selisih) {
-                                    $kBekas -= $selisih;
-                                } else {
-                                    $selisih -= $kBekas;
-                                    $kBekas = 0;
-                                    $kRusak = max(0, $kRusak - $selisih);
-                                }
                             }
                         }
                     }
