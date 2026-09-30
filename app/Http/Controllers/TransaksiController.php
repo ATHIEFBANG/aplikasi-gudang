@@ -24,9 +24,13 @@ class TransaksiController extends Controller
      */
     private function syncStokAndSerials(): void
     {
-        // 1. Hapus Serial Number yatim (yang transaksi masuk dasarnya sudah tidak ada)
+        // 1. Hapus Serial Number yatim (yang transaksi masuk dasarnya sudah tidak ada atau dibatalkan)
         $inboundDetailIds = TransaksiDetail::whereHas('transaksi', function ($q) {
-            $q->where('jenis_transaksi', 'MASUK');
+            $q->where('jenis_transaksi', 'MASUK')
+              ->where(function ($sq) {
+                  $sq->whereIn('status', ['COMPLETED', 'completed'])
+                    ->orWhereNull('status');
+              });
         })->pluck('id')->toArray();
 
         if (!empty($inboundDetailIds)) {
@@ -49,8 +53,12 @@ class TransaksiController extends Controller
         // 2. Reset semua stok di tabel `stoks` menjadi 0
         Stok::query()->update(['jumlah' => 0]);
 
-        // 3. Ambil seluruh transaksi berurutan secara kronologis (tanggal ASC, id ASC)
+        // 3. Ambil seluruh transaksi aktif berurutan secara kronologis (Hanya status COMPLETED / NULL)
         $transaksis = Transaksi::with(['details.serials'])
+            ->where(function ($q) {
+                $q->whereIn('status', ['COMPLETED', 'completed'])
+                  ->orWhereNull('status');
+            })
             ->orderBy('tanggal', 'asc')
             ->orderBy('id', 'asc')
             ->get();
@@ -150,10 +158,14 @@ class TransaksiController extends Controller
             }
         }
 
-        $nonSnBarangSet = array_flip(Barang::where('is_wajib_sn', false)->pluck('id')->toArray());$stokNetMap = [];
+        $nonSnBarangSet = array_flip(Barang::where('is_wajib_sn', false)->pluck('id')->toArray());$stokNetMap     = [];
 
+        // Hanya hitung rincian kondisi dari transaksi aktif (status COMPLETED / NULL)
         $allDetails = DB::table('transaksi_details')
             ->join('transaksis', 'transaksis.id', '=', 'transaksi_details.transaksi_id')
+            ->where(function ($q) {$q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
+                  ->orWhereNull('transaksis.status');
+            })
             ->orderBy('transaksis.tanggal', 'asc')
             ->orderBy('transaksis.id', 'asc')
             ->select([
@@ -173,7 +185,7 @@ class TransaksiController extends Controller
             $qty        = (int)$d->qty;
             $kondisiRaw = ($d->detail_kondisi &&$d->detail_kondisi !== '-') ? $d->detail_kondisi : ($d->transaksi_kondisi ?? 'Baru');
             $k          = strtoupper(trim((string)$kondisiRaw));
-            
+
             $hasBekas = str_contains($k, 'BEKAS') || str_contains($k, 'SECOND') || str_contains($k, 'USED');
             $hasRusak = str_contains($k, 'RUSAK') || str_contains($k, 'DAMAGED');$kKey     = $hasRusak ? 'rusak' : ($hasBekas ? 'bekas' : 'baru');
 
@@ -236,7 +248,7 @@ class TransaksiController extends Controller
         $endDate   =$request->input('end_date');
         $perPage   = (int)$request->input('per_page', 10);
 
-        $rawOrder = strtolower((string) $request->input('order', 'desc'));$order    = in_array($rawOrder, ['asc', 'desc'], true) ?$rawOrder : 'desc';
+        $rawOrder  = strtolower((string) $request->input('order', 'desc'));$order     = in_array($rawOrder, ['asc', 'desc'], true) ?$rawOrder : 'desc';
 
         $query = Transaksi::with([
             'gudangAsal:id,nama_gudang',
@@ -286,7 +298,7 @@ class TransaksiController extends Controller
                   ->orWhere('kode_projek', 'like', "%{$search}%")
                   ->orWhere('nama_customer', 'like', "%{$search}%")
                   ->orWhereHas('details.barang', function ($qb) use ($search) {
-                      $qb->where('nama_barang', 'like', "\%{$search}%")
+                      $qb->where('nama_barang', 'like', "%{$search}%")
                          ->orWhere('kode_barang', 'like', "%{$search}%")
                          ->orWhere('brand', 'like', "%{$search}%")
                          ->orWhere('tipe', 'like', "%{$search}%")

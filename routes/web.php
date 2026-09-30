@@ -47,11 +47,14 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('transaksi-keluar')->name('transaksi.keluar.')->controller(TransaksiBarangKeluarController::class)->group(function () {
         Route::post('/', 'store')->name('store');
         Route::put('/{id}', 'update')->name('update');
+        Route::post('/{id}/cancel', 'cancel')->name('cancel'); // <-- Route Pembatalan Barang Keluar
     });
 
     // ACTION: TRANSFER GUDANG
     Route::prefix('transaksi-transfer')->name('transaksi.transfer.')->controller(TransaksiTransferController::class)->group(function () {
         Route::post('/', 'store')->name('store');
+        Route::put('/{id}', 'update')->name('update');
+        Route::post('/{id}/cancel', 'cancel')->name('cancel'); // <-- Route Pembatalan Transfer Gudang
     });
 
     // HALAMAN UTAMA TRANSAKSI STOK & MANAGEMENT (READ / EXPORT / DELETE / FETCH SERIALS)

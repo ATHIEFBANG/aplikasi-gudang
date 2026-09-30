@@ -1,6 +1,12 @@
 import React from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, RotateCcw, MoreHorizontal } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const geometricHeader = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 100" preserveAspectRatio="none">
@@ -108,6 +114,8 @@ export default function Tabel({
     onSelectAll,
     onSelectRow,
     onEditRow,
+    onCancelRow,
+    mainTab = 'MASUK',
     getItemId = (item) => item.id,
     getRowNumber,
     emptyMessage = 'Tidak ada data ditemukan.',
@@ -139,8 +147,8 @@ export default function Tabel({
                         }}
                     >
                         {/* KOLOM AKSI / CHECKBOX */}
-                        {(onSelectAll || onSelectRow || onEditRow) && (
-                            <th className="py-3 px-3 w-14 text-center">
+                        {(onSelectAll || onSelectRow || onEditRow || onCancelRow) && (
+                            <th className="py-3 px-3 w-16 text-center">
                                 <div className="flex items-center justify-center gap-1.5">
                                     {onSelectAll && (
                                         <Checkbox
@@ -186,7 +194,7 @@ export default function Tabel({
                             <td
                                 colSpan={
                                     columns.length +
-                                    (onSelectAll || onSelectRow || onEditRow ? 1 : 0) +
+                                    (onSelectAll || onSelectRow || onEditRow || onCancelRow ? 1 : 0) +
                                     (getRowNumber ? 1 : 0)
                                 }
                                 className="py-10 text-center text-xs text-slate-400"
@@ -198,38 +206,70 @@ export default function Tabel({
                         data.map((item, index) => {
                             const id = getItemId(item);
                             const isSelected = selectedIds.includes(id);
+                            const isCancelled = item.status === 'CANCELLED';
+                            const showCancelOption = (mainTab === 'KELUAR' || mainTab === 'TRANSFER') && !isCancelled;
 
                             return (
                                 <tr
                                     key={id || index}
                                     className={`transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50 ${
-                                        isSelected
+                                        isCancelled
+                                            ? 'opacity-60 bg-rose-50/20 dark:bg-rose-950/10'
+                                            : isSelected
                                             ? 'bg-blue-50/50 dark:bg-blue-950/20'
                                             : ''
                                     }`}
                                 >
-                                    {(onSelectAll || onSelectRow || onEditRow) && (
+                                    {(onSelectAll || onSelectRow || onEditRow || onCancelRow) && (
                                         <td className="py-2.5 px-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 {onSelectRow && (
                                                     <Checkbox
                                                         checked={isSelected}
-                                                        onCheckedChange={() =>
-                                                            onSelectRow(id)
-                                                        }
+                                                        onCheckedChange={() => onSelectRow(id)}
+                                                        disabled={isCancelled}
                                                         className="h-4 w-4 rounded-sm border-slate-300 dark:border-slate-600"
                                                     />
                                                 )}
 
-                                                {onEditRow && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => onEditRow(item)}
-                                                        className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-0.5 rounded cursor-pointer transition-colors"
-                                                        title="Edit Data"
-                                                    >
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                    </button>
+                                                {(onEditRow || onCancelRow) && (
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                                                                title="Menu Aksi"
+                                                            >
+                                                                <MoreHorizontal className="w-4 h-4" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="start" className="w-40 z-50">
+                                                            {onEditRow && (
+                                                                <DropdownMenuItem
+                                                                    onClick={() => onEditRow(item)}
+                                                                    disabled={isCancelled}
+                                                                    className="cursor-pointer"
+                                                                >
+                                                                    <Pencil className="mr-2 h-3.5 w-3.5 text-blue-500" />
+                                                                    <span>Edit Data</span>
+                                                                </DropdownMenuItem>
+                                                            )}
+
+                                                            {onCancelRow && showCancelOption && (
+                                                                <DropdownMenuItem
+                                                                    onClick={() => {
+                                                                        if (confirm(`Apakah Anda yakin ingin membatalkan transaksi ${item.no_transaksi}? Stok barang akan dikembalikan otomatis.`)) {
+                                                                            onCancelRow(item);
+                                                                        }
+                                                                    }}
+                                                                    className="cursor-pointer text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/50 font-medium"
+                                                                >
+                                                                    <RotateCcw className="mr-2 h-3.5 w-3.5 text-rose-600" />
+                                                                    <span>Batalkan</span>
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 )}
                                             </div>
                                         </td>
@@ -244,7 +284,7 @@ export default function Tabel({
                                     {columns.map((col) => (
                                         <td
                                             key={col.key}
-                                            className={`py-2.5 px-3 whitespace-nowrap ${col.cellClassName || ''}`}
+                                            className={`py-2.5 px-3 whitespace-nowrap ${col.cellClassName || ''} ${isCancelled ? 'line-through text-slate-400' : ''}`}
                                         >
                                             {col.render
                                                 ? col.render(item, index)

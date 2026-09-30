@@ -37,7 +37,6 @@ class TransaksiBarangKeluarController extends Controller
                 'items.*.serials.*'         => 'nullable|string|max:100',
             ]);
 
-            // 1. Pre-fetch Data secara Kolektif untuk Memangkas Query (Mencegah N+1)
             $barangIds    = array_unique(array_column($validated['items'], 'barang_id'));
             $gudangIds    = array_unique(array_column($validated['items'], 'gudang_asal_id'));
             $allCleanSns  = [];
@@ -57,14 +56,12 @@ class TransaksiBarangKeluarController extends Controller
             $barangs     = Barang::whereIn('id', $barangIds)->get()->keyBy('id');
 
             DB::transaction(function () use ($validated, $request, $barangs, $barangIds, $gudangIds, $allCleanSns) {
-                // Pre-lock semua Stok yang terdampak
                 $stoks = Stok::whereIn('barang_id', $barangIds)
                     ->whereIn('gudang_id', $gudangIds)
                     ->lockForUpdate()
                     ->get()
                     ->keyBy(fn($s) => $s->barang_id . '_' . $s->gudang_id);
 
-                // Pre-fetch Serial Number yang valid & tersedia di Gudang Asal terpilih
                 $serialsMap = collect();
                 if (!empty($allCleanSns)) {
                     $serialsMap = BarangSerial::whereIn('barang_id', $barangIds)
@@ -124,7 +121,6 @@ class TransaksiBarangKeluarController extends Controller
                         throw new \Exception("Stok barang '{$barang->nama_barang}' di gudang asal tidak mencukupi (Tersedia: {$stokTersedia}, Diminta: {$qty}).");
                     }
 
-                    // 2. Simpan Header Transaksi Keluar
                     $transaksi = Transaksi::create([
                         'no_transaksi'     => $noTransaksi,
                         'jenis_transaksi'  => 'KELUAR',
@@ -142,7 +138,6 @@ class TransaksiBarangKeluarController extends Controller
                         'status'           => 'COMPLETED',
                     ]);
 
-                    // 3. Simpan Detail Transaksi
                     $detail = TransaksiDetail::create([
                         'transaksi_id' => $transaksi->id,
                         'barang_id'    => $barangId,
@@ -151,7 +146,6 @@ class TransaksiBarangKeluarController extends Controller
                         'kondisi'      => $kondisiFix,
                     ]);
 
-                    // 4. Potong Stok Fisik Gudang Asal
                     $stokAsal->jumlah -= $qty;
                     $stokAsal->save();
 
@@ -167,7 +161,6 @@ class TransaksiBarangKeluarController extends Controller
                         'updated_at'    => $now,
                     ];
 
-                    // 5. Validasi & Kumpulkan Serial Numbers
                     if (!empty($serials)) {
                         foreach ($serials as $sn) {
                             $snKey        = $barangId . '_' . $gudangAsalId . '_' . $sn;
@@ -189,7 +182,6 @@ class TransaksiBarangKeluarController extends Controller
                     }
                 }
 
-                // Update Status Serial Number menjadi IN_USE
                 if (!empty($serialsToUpdateIds)) {
                     BarangSerial::whereIn('id', $serialsToUpdateIds)->update([
                         'gudang_id'  => null,
@@ -252,5 +244,57 @@ class TransaksiBarangKeluarController extends Controller
         });
 
         return redirect()->back()->with('success', 'Data transaksi keluar berhasil diperbarui.');
+    }
+
+    public function cancel(Request $request, int $id)
+    {
+        DB::transaction(function () use ($id, $request) {
+            $transaksi = Transaksi::with(['details'])->findOrFail($id);
+
+            if ($transaksi->status === 'CANCELLED') {
+                throw new \Exception("Transaksi barang keluar ini sudah dibatalkan sebelumnya.");
+            }
+
+            $now = now();
+
+            foreach ($transaksi->details as $detail) {
+                // 1. Kembalikan stok ke Gudang Asal (+qty)
+                $stokAsal = Stok::firstOrCreate(
+                    ['barang_id' => $detail->barang_id, 'gudang_id' => $transaksi->gudang_asal_id],
+                    ['jumlah' => 0]
+                );
+                $stokAsal->increment('jumlah', $detail->qty);
+
+                // 2. Kembalikan Serial Number ke Gudang Asal & ganti status ke IN_WAREHOUSE
+                $serialIds = DB::table('transaksi_detail_serials')
+                    ->where('transaksi_detail_id', $detail->id)
+                    ->pluck('barang_serial_id');
+
+                if ($serialIds->isNotEmpty()) {
+                    BarangSerial::whereIn('id', $serialIds)->update([
+                        'gudang_id'  => $transaksi->gudang_asal_id,
+                        'status'     => 'IN_WAREHOUSE',
+                        'updated_at' => $now,
+                    ]);
+                }
+
+                // 3. Catat Log Pembatalan Stok
+                StockLog::create([
+                    'barang_id'     => $detail->barang_id,
+                    'gudang_id'     => $transaksi->gudang_asal_id,
+                    'transaksi_id'  => $transaksi->id,
+                    'user_id'       => $request->user()->id,
+                    'qty_perubahan' => +$detail->qty,
+                    'qty_akhir'     => $stokAsal->jumlah,
+                    'keterangan'    => "Pembatalan Barang Keluar (#{$transaksi->no_transaksi})",
+                    'created_at'    => $now,
+                    'updated_at'    => $now,
+                ]);
+            }
+
+            $transaksi->update(['status' => 'CANCELLED']);
+        });
+
+        return redirect()->back()->with('success', 'Barang keluar berhasil dibatalkan dan stok telah dikembalikan.');
     }
 }

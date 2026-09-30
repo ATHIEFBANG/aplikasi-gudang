@@ -29,6 +29,7 @@ export default function CrudTable({
     onSelectAll, 
     onSelectRow, 
     onEditRow, 
+    onCancelRow, // <-- Terima Callback Pembatalan
     getRowNumber,
     zoomLevel = 100,
     mainTab = 'MASUK'
@@ -244,7 +245,6 @@ export default function CrudTable({
                         const listSn = detail.serials || item.serials || [];
                         const rawKondisi = String(detail.kondisi || item.kondisi || 'Baru').trim();
                         const qty = detail.qty || item.qty || 1;
-
                         if (listSn.length > 0) {
                             return (
                                 <div className="flex flex-wrap gap-1 max-w-[280px] max-h-24 overflow-y-auto py-1">
@@ -281,20 +281,17 @@ export default function CrudTable({
                                 </div>
                             );
                         }
-
                         if (mainTab === 'KELUAR' || mainTab === 'TRANSFER') {
                             let cleanKondisi = (!rawKondisi || rawKondisi === '-') ? 'Baru' : rawKondisi;
                             if (!/^\d+/.test(cleanKondisi)) {
                                 cleanKondisi = `${qty} ${cleanKondisi}`;
                             }
-
                             return (
                                 <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                                     No SN ({cleanKondisi})
                                 </span>
                             );
                         }
-
                         return <span className="text-slate-400 font-mono text-xs">-</span>;
                     }
                     default:
@@ -312,9 +309,11 @@ export default function CrudTable({
             onSelectAll={onSelectAll}
             onSelectRow={onSelectRow}
             onEditRow={onEditRow}
+            onCancelRow={onCancelRow}
             getItemId={getItemId}
             getRowNumber={getRowNumber}
             zoomLevel={zoomLevel}
+            mainTab={mainTab}
             emptyMessage={`Belum ada riwayat data ${mainTab.toLowerCase()}.`}
         />
     );
