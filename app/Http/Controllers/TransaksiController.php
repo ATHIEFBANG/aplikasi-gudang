@@ -53,13 +53,19 @@ class TransaksiController extends Controller
         // 2. Reset semua stok di tabel `stoks` menjadi 0
         Stok::query()->update(['jumlah' => 0]);
 
-        // 3. Ambil seluruh transaksi aktif berurutan secara kronologis (Hanya status COMPLETED / NULL)
+        // 3. Ambil seluruh transaksi aktif berurutan secara logis:
+        // Urutan: Tanggal ASC -> Jenis Transaksi (MASUK = 1, TRANSFER = 2, KELUAR = 3) -> ID ASC
         $transaksis = Transaksi::with(['details.serials'])
             ->where(function ($q) {
                 $q->whereIn('status', ['COMPLETED', 'completed'])
                   ->orWhereNull('status');
             })
             ->orderBy('tanggal', 'asc')
+            ->orderByRaw("CASE 
+                WHEN jenis_transaksi = 'MASUK' THEN 1 
+                WHEN jenis_transaksi = 'TRANSFER' OR sub_jenis = 'TRANSFER_GUDANG' THEN 2 
+                ELSE 3 
+            END ASC")
             ->orderBy('id', 'asc')
             ->get();
 
@@ -167,6 +173,11 @@ class TransaksiController extends Controller
                   ->orWhereNull('transaksis.status');
             })
             ->orderBy('transaksis.tanggal', 'asc')
+            ->orderByRaw("CASE 
+                WHEN transaksis.jenis_transaksi = 'MASUK' THEN 1 
+                WHEN transaksis.jenis_transaksi = 'TRANSFER' OR transaksis.sub_jenis = 'TRANSFER_GUDANG' THEN 2 
+                ELSE 3 
+            END ASC")
             ->orderBy('transaksis.id', 'asc')
             ->select([
                 'transaksi_details.barang_id',
