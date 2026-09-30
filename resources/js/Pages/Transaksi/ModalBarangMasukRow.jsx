@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Trash2, Check, Minus, Plus, Coins } from 'lucide-react';
 import HybridDropdown from '@/components/HybridDropdown';
+import DatePicker from '@/components/DatePicker';
 import { CATEGORIES_MASUK } from './ModalBarangMasukControl';
 
 export default function ModalBarangMasukRow({
@@ -216,7 +217,7 @@ export default function ModalBarangMasukRow({
 
             {/* 3. Detail Barang, Kuantitas, Harga & Kondisi */}
             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                {/* BARIS 1: KODE PPL (4/12) & NAMA BARANG (8/12 - LEBAR & LEGA) */}
+                {/* BARIS 1: KODE PPL & NAMA BARANG */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                     <div className="sm:col-span-4 space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
@@ -270,21 +271,15 @@ export default function ModalBarangMasukRow({
                     </div>
                 </div>
 
-                {/* BARIS 2: TANGGAL, SATUAN, QUANTITY (MAKS. 10), KONDISI FISIK */}
+                {/* BARIS 2: TANGGAL, SATUAN, QUANTITY, KONDISI FISIK */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Transaksi *</Label>
-                        <Input
-                            type="date"
+                        <DatePicker
                             disabled={isProcessing}
                             value={row.tanggal}
-                            onClick={(e) => {
-                                try {
-                                    if (typeof e.target.showPicker === 'function') e.target.showPicker();
-                                } catch (err) {}
-                            }}
-                            onChange={(e) => onFieldChange(rowIdx, 'tanggal', e.target.value)}
-                            className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
+                            onChange={(newDate) => onFieldChange(rowIdx, 'tanggal', newDate)}
+                            inputClassName="h-8 text-xs font-medium"
                             required
                         />
                     </div>

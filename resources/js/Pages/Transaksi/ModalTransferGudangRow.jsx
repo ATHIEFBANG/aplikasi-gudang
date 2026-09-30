@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Trash2, Minus, Plus, PackageCheck, Search, X, Check } from 'lucide-react';
 import HybridDropdown from '@/components/HybridDropdown';
+import DatePicker from '@/components/DatePicker';
 import ModalSerialSelector from './ModalSerialSelector';
 
 export default function ModalTransferGudangRow({
@@ -258,16 +259,11 @@ export default function ModalTransferGudangRow({
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal *</Label>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            disabled={isProcessing}
                             value={row.tanggal}
-                            onClick={(e) => {
-                                try {
-                                    if (typeof e.target.showPicker === 'function') e.target.showPicker();
-                                } catch (err) {}
-                            }}
-                            onChange={(e) => onFieldChange(rowIdx, 'tanggal', e.target.value)}
-                            className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 cursor-pointer"
+                            onChange={(newDate) => onFieldChange(rowIdx, 'tanggal', newDate)}
+                            inputClassName="h-8 text-xs font-medium"
                             required
                         />
                     </div>

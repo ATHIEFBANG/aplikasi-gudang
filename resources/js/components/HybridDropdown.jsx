@@ -123,6 +123,7 @@ export default function HybridDropdown({
                     disabled={disabled}
                     readOnly={!allowCustom}
                     value={displayValue}
+                    title={displayValue} // Tooltip bawaan untuk melihat nama lengkap saat di-hover
                     onChange={handleInputChange}
                     onFocus={() => {
                         if (!disabled && allowCustom) setIsOpen(true);
@@ -134,7 +135,7 @@ export default function HybridDropdown({
                         }
                     }}
                     placeholder={placeholder}
-                    className={`w-full h-8 pl-3 pr-14 rounded-lg border bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`w-full h-8 pl-3 pr-14 truncate rounded-lg border bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
                         !allowCustom ? 'cursor-pointer select-none' : ''
                     } ${
                         isOpen 
@@ -144,7 +145,7 @@ export default function HybridDropdown({
                 />
 
                 {/* Tombol Clear & Chevron Dropdown */}
-                <div className="absolute right-1.5 flex items-center gap-0.5">
+                <div className="absolute right-1.5 flex items-center gap-0.5 z-10 bg-inherit">
                     {displayValue && !disabled && (
                         <button
                             type="button"
@@ -214,7 +215,7 @@ export default function HybridDropdown({
                     <div className="overflow-y-auto max-h-56 py-0.5 space-y-0.5">
                         {filteredOptions.length === 0 ? (
                             allowCustom ? (
-                                <div className="py-2.5 px-3 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+                                <div className="py-2.5 px-3 text-[11px] text-blue-600 dark:text-blue-400 font-medium truncate">
                                     Tekan simpan untuk menggunakan: <strong>"{searchQuery || displayValue}"</strong>
                                 </div>
                             ) : (
