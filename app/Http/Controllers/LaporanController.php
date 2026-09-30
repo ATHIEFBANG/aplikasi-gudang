@@ -226,56 +226,32 @@ class LaporanController extends Controller
             $transferNet = ($gudangId !== 'ALL') ? ($trfIn - $trfOut) : 0;
             $stokAkhir   = max(0, $stokAwal + $masukBulan - $keluarBulan + $transferNet);
 
-            // Rincian sisa fisik unit di gudang dengan Rekonsiliasi Otomatis Ke Stok Akhir
+            // Rincian sisa fisik unit di gudang
             if ($b->is_wajib_sn) {
                 $serials = $b->serials;
                 $kBaru   = $serials->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK', '-']) || empty($s->kondisi))->count();
                 $kBekas  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS') || str_contains(strtoupper($s->kondisi ?? ''), 'SECOND'))->count();
                 $kRusak  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
+            } else {
+                $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? 0));
+                $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
+                $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
+            }
 
-                $totalSerialCount = $kBaru + $kBekas + $kRusak;
-                if ($stokAkhir > $totalSerialCount) {
-                    $kBaru += ($stokAkhir - $totalSerialCount);
-                } elseif ($stokAkhir < $totalSerialCount) {
-                    $selisih = $totalSerialCount - $stokAkhir;
+            // REKONSILIASI HANYA PADA STOK LAYAK PAKAI (Baru + Bekas) TERHADAP stok_akhir
+            // kRusak TIDAK DIKURANGI AGAR KONDISI DARI MUTASI RUSAK TETAP TERCATAT UTUH
+            $usableFisik = $kBaru + $kBekas;
+            if ($stokAkhir !== $usableFisik) {
+                if ($stokAkhir > $usableFisik) {
+                    $kBaru += ($stokAkhir - $usableFisik);
+                } else {
+                    $selisih = $usableFisik - $stokAkhir;
                     if ($kBaru >= $selisih) {
                         $kBaru -= $selisih;
                     } else {
                         $selisih -= $kBaru;
                         $kBaru = 0;
-                        if ($kBekas >= $selisih) {
-                            $kBekas -= $selisih;
-                        } else {
-                            $selisih -= $kBekas;
-                            $kBekas = 0;
-                            $kRusak = max(0, $kRusak - $selisih);
-                        }
-                    }
-                }
-            } else {
-                $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? 0));
-                $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
-                $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
-
-                $totalUsableNonSn = $kBaru + $kBekas + $kRusak;
-                if ($stokAkhir !== $totalUsableNonSn) {
-                    if ($stokAkhir > $totalUsableNonSn) {
-                        $kBaru += ($stokAkhir - $totalUsableNonSn);
-                    } else {
-                        $selisih = $totalUsableNonSn - $stokAkhir;
-                        if ($kBaru >= $selisih) {
-                            $kBaru -= $selisih;
-                        } else {
-                            $selisih -= $kBaru;
-                            $kBaru = 0;
-                            if ($kBekas >= $selisih) {
-                                $kBekas -= $selisih;
-                            } else {
-                                $selisih -= $kBekas;
-                                $kBekas = 0;
-                                $kRusak = max(0, $kRusak - $selisih);
-                            }
-                        }
+                        $kBekas = max(0, $kBekas - $selisih);
                     }
                 }
             }
@@ -593,50 +569,24 @@ class LaporanController extends Controller
                     $kBaru   = $serials->filter(fn($s) => in_array(strtoupper($s->kondisi ?? ''), ['BARU', 'BAIK', '-']) || empty($s->kondisi))->count();
                     $kBekas  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'BEKAS') || str_contains(strtoupper($s->kondisi ?? ''), 'SECOND'))->count();
                     $kRusak  = $serials->filter(fn($s) => str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))->count();
+                } else {
+                    $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? 0));
+                    $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
+                    $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
+                }
 
-                    $totalSerialCount = $kBaru + $kBekas + $kRusak;
-                    if ($stokAkhir > $totalSerialCount) {
-                        $kBaru += ($stokAkhir - $totalSerialCount);
-                    } elseif ($stokAkhir < $totalSerialCount) {
-                        $selisih = $totalSerialCount - $stokAkhir;
+                $usableFisik = $kBaru + $kBekas;
+                if ($stokAkhir !== $usableFisik) {
+                    if ($stokAkhir > $usableFisik) {
+                        $kBaru += ($stokAkhir - $usableFisik);
+                    } else {
+                        $selisih = $usableFisik - $stokAkhir;
                         if ($kBaru >= $selisih) {
                             $kBaru -= $selisih;
                         } else {
                             $selisih -= $kBaru;
                             $kBaru = 0;
-                            if ($kBekas >= $selisih) {
-                                $kBekas -= $selisih;
-                            } else {
-                                $selisih -= $kBekas;
-                                $kBekas = 0;
-                                $kRusak = max(0, $kRusak - $selisih);
-                            }
-                        }
-                    }
-                } else {
-                    $kBaru   = max(0, (int) ($kNonSn?->net_baru ?? 0));
-                    $kBekas  = max(0, (int) ($kNonSn?->net_bekas ?? 0));
-                    $kRusak  = max(0, (int) ($kNonSn?->net_rusak ?? 0));
-
-                    $totalUsableNonSn = $kBaru + $kBekas + $kRusak;
-                    if ($stokAkhir !== $totalUsableNonSn) {
-                        if ($stokAkhir > $totalUsableNonSn) {
-                            $kBaru += ($stokAkhir - $totalUsableNonSn);
-                        } else {
-                            $selisih = $totalUsableNonSn - $stokAkhir;
-                            if ($kBaru >= $selisih) {
-                                $kBaru -= $selisih;
-                            } else {
-                                $selisih -= $kBaru;
-                                $kBaru = 0;
-                                if ($kBekas >= $selisih) {
-                                    $kBekas -= $selisih;
-                                } else {
-                                    $selisih -= $kBekas;
-                                    $kBekas = 0;
-                                    $kRusak = max(0, $kRusak - $selisih);
-                                }
-                            }
+                            $kBekas = max(0, $kBekas - $selisih);
                         }
                     }
                 }

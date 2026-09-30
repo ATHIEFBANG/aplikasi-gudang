@@ -191,10 +191,11 @@ export default function CrudTable({
                             <span className="text-slate-400 text-xs">-</span>
                         );
                     case 'kondisi': {
-                        const raw = String(item.kondisi || detail.kondisi || 'Baru').toUpperCase().trim();
+                        const rawVal = item.kondisi || detail.kondisi;
+                        const raw = String(!rawVal || rawVal === '-' ? 'Baru' : rawVal).toUpperCase().trim();
                         let displayKondisi = 'Baru';
                         let badgeStyle = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
-                        if (raw === 'RUSAK') {
+                        if (raw.includes('RUSAK') || raw.includes('DAMAGED')) {
                             displayKondisi = 'Rusak';
                             badgeStyle = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
                         } else if (raw.includes('BEKAS') || raw.includes('SECOND')) {
@@ -252,13 +253,13 @@ export default function CrudTable({
                                         const k = String(s.kondisi || '').toUpperCase().trim();
                                         let kondisiText = '';
                                         let badgeColor = '';
-                                        if (k === 'RUSAK') {
+                                        if (k.includes('RUSAK') || k.includes('DAMAGED')) {
                                             kondisiText = 'Rusak';
                                             badgeColor = 'bg-rose-500/20 text-rose-600';
                                         } else if (k.includes('BEKAS') || k.includes('SECOND')) {
                                             kondisiText = 'Bekas';
                                             badgeColor = 'bg-amber-500/20 text-amber-600';
-                                        } else if (k === 'BARU' || k === 'BAIK') {
+                                        } else if (k.includes('BARU') || k.includes('BAIK')) {
                                             kondisiText = 'Baru';
                                             badgeColor = 'bg-emerald-500/20 text-emerald-600';
                                         }
