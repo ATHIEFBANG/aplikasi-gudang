@@ -1,12 +1,6 @@
 import React from 'react';
-import { Pencil, RotateCcw, MoreHorizontal } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 const geometricHeader = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 100" preserveAspectRatio="none">
@@ -16,92 +10,23 @@ const geometricHeader = `
             <stop offset="50%" stop-color="#092b5c"/>
             <stop offset="100%" stop-color="#061c3c"/>
         </linearGradient>
-
         <linearGradient id="blueAccent" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stop-color="#147cff"/>
             <stop offset="100%" stop-color="#0752c9"/>
         </linearGradient>
     </defs>
 
-    <!-- Background -->
     <rect width="1600" height="100" fill="url(#base)"/>
-
-    <!-- Left geometric accent -->
-    <polygon
-        points="0,0 155,0 80,100 0,100"
-        fill="url(#blueAccent)"
-        opacity=".95"
-    />
-
-    <polygon
-        points="55,0 185,0 110,100 25,100"
-        fill="#0a5fd8"
-        opacity=".55"
-    />
-
-    <!-- Left thin diagonal -->
-    <polygon
-        points="145,0 175,0 100,100 72,100"
-        fill="#38a0ff"
-        opacity=".25"
-    />
-
-    <!-- Subtle center geometric line -->
-    <polygon
-        points="650,0 660,0 585,100 575,100"
-        fill="#2386f5"
-        opacity=".10"
-    />
-
-    <!-- Right geometric accent -->
-    <polygon
-        points="1510,0 1600,0 1600,100 1435,100"
-        fill="#0d58c7"
-        opacity=".55"
-    />
-
-    <polygon
-        points="1560,0 1600,0 1600,100 1490,100"
-        fill="url(#blueAccent)"
-        opacity=".95"
-    />
-
-    <polygon
-        points="1525,0 1555,0 1480,100 1450,100"
-        fill="#49a5ff"
-        opacity=".35"
-    />
-
-    <!-- Thin geometric lines -->
-    <line
-        x1="0"
-        y1="99"
-        x2="1600"
-        y2="99"
-        stroke="#4da5ff"
-        stroke-opacity=".45"
-        stroke-width="1"
-    />
-
-    <line
-        x1="160"
-        y1="0"
-        x2="85"
-        y2="100"
-        stroke="#56aeff"
-        stroke-opacity=".25"
-        stroke-width="1"
-    />
-
-    <line
-        x1="1515"
-        y1="0"
-        x2="1440"
-        y2="100"
-        stroke="#56aeff"
-        stroke-opacity=".25"
-        stroke-width="1"
-    />
+    <polygon points="0,0 155,0 80,100 0,100" fill="url(#blueAccent)" opacity=".95"/>
+    <polygon points="55,0 185,0 110,100 25,100" fill="#0a5fd8" opacity=".55"/>
+    <polygon points="145,0 175,0 100,100 72,100" fill="#38a0ff" opacity=".25"/>
+    <polygon points="650,0 660,0 585,100 575,100" fill="#2386f5" opacity=".10"/>
+    <polygon points="1510,0 1600,0 1600,100 1435,100" fill="#0d58c7" opacity=".55"/>
+    <polygon points="1560,0 1600,0 1600,100 1490,100" fill="url(#blueAccent)" opacity=".95"/>
+    <polygon points="1525,0 1555,0 1480,100 1450,100" fill="#49a5ff" opacity=".35"/>
+    <line x1="0" y1="99" x2="1600" y2="99" stroke="#4da5ff" stroke-opacity=".45" stroke-width="1"/>
+    <line x1="160" y1="0" x2="85" y2="100" stroke="#56aeff" stroke-opacity=".25" stroke-width="1"/>
+    <line x1="1515" y1="0" x2="1440" y2="100" stroke="#56aeff" stroke-opacity=".25" stroke-width="1"/>
 </svg>
 `;
 
@@ -114,8 +39,6 @@ export default function Tabel({
     onSelectAll,
     onSelectRow,
     onEditRow,
-    onCancelRow,
-    mainTab = 'MASUK',
     getItemId = (item) => item.id,
     getRowNumber,
     emptyMessage = 'Tidak ada data ditemukan.',
@@ -146,8 +69,7 @@ export default function Tabel({
                             backgroundRepeat: 'no-repeat',
                         }}
                     >
-                        {/* KOLOM AKSI / CHECKBOX */}
-                        {(onSelectAll || onSelectRow || onEditRow || onCancelRow) && (
+                        {(onSelectAll || onSelectRow || onEditRow) && (
                             <th className="py-3 px-3 w-16 text-center">
                                 <div className="flex items-center justify-center gap-1.5">
                                     {onSelectAll && (
@@ -169,14 +91,12 @@ export default function Tabel({
                             </th>
                         )}
 
-                        {/* NO URUT */}
                         {getRowNumber && (
                             <th className="py-3 px-3 w-12 text-center">
                                 No
                             </th>
                         )}
 
-                        {/* DAFTAR KOLOM */}
                         {columns.map((col) => (
                             <th
                                 key={col.key}
@@ -194,7 +114,7 @@ export default function Tabel({
                             <td
                                 colSpan={
                                     columns.length +
-                                    (onSelectAll || onSelectRow || onEditRow || onCancelRow ? 1 : 0) +
+                                    (onSelectAll || onSelectRow || onEditRow ? 1 : 0) +
                                     (getRowNumber ? 1 : 0)
                                 }
                                 className="py-10 text-center text-xs text-slate-400"
@@ -207,7 +127,6 @@ export default function Tabel({
                             const id = getItemId(item);
                             const isSelected = selectedIds.includes(id);
                             const isCancelled = item.status === 'CANCELLED';
-                            const showCancelOption = (mainTab === 'KELUAR' || mainTab === 'TRANSFER') && !isCancelled;
 
                             return (
                                 <tr
@@ -220,7 +139,7 @@ export default function Tabel({
                                             : ''
                                     }`}
                                 >
-                                    {(onSelectAll || onSelectRow || onEditRow || onCancelRow) && (
+                                    {(onSelectAll || onSelectRow || onEditRow) && (
                                         <td className="py-2.5 px-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 {onSelectRow && (
@@ -232,44 +151,16 @@ export default function Tabel({
                                                     />
                                                 )}
 
-                                                {(onEditRow || onCancelRow) && (
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <button
-                                                                type="button"
-                                                                className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                                                                title="Menu Aksi"
-                                                            >
-                                                                <MoreHorizontal className="w-4 h-4" />
-                                                            </button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="start" className="w-40 z-50">
-                                                            {onEditRow && (
-                                                                <DropdownMenuItem
-                                                                    onClick={() => onEditRow(item)}
-                                                                    disabled={isCancelled}
-                                                                    className="cursor-pointer"
-                                                                >
-                                                                    <Pencil className="mr-2 h-3.5 w-3.5 text-blue-500" />
-                                                                    <span>Edit Data</span>
-                                                                </DropdownMenuItem>
-                                                            )}
-
-                                                            {onCancelRow && showCancelOption && (
-                                                                <DropdownMenuItem
-                                                                    onClick={() => {
-                                                                        if (confirm(`Apakah Anda yakin ingin membatalkan transaksi ${item.no_transaksi}? Stok barang akan dikembalikan otomatis.`)) {
-                                                                            onCancelRow(item);
-                                                                        }
-                                                                    }}
-                                                                    className="cursor-pointer text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/50 font-medium"
-                                                                >
-                                                                    <RotateCcw className="mr-2 h-3.5 w-3.5 text-rose-600" />
-                                                                    <span>Batalkan</span>
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
+                                                {onEditRow && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onEditRow(item)}
+                                                        disabled={isCancelled}
+                                                        className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        title="Edit Data"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
                                                 )}
                                             </div>
                                         </td>
@@ -284,7 +175,9 @@ export default function Tabel({
                                     {columns.map((col) => (
                                         <td
                                             key={col.key}
-                                            className={`py-2.5 px-3 whitespace-nowrap ${col.cellClassName || ''} ${isCancelled ? 'line-through text-slate-400' : ''}`}
+                                            className={`py-2.5 px-3 whitespace-nowrap ${col.cellClassName || ''} ${
+                                                isCancelled ? 'line-through text-slate-400' : ''
+                                            }`}
                                         >
                                             {col.render
                                                 ? col.render(item, index)

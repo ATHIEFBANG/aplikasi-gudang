@@ -310,7 +310,6 @@ class TransaksiController extends Controller
 
     public function index(Request $request): Response
     {
-        // Jangan rebuild stok di setiap GET /transaksi.
         $jenis = $request->input('jenis_transaksi', 'MASUK');
         $gudangId = $request->input('gudang_id');
         $search = $request->input('search');
@@ -329,6 +328,11 @@ class TransaksiController extends Controller
             'details.barang:id,kode_barang,nama_barang,brand,tipe,kategori,part_number,deskripsi,is_wajib_sn,is_wajib_pn',
             'details.serials',
         ])->orderBy('tanggal', $order)->orderBy('id', $order);
+
+        $query->where(function ($q) {
+            $q->whereNull('status')
+                ->orWhereIn('status', ['COMPLETED', 'completed']);
+        });
 
         if ($jenis === 'TRANSFER') {
             $query->where(function ($q) {
@@ -383,8 +387,7 @@ class TransaksiController extends Controller
             });
         }
 
-        [$kondisiByGudang, $stokNetMap, $kondisiByBarangGudang] =
-            $this->calculateKondisiAndStokNet();
+        [$kondisiByGudang, $stokNetMap, $kondisiByBarangGudang] = $this->calculateKondisiAndStokNet();
 
         $stokAllRaw = Stok::select('gudang_id', DB::raw('SUM(jumlah) as total_qty'))
             ->groupBy('gudang_id')
@@ -498,13 +501,10 @@ class TransaksiController extends Controller
                     $gudangId = $td->transaksi?->gudang_tujuan_id;
                     $sisaQty = $b->is_wajib_sn
                         ? (int) $td->qty
-                        : max(
-                            0,
-                            min(
-                                (int) $td->qty,
-                                $stokNetMap[$b->id][$gudangId] ?? 0
-                            )
-                        );
+                        : max(0, min(
+                            (int) $td->qty,
+                            $stokNetMap[$b->id][$gudangId] ?? 0
+                        ));
 
                     return [
                         'id' => $td->id,
@@ -665,6 +665,11 @@ class TransaksiController extends Controller
             'details.serials',
         ])->orderBy('tanggal', $order);
 
+        $query->where(function ($q) {
+            $q->whereNull('status')
+                ->orWhereIn('status', ['COMPLETED', 'completed']);
+        });
+
         if ($jenis === 'TRANSFER') {
             $query->where(function ($q) {
                 $q->where('jenis_transaksi', 'TRANSFER')
@@ -739,6 +744,7 @@ class TransaksiController extends Controller
             foreach ($transaksis as $t) {
                 $detail = $t->details->first();
                 $barang = $detail?->barang;
+
                 $snList = $detail
                     ? $detail->serials
                         ->map(fn($s) => "{$s->serial_number} ({$s->kondisi})")

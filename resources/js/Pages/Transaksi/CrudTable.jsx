@@ -29,7 +29,6 @@ export default function CrudTable({
     onSelectAll,
     onSelectRow,
     onEditRow,
-    onCancelRow,
     getRowNumber,
     zoomLevel = 100,
     mainTab = 'MASUK'
@@ -151,6 +150,7 @@ export default function CrudTable({
                                 <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
                                     {brandNama}
                                 </span>
+
                                 {subDeskripsi && (
                                     <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate mt-0.5">
                                         {subDeskripsi}
@@ -166,6 +166,7 @@ export default function CrudTable({
                             barang.is_wajib_pn === 1 ||
                             barang.is_wajib_pn === '1'
                         );
+
                         const pnValue = isPn ? (barang.part_number || '-') : '-';
 
                         return (
@@ -236,7 +237,10 @@ export default function CrudTable({
                         }
 
                         return (
-                            <Badge variant="outline" className={`${badgeStyle} text-[10px] font-bold px-2 py-0.5 rounded-md`}>
+                            <Badge
+                                variant="outline"
+                                className={`${badgeStyle} text-[10px] font-bold px-2 py-0.5 rounded-md`}
+                            >
                                 {displayKondisi}
                             </Badge>
                         );
@@ -291,7 +295,6 @@ export default function CrudTable({
                     case 'serials': {
                         const detailSerials = Array.isArray(detail.serials) ? detail.serials : [];
                         const itemSerials = Array.isArray(item.serials) ? item.serials : [];
-
                         const mergedSerials = [...detailSerials, ...itemSerials];
                         const seenSerials = new Set();
 
@@ -348,6 +351,7 @@ export default function CrudTable({
                                                 className="text-[10px] font-mono text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 px-1.5 py-0.5 shrink-0 flex items-center gap-1"
                                             >
                                                 <span>{snVal}</span>
+
                                                 {kondisiText && (
                                                     <span className={`text-[8px] px-1 py-0.2 rounded font-sans font-bold uppercase ${badgeColor}`}>
                                                         {kondisiText}
@@ -385,7 +389,11 @@ export default function CrudTable({
                             );
                         }
 
-                        return <span className="text-slate-400 font-mono text-xs">-</span>;
+                        return (
+                            <span className="text-slate-400 font-mono text-xs">
+                                -
+                            </span>
+                        );
                     }
 
                     default:
@@ -403,7 +411,6 @@ export default function CrudTable({
             onSelectAll={onSelectAll}
             onSelectRow={onSelectRow}
             onEditRow={onEditRow}
-            onCancelRow={onCancelRow}
             getItemId={getItemId}
             getRowNumber={getRowNumber}
             zoomLevel={zoomLevel}

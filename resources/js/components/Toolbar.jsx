@@ -15,6 +15,7 @@ export default function Toolbar({
     onToggleSort,
     selectedCount = 0,
     onDeleteSelected,
+    onCancelSelected,
     onReset,
     onExport,
     isProcessing = false,
@@ -27,14 +28,11 @@ export default function Toolbar({
 }) {
     return (
         <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-3">
-            {/* SISI KIRI: TAB / BADGE STATUS */}
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 {leftContent}
             </div>
 
-            {/* SISI KANAN: KONTROL ZOOM + AKSI TABEL */}
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-                {/* 1. KONTROL ZOOM TABEL */}
                 {onZoomIn && onZoomOut && (
                     <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                         <Button
@@ -85,7 +83,6 @@ export default function Toolbar({
                     </div>
                 )}
 
-                {/* 2. HAPUS DATA TERPILIH (BULK DELETE) */}
                 {selectedCount > 0 && onDeleteSelected && (
                     <Button
                         type="button"
@@ -96,11 +93,24 @@ export default function Toolbar({
                         className="h-8 text-xs gap-1.5 shadow-xs cursor-pointer animate-in fade-in zoom-in-95"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span>Hapus ({selectedCount})</span>
+                        <span>({selectedCount})</span>
                     </Button>
                 )}
 
-                {/* 3. SORTING ASC / DESC */}
+                {selectedCount > 0 && onCancelSelected && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onCancelSelected}
+                        disabled={isProcessing}
+                        className="h-8 text-xs gap-1.5 border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer animate-in fade-in zoom-in-95"
+                    >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>({selectedCount})</span>
+                    </Button>
+                )}
+
                 {onToggleSort && (
                     <Button
                         type="button"
@@ -115,7 +125,6 @@ export default function Toolbar({
                     </Button>
                 )}
 
-                {/* 4. RESET DATA */}
                 {onReset && (
                     <Button
                         type="button"
@@ -130,7 +139,6 @@ export default function Toolbar({
                     </Button>
                 )}
 
-                {/* 5. EXPORT CSV */}
                 {onExport && (
                     <Button
                         type="button"

@@ -37,7 +37,13 @@ export default function TabTransaksi({
     const isAdmin = userRole === 'admin';
     const confirm = useConfirm();
 
-    const [toast, setToast] = useState({ isOpen: false, type: 'info', title: '', message: '' });
+    const [toast, setToast] = useState({
+        isOpen: false,
+        type: 'info',
+        title: '',
+        message: ''
+    });
+
     const [mainTab, setMainTab] = useState(filters?.jenis_transaksi || 'MASUK');
     const [gudangId, setGudangId] = useState(filters?.gudang_id || 'ALL');
     const [startDate, setStartDate] = useState(filters?.start_date || '');
@@ -65,14 +71,27 @@ export default function TabTransaksi({
 
     const gudangFilterOptions = useMemo(() => [
         { value: 'ALL', label: 'Semua Gudang' },
-        ...gudangs.map(g => ({ value: String(g.id), label: g.nama_gudang }))
+        ...gudangs.map(g => ({
+            value: String(g.id),
+            label: g.nama_gudang
+        }))
     ], [gudangs]);
 
     useEffect(() => {
         if (flash?.error) {
-            setToast({ isOpen: true, type: 'error', title: 'Gagal Menyimpan', message: flash.error });
+            setToast({
+                isOpen: true,
+                type: 'error',
+                title: 'Gagal Menyimpan',
+                message: flash.error
+            });
         } else if (flash?.success) {
-            setToast({ isOpen: true, type: 'success', title: 'Berhasil', message: flash.success });
+            setToast({
+                isOpen: true,
+                type: 'success',
+                title: 'Berhasil',
+                message: flash.success
+            });
         }
     }, [flash]);
 
@@ -85,7 +104,16 @@ export default function TabTransaksi({
         }
 
         const timer = setTimeout(() => {
-            fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, perPage, 1, startDate, endDate);
+            fetchFilteredData(
+                mainTab,
+                gudangId,
+                searchTerm,
+                sortOrder,
+                perPage,
+                1,
+                startDate,
+                endDate
+            );
         }, 400);
 
         return () => clearTimeout(timer);
@@ -124,34 +152,82 @@ export default function TabTransaksi({
 
     const handleMainTabChange = tab => {
         setMainTab(tab);
-        fetchFilteredData(tab, gudangId, searchTerm, sortOrder, perPage, 1, startDate, endDate);
+        fetchFilteredData(
+            tab,
+            gudangId,
+            searchTerm,
+            sortOrder,
+            perPage,
+            1,
+            startDate,
+            endDate
+        );
     };
 
     const handleGudangFilterChange = val => {
         setGudangId(val);
-        fetchFilteredData(mainTab, val, searchTerm, sortOrder, perPage, 1, startDate, endDate);
+        fetchFilteredData(
+            mainTab,
+            val,
+            searchTerm,
+            sortOrder,
+            perPage,
+            1,
+            startDate,
+            endDate
+        );
     };
 
     const handleDateApply = (start, end) => {
         setStartDate(start);
         setEndDate(end);
-        fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, perPage, 1, start, end);
+        fetchFilteredData(
+            mainTab,
+            gudangId,
+            searchTerm,
+            sortOrder,
+            perPage,
+            1,
+            start,
+            end
+        );
     };
 
     const handleDateReset = () => {
         setStartDate('');
         setEndDate('');
-        fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, perPage, 1, '', '');
+        fetchFilteredData(
+            mainTab,
+            gudangId,
+            searchTerm,
+            sortOrder,
+            perPage,
+            1,
+            '',
+            ''
+        );
     };
 
     const toggleSort = () => {
         const nextOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+
         setSortOrder(nextOrder);
-        fetchFilteredData(mainTab, gudangId, searchTerm, nextOrder, perPage, 1, startDate, endDate);
+
+        fetchFilteredData(
+            mainTab,
+            gudangId,
+            searchTerm,
+            nextOrder,
+            perPage,
+            1,
+            startDate,
+            endDate
+        );
     };
 
     const handlePerPageSubmit = () => {
         let val = parseInt(perPageInput, 10);
+
         if (isNaN(val) || val < 1) val = 10;
         else if (val > 100) val = 100;
 
@@ -159,13 +235,26 @@ export default function TabTransaksi({
 
         if (val !== perPage) {
             setPerPage(val);
-            fetchFilteredData(mainTab, gudangId, searchTerm, sortOrder, val, 1, startDate, endDate);
+
+            fetchFilteredData(
+                mainTab,
+                gudangId,
+                searchTerm,
+                sortOrder,
+                val,
+                1,
+                startDate,
+                endDate
+            );
         }
     };
 
     const handleSelectAll = checked => {
         if (checked) {
-            const allIds = dataList.map(item => item.id).filter(Boolean);
+            const allIds = dataList
+                .map(item => item.id)
+                .filter(Boolean);
+
             setSelectedIds(allIds);
         } else {
             setSelectedIds([]);
@@ -174,15 +263,28 @@ export default function TabTransaksi({
 
     const handleSelectRow = id => {
         setSelectedIds(prev =>
-            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+            prev.includes(id)
+                ? prev.filter(item => item !== id)
+                : [...prev, id]
         );
     };
 
     const handleExport = () => {
-        const gudangParam = gudangId !== 'ALL' ? `&gudang_id=${gudangId}` : '';
-        const startParam = startDate ? `&start_date=${startDate}` : '';
-        const endParam = endDate ? `&end_date=${endDate}` : '';
-        const exportUrl = `/transaksi/export?jenis_transaksi=${mainTab}&order=${sortOrder}${gudangParam}${startParam}${endParam}`;
+        const gudangParam = gudangId !== 'ALL'
+            ? `&gudang_id=${gudangId}`
+            : '';
+
+        const startParam = startDate
+            ? `&start_date=${startDate}`
+            : '';
+
+        const endParam = endDate
+            ? `&end_date=${endDate}`
+            : '';
+
+        const exportUrl =
+            `/transaksi/export?jenis_transaksi=${mainTab}&order=${sortOrder}${gudangParam}${startParam}${endParam}`;
+
         window.open(exportUrl, '_blank');
     };
 
@@ -196,12 +298,79 @@ export default function TabTransaksi({
             confirmText: 'Ya, Hapus',
             cancelText: 'Batal',
             onConfirm: () => {
-                router.post('/transaksi/bulk-delete', { ids: selectedIds }, {
+                router.post('/transaksi/bulk-delete', {
+                    ids: selectedIds
+                }, {
                     preserveScroll: true,
                     only: TRANSAKSI_PROPS,
                     onStart: () => setIsProcessing(true),
                     onSuccess: () => setSelectedIds([]),
                     onFinish: () => setIsProcessing(false)
+                });
+            }
+        });
+    };
+
+    const handleCancelSelected = () => {
+        if (
+            !canWrite ||
+            selectedIds.length === 0 ||
+            !['KELUAR', 'TRANSFER'].includes(mainTab)
+        ) {
+            return;
+        }
+
+        const selectedItems = dataList.filter(
+            item =>
+                selectedIds.includes(item.id) &&
+                item.status !== 'CANCELLED'
+        );
+
+        if (selectedItems.length === 0) return;
+
+        confirm({
+            title: 'Batalkan Transaksi',
+            message: `Apakah Anda yakin ingin membatalkan ${selectedItems.length} transaksi terpilih? Stok barang akan dikembalikan otomatis.`,
+            variant: 'danger',
+            confirmText: 'Ya, Batalkan',
+            cancelText: 'Batal',
+            onConfirm: async () => {
+                setIsProcessing(true);
+
+                let successCount = 0;
+
+                for (const item of selectedItems) {
+                    const url = mainTab === 'TRANSFER'
+                        ? `/transaksi-transfer/${item.id}/cancel`
+                        : `/transaksi-keluar/${item.id}/cancel`;
+
+                    await new Promise(resolve => {
+                        router.post(url, {}, {
+                            preserveScroll: true,
+                            only: TRANSAKSI_PROPS,
+                            onSuccess: page => {
+                                if (!page.props.flash?.error) {
+                                    successCount++;
+                                }
+                            },
+                            onError: () => {},
+                            onFinish: resolve
+                        });
+                    });
+                }
+
+                setSelectedIds([]);
+                setIsProcessing(false);
+
+                setToast({
+                    isOpen: true,
+                    type: successCount > 0 ? 'success' : 'error',
+                    title: successCount > 0
+                        ? 'Transaksi Dibatalkan'
+                        : 'Gagal Membatalkan',
+                    message: successCount > 0
+                        ? `${successCount} transaksi berhasil dibatalkan dan stok dikembalikan.`
+                        : 'Tidak ada transaksi yang berhasil dibatalkan.'
                 });
             }
         });
@@ -247,56 +416,14 @@ export default function TabTransaksi({
 
         if (item.jenis_transaksi === 'KELUAR') {
             setIsModalKeluarOpen(true);
-        } else if (item.jenis_transaksi === 'TRANSFER' || item.sub_jenis === 'TRANSFER_GUDANG') {
+        } else if (
+            item.jenis_transaksi === 'TRANSFER' ||
+            item.sub_jenis === 'TRANSFER_GUDANG'
+        ) {
             setIsModalTransferOpen(true);
         } else {
             setIsModalMasukOpen(true);
         }
-    };
-
-    const handleCancelTransaction = item => {
-        if (!canWrite) return;
-
-        confirm({
-            title: 'Batalkan Transaksi',
-            message: `Apakah Anda yakin ingin membatalkan transaksi #${item.no_transaksi}? Stok barang akan dikembalikan otomatis ke gudang asal.`,
-            variant: 'danger',
-            confirmText: 'Ya, Batalkan Transaksi',
-            cancelText: 'Batal',
-            onConfirm: () => {
-                const url = mainTab === 'TRANSFER'
-                    ? `/transaksi-transfer/${item.id}/cancel`
-                    : `/transaksi-keluar/${item.id}/cancel`;
-
-                router.post(url, {}, {
-                    preserveScroll: true,
-                    only: TRANSAKSI_PROPS,
-                    onStart: () => setIsProcessing(true),
-                    onSuccess: page => {
-                        setIsProcessing(false);
-
-                        if (!page.props.flash?.error) {
-                            setToast({
-                                isOpen: true,
-                                type: 'success',
-                                title: 'Transaksi Dibatalkan',
-                                message: `Transaksi ${item.no_transaksi} berhasil dibatalkan dan stok dikembalikan.`
-                            });
-                        }
-                    },
-                    onError: err => {
-                        setIsProcessing(false);
-                        setToast({
-                            isOpen: true,
-                            type: 'error',
-                            title: 'Gagal Membatalkan',
-                            message: err?.message || 'Terjadi kesalahan saat membatalkan transaksi.'
-                        });
-                    },
-                    onFinish: () => setIsProcessing(false)
-                });
-            }
-        });
     };
 
     const getRowNumber = index => {
@@ -304,6 +431,7 @@ export default function TabTransaksi({
 
         const currentPage = transaksis.current_page || 1;
         const limit = transaksis.per_page || 10;
+
         return (currentPage - 1) * limit + index + 1;
     };
 
@@ -320,6 +448,11 @@ export default function TabTransaksi({
                 onToggleSort={toggleSort}
                 selectedCount={selectedIds.length}
                 onDeleteSelected={isAdmin ? handleDeleteSelected : undefined}
+                onCancelSelected={
+                    canWrite && ['KELUAR', 'TRANSFER'].includes(mainTab)
+                        ? handleCancelSelected
+                        : undefined
+                }
                 onReset={isAdmin ? handleReset : undefined}
                 onExport={handleExport}
                 isProcessing={isProcessing}
@@ -400,6 +533,7 @@ export default function TabTransaksi({
 
                     <div className="relative w-full sm:w-48">
                         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+
                         <Input
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
@@ -433,6 +567,7 @@ export default function TabTransaksi({
                             }`}
                         >
                             <Plus className="w-3.5 h-3.5" />
+
                             <span>
                                 {mainTab === 'MASUK'
                                     ? 'Tambah Data Masuk'
@@ -452,7 +587,6 @@ export default function TabTransaksi({
                     onSelectAll={handleSelectAll}
                     onSelectRow={handleSelectRow}
                     onEditRow={canWrite ? handleOpenEdit : undefined}
-                    onCancelRow={canWrite ? handleCancelTransaction : undefined}
                     getRowNumber={getRowNumber}
                     zoomLevel={zoomLevel}
                     mainTab={mainTab}
@@ -463,6 +597,7 @@ export default function TabTransaksi({
                 <div className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="flex items-center gap-2">
                         <span>Tampilkan</span>
+
                         <Input
                             type="number"
                             min={1}
@@ -471,8 +606,12 @@ export default function TabTransaksi({
                             disabled={isProcessing}
                             onChange={e => {
                                 const val = e.target.value;
-                                if (val !== '' && Number(val) > 100) setPerPageInput(100);
-                                else setPerPageInput(val);
+
+                                if (val !== '' && Number(val) > 100) {
+                                    setPerPageInput(100);
+                                } else {
+                                    setPerPageInput(val);
+                                }
                             }}
                             onBlur={handlePerPageSubmit}
                             onKeyDown={e => {
@@ -483,11 +622,24 @@ export default function TabTransaksi({
                             }}
                             className="h-8 w-16 text-center text-xs font-bold bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
+
                         <span>data per halaman</span>
                     </div>
 
                     <div className="text-slate-500">
-                        Menampilkan <span className="font-semibold text-slate-700 dark:text-slate-300">{transaksis.from || 0}</span> - <span className="font-semibold text-slate-700 dark:text-slate-300">{transaksis.to || 0}</span> dari <span className="font-semibold text-slate-700 dark:text-slate-300">{transaksis.total || 0}</span> data
+                        Menampilkan{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {transaksis.from || 0}
+                        </span>{' '}
+                        -{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {transaksis.to || 0}
+                        </span>{' '}
+                        dari{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {transaksis.total || 0}
+                        </span>{' '}
+                        data
                     </div>
 
                     <div className="flex items-center gap-1">
