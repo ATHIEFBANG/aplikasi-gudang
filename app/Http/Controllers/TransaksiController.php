@@ -254,8 +254,10 @@ class TransaksiController extends Controller
                 $gId = (int) $d->gudang_tujuan_id;
                 $ensureMap($kondisiByBarangGudang, $bId, $gId);
 
+                $kondisiByGudang[$gId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
                 foreach ($conditionQty as $key => $jumlah) {
                     $kondisiByBarangGudang[$bId][$gId][$key] += $jumlah;
+                    $kondisiByGudang[$gId][$key] += $jumlah;
                 }
 
                 $stokNetMap[$bId][$gId] = ($stokNetMap[$bId][$gId] ?? 0) + $qty;
@@ -263,41 +265,47 @@ class TransaksiController extends Controller
                 $gId = (int) $d->gudang_asal_id;
                 $ensureMap($kondisiByBarangGudang, $bId, $gId);
 
+                $kondisiByGudang[$gId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
                 foreach ($conditionQty as $key => $jumlah) {
                     $kondisiByBarangGudang[$bId][$gId][$key] = max(
                         0,
                         $kondisiByBarangGudang[$bId][$gId][$key] - $jumlah
                     );
+                    $kondisiByGudang[$gId][$key] = max(
+                        0,
+                        $kondisiByGudang[$gId][$key] - $jumlah
+                    );
                 }
 
-                $stokNetMap[$bId][$gId] = max(
-                    0,
-                    ($stokNetMap[$bId][$gId] ?? 0) - $qty
-                );
+                $stokNetMap[$bId][$gId] = max(0, ($stokNetMap[$bId][$gId] ?? 0) - $qty);
             } elseif ($d->jenis_transaksi === 'TRANSFER' || $d->sub_jenis === 'TRANSFER_GUDANG') {
                 if ($d->gudang_asal_id) {
                     $gId = (int) $d->gudang_asal_id;
                     $ensureMap($kondisiByBarangGudang, $bId, $gId);
 
+                    $kondisiByGudang[$gId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
                     foreach ($conditionQty as $key => $jumlah) {
                         $kondisiByBarangGudang[$bId][$gId][$key] = max(
                             0,
                             $kondisiByBarangGudang[$bId][$gId][$key] - $jumlah
                         );
+                        $kondisiByGudang[$gId][$key] = max(
+                            0,
+                            $kondisiByGudang[$gId][$key] - $jumlah
+                        );
                     }
 
-                    $stokNetMap[$bId][$gId] = max(
-                        0,
-                        ($stokNetMap[$bId][$gId] ?? 0) - $qty
-                    );
+                    $stokNetMap[$bId][$gId] = max(0, ($stokNetMap[$bId][$gId] ?? 0) - $qty);
                 }
 
                 if ($d->gudang_tujuan_id) {
                     $gId = (int) $d->gudang_tujuan_id;
                     $ensureMap($kondisiByBarangGudang, $bId, $gId);
 
+                    $kondisiByGudang[$gId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
                     foreach ($conditionQty as $key => $jumlah) {
                         $kondisiByBarangGudang[$bId][$gId][$key] += $jumlah;
+                        $kondisiByGudang[$gId][$key] += $jumlah;
                     }
 
                     $stokNetMap[$bId][$gId] = ($stokNetMap[$bId][$gId] ?? 0) + $qty;
