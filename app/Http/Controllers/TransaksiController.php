@@ -11,7 +11,6 @@ use App\Models\Supplier;
 use App\Models\Transaksi;
 use App\Models\TransaksiDetail;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,109 +20,113 @@ class TransaksiController extends Controller
 {
     private function syncStokAndSerials(): void
     {
-        $inboundDetailIds = TransaksiDetail::whereHas('transaksi', function ($q) {
-            $q->where('jenis_transaksi', 'MASUK')
-                ->where(function ($sq) {
-                    $sq->whereIn('status', ['COMPLETED', 'completed'])
-                        ->orWhereNull('status');
-                });
-        })->pluck('id')->toArray();
+        DB::transaction(function () {
+            $inboundDetailIds = TransaksiDetail::whereHas('transaksi', function ($q) {
+                $q->where('jenis_transaksi', 'MASUK')
+                    ->where(function ($sq) {
+                        $sq->whereIn('status', ['COMPLETED', 'completed'])
+                            ->orWhereNull('status');
+                    });
+            })->pluck('id')->toArray();
 
-        if (!empty($inboundDetailIds)) {
-            $validSerialIds = DB::table('transaksi_detail_serials')
-                ->whereIn('transaksi_detail_id', $inboundDetailIds)
-                ->pluck('barang_serial_id')
-                ->filter()
-                ->unique()
-                ->toArray();
+            if (!empty($inboundDetailIds)) {
+                $validSerialIds = DB::table('transaksi_detail_serials')
+                    ->whereIn('transaksi_detail_id', $inboundDetailIds)
+                    ->pluck('barang_serial_id')
+                    ->filter()
+                    ->unique()
+                    ->toArray();
 
-            if (!empty($validSerialIds)) {
-                BarangSerial::whereNotIn('id', $validSerialIds)->delete();
+                if (!empty($validSerialIds)) {
+                    BarangSerial::whereNotIn('id', $validSerialIds)->delete();
+                } else {
+                    BarangSerial::query()->delete();
+                }
             } else {
                 BarangSerial::query()->delete();
             }
-        } else {
-            BarangSerial::query()->delete();
-        }
 
-        Stok::query()->update(['jumlah' => 0]);
+            Stok::query()->update(['jumlah' => 0]);
 
-        $transaksis = Transaksi::with(['details.serials'])
-            ->where(function ($q) {
-                $q->whereIn('status', ['COMPLETED', 'completed'])
-                    ->orWhereNull('status');
-            })
-            ->orderBy('tanggal', 'asc')
-            ->orderByRaw("CASE
-                WHEN jenis_transaksi = 'MASUK' THEN 1
-                WHEN jenis_transaksi = 'TRANSFER' OR sub_jenis = 'TRANSFER_GUDANG' THEN 2
-                ELSE 3 END ASC")
-            ->orderBy('id', 'asc')
-            ->get();
+            $transaksis = Transaksi::with(['details.serials'])
+                ->where(function ($q) {
+                    $q->whereIn('status', ['COMPLETED', 'completed'])
+                        ->orWhereNull('status');
+                })
+                ->orderBy('tanggal', 'asc')
+                ->orderByRaw("CASE
+                    WHEN jenis_transaksi = 'MASUK' THEN 1
+                    WHEN jenis_transaksi = 'TRANSFER' OR sub_jenis = 'TRANSFER_GUDANG' THEN 2
+                    ELSE 3
+                END ASC")
+                ->orderBy('id', 'asc')
+                ->get();
 
-        $stokMap = [];
+            $stokMap = [];
 
-        foreach ($transaksis as $t) {
-            foreach ($t->details as $d) {
-                $bId = (int) $d->barang_id;
-                $qty = (int) $d->qty;
+            foreach ($transaksis as $t) {
+                foreach ($t->details as $d) {
+                    $bId = (int) $d->barang_id;
+                    $qty = (int) $d->qty;
 
-                if ($t->jenis_transaksi === 'MASUK' && $t->gudang_tujuan_id) {
-                    $gId = (int) $t->gudang_tujuan_id;
-                    $stokMap[$bId][$gId] = ($stokMap[$bId][$gId] ?? 0) + $qty;
-
-                    foreach ($d->serials as $s) {
-                        $s->update([
-                            'gudang_id' => $gId,
-                            'status' => 'IN_WAREHOUSE',
-                            'nomer_imc' => $t->nomor_imc ?? $s->nomer_imc,
-                        ]);
-                    }
-                } elseif ($t->jenis_transaksi === 'KELUAR' && $t->gudang_asal_id) {
-                    $gId = (int) $t->gudang_asal_id;
-                    $stokMap[$bId][$gId] = max(0, ($stokMap[$bId][$gId] ?? 0) - $qty);
-
-                    foreach ($d->serials as $s) {
-                        $s->update([
-                            'gudang_id' => null,
-                            'status' => 'IN_USE',
-                        ]);
-                    }
-                } elseif ($t->jenis_transaksi === 'TRANSFER' || $t->sub_jenis === 'TRANSFER_GUDANG') {
-                    if ($t->gudang_asal_id) {
-                        $gIdAsal = (int) $t->gudang_asal_id;
-                        $stokMap[$bId][$gIdAsal] = max(0, ($stokMap[$bId][$gIdAsal] ?? 0) - $qty);
-                    }
-
-                    if ($t->gudang_tujuan_id) {
-                        $gIdTujuan = (int) $t->gudang_tujuan_id;
-                        $stokMap[$bId][$gIdTujuan] = ($stokMap[$bId][$gIdTujuan] ?? 0) + $qty;
+                    if ($t->jenis_transaksi === 'MASUK' && $t->gudang_tujuan_id) {
+                        $gId = (int) $t->gudang_tujuan_id;
+                        $stokMap[$bId][$gId] = ($stokMap[$bId][$gId] ?? 0) + $qty;
 
                         foreach ($d->serials as $s) {
                             $s->update([
-                                'gudang_id' => $gIdTujuan,
+                                'gudang_id' => $gId,
                                 'status' => 'IN_WAREHOUSE',
+                                'nomer_imc' => $t->nomor_imc ?? $s->nomer_imc,
                             ]);
+                        }
+                    } elseif ($t->jenis_transaksi === 'KELUAR' && $t->gudang_asal_id) {
+                        $gId = (int) $t->gudang_asal_id;
+                        $stokMap[$bId][$gId] = max(0, ($stokMap[$bId][$gId] ?? 0) - $qty);
+
+                        foreach ($d->serials as $s) {
+                            $s->update([
+                                'gudang_id' => null,
+                                'status' => 'IN_USE',
+                            ]);
+                        }
+                    } elseif ($t->jenis_transaksi === 'TRANSFER' || $t->sub_jenis === 'TRANSFER_GUDANG') {
+                        if ($t->gudang_asal_id) {
+                            $gIdAsal = (int) $t->gudang_asal_id;
+                            $stokMap[$bId][$gIdAsal] = max(0, ($stokMap[$bId][$gIdAsal] ?? 0) - $qty);
+                        }
+
+                        if ($t->gudang_tujuan_id) {
+                            $gIdTujuan = (int) $t->gudang_tujuan_id;
+                            $stokMap[$bId][$gIdTujuan] = ($stokMap[$bId][$gIdTujuan] ?? 0) + $qty;
+
+                            foreach ($d->serials as $s) {
+                                $s->update([
+                                    'gudang_id' => $gIdTujuan,
+                                    'status' => 'IN_WAREHOUSE',
+                                ]);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        $upsertData = [];
-        foreach ($stokMap as $bId => $gudangs) {
-            foreach ($gudangs as $gId => $jumlah) {
-                $upsertData[] = [
-                    'barang_id' => $bId,
-                    'gudang_id' => $gId,
-                    'jumlah' => $jumlah,
-                ];
+            $upsertData = [];
+
+            foreach ($stokMap as $bId => $gudangs) {
+                foreach ($gudangs as $gId => $jumlah) {
+                    $upsertData[] = [
+                        'barang_id' => $bId,
+                        'gudang_id' => $gId,
+                        'jumlah' => $jumlah,
+                    ];
+                }
             }
-        }
 
-        if (!empty($upsertData)) {
-            Stok::upsert($upsertData, ['barang_id', 'gudang_id'], ['jumlah']);
-        }
+            if (!empty($upsertData)) {
+                Stok::upsert($upsertData, ['barang_id', 'gudang_id'], ['jumlah']);
+            }
+        });
     }
 
     private function calculateKondisiAndStokNet(): array
@@ -144,12 +147,8 @@ class TransaksiController extends Controller
             $k = strtoupper(trim((string) ($row->kondisi ?? 'BARU')));
             $total = (int) $row->total;
 
-            $kondisiByGudang[$gudangId] ??= [
-                'baru' => 0, 'bekas' => 0, 'rusak' => 0
-            ];
-            $kondisiByBarangGudang[$barangId][$gudangId] ??= [
-                'baru' => 0, 'bekas' => 0, 'rusak' => 0
-            ];
+            $kondisiByGudang[$gudangId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+            $kondisiByBarangGudang[$barangId][$gudangId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
 
             if (str_contains($k, 'RUSAK') || str_contains($k, 'DAMAGED')) {
                 $key = 'rusak';
@@ -177,7 +176,8 @@ class TransaksiController extends Controller
             ->orderByRaw("CASE
                 WHEN transaksis.jenis_transaksi = 'MASUK' THEN 1
                 WHEN transaksis.jenis_transaksi = 'TRANSFER' OR transaksis.sub_jenis = 'TRANSFER_GUDANG' THEN 2
-                ELSE 3 END ASC")
+                ELSE 3
+            END ASC")
             ->orderBy('transaksis.id', 'asc')
             ->select([
                 'transaksi_details.barang_id',
@@ -192,9 +192,7 @@ class TransaksiController extends Controller
             ->get();
 
         $ensureMap = function (&$map, $barangId, $gudangId) {
-            $map[$barangId][$gudangId] ??= [
-                'baru' => 0, 'bekas' => 0, 'rusak' => 0
-            ];
+            $map[$barangId][$gudangId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
         };
 
         $parseCondition = function ($raw, $qty) {
@@ -221,6 +219,7 @@ class TransaksiController extends Controller
                         $result['baru'] += $jumlah;
                     }
                 }
+
                 return $result;
             }
 
@@ -241,7 +240,6 @@ class TransaksiController extends Controller
             $bId = (int) $d->barang_id;
             $qty = (int) $d->qty;
 
-            // Barang SN mengikuti kondisi Serial Number aktif.
             if (!isset($nonSnBarangSet[$bId])) {
                 continue;
             }
@@ -312,8 +310,7 @@ class TransaksiController extends Controller
 
     public function index(Request $request): Response
     {
-        $this->syncStokAndSerials();
-
+        // Jangan rebuild stok di setiap GET /transaksi.
         $jenis = $request->input('jenis_transaksi', 'MASUK');
         $gudangId = $request->input('gudang_id');
         $search = $request->input('search');
@@ -396,11 +393,9 @@ class TransaksiController extends Controller
         $gudangList = Gudang::where('is_active', true)
             ->get(['id', 'nama_gudang', 'kode_gudang'])
             ->map(function ($g) use ($kondisiByGudang, $stokAllRaw) {
-                $kData = $kondisiByGudang[$g->id] ?? [
-                    'baru' => 0, 'bekas' => 0, 'rusak' => 0
-                ];
-
+                $kData = $kondisiByGudang[$g->id] ?? ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
                 $totalStokFisik = (int) ($stokAllRaw[$g->id] ?? 0);
+
                 $g->stok_baru = max(0, $kData['baru']);
                 $g->stok_bekas = max(0, $kData['bekas']);
                 $g->stok_rusak = max(0, $kData['rusak']);
@@ -414,49 +409,36 @@ class TransaksiController extends Controller
         $barangList = Barang::select([
             'id', 'kode_barang', 'nama_barang', 'part_number',
             'brand', 'tipe', 'kategori', 'deskripsi',
-            'is_wajib_sn', 'is_wajib_pn'
+            'is_wajib_sn', 'is_wajib_pn',
         ])->with([
             'serials' => function ($q) {
                 $q->select([
                     'id', 'barang_id', 'gudang_id', 'serial_number',
-                    'kondisi', 'status', 'nomer_imc'
-                ])->whereIn(
-                    'status',
-                    ['IN_WAREHOUSE', 'READY', 'AVAILABLE']
-                );
+                    'kondisi', 'status', 'nomer_imc',
+                ])->whereIn('status', ['IN_WAREHOUSE', 'READY', 'AVAILABLE']);
             },
             'transaksiDetails' => function ($q) {
                 $q->select([
-                    'id', 'transaksi_id', 'barang_id', 'qty', 'kondisi'
+                    'id', 'transaksi_id', 'barang_id', 'qty', 'kondisi',
                 ])->with([
-                    'transaksi:id,no_transaksi,jenis_transaksi,sub_jenis,gudang_asal_id,gudang_tujuan_id,nomor_imc'
+                    'transaksi:id,no_transaksi,jenis_transaksi,sub_jenis,gudang_asal_id,gudang_tujuan_id,nomor_imc',
                 ]);
-            }
-        ])->get()->map(function ($b) use (
-            $stokNetMap,
-            $gudangList,
-            $kondisiByBarangGudang
-        ) {
-            $stoksFormatted = $gudangList->map(function ($g) use (
-                $b,
-                $stokNetMap,
-                $kondisiByBarangGudang
-            ) {
+            },
+        ])->get()->map(function ($b) use ($stokNetMap, $gudangList, $kondisiByBarangGudang) {
+            $stoksFormatted = $gudangList->map(function ($g) use ($b, $stokNetMap, $kondisiByBarangGudang) {
                 if ($b->is_wajib_sn) {
                     $jumlah = $b->serials
                         ->where('gudang_id', $g->id)
-                        ->filter(fn($s) =>
-                            !str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK')
-                        )->count();
+                        ->filter(fn($s) => !str_contains(strtoupper($s->kondisi ?? ''), 'RUSAK'))
+                        ->count();
                 } else {
-                    $jumlah = max(
-                        0,
-                        $stokNetMap[$b->id][$g->id] ?? 0
-                    );
+                    $jumlah = max(0, $stokNetMap[$b->id][$g->id] ?? 0);
                 }
 
                 $kData = $kondisiByBarangGudang[$b->id][$g->id] ?? [
-                    'baru' => 0, 'bekas' => 0, 'rusak' => 0
+                    'baru' => 0,
+                    'bekas' => 0,
+                    'rusak' => 0,
                 ];
 
                 return [
@@ -473,12 +455,11 @@ class TransaksiController extends Controller
                 ];
             })->values();
 
-            $kondisiStok = $gudangList->mapWithKeys(function ($g) use (
-                $b,
-                $kondisiByBarangGudang
-            ) {
+            $kondisiStok = $gudangList->mapWithKeys(function ($g) use ($b, $kondisiByBarangGudang) {
                 $data = $kondisiByBarangGudang[$b->id][$g->id] ?? [
-                    'baru' => 0, 'bekas' => 0, 'rusak' => 0
+                    'baru' => 0,
+                    'bekas' => 0,
+                    'rusak' => 0,
                 ];
 
                 return [
@@ -487,7 +468,7 @@ class TransaksiController extends Controller
                         'bekas' => (int) ($data['bekas'] ?? 0),
                         'rusak' => (int) ($data['rusak'] ?? 0),
                         'aktif' => (int) (($data['baru'] ?? 0) + ($data['bekas'] ?? 0)),
-                    ]
+                    ],
                 ];
             })->toArray();
 
@@ -589,10 +570,7 @@ class TransaksiController extends Controller
 
         $this->syncStokAndSerials();
 
-        return redirect()->back()->with(
-            'success',
-            'Transaksi berhasil dihapus.'
-        );
+        return redirect()->back()->with('success', 'Transaksi berhasil dihapus.');
     }
 
     public function bulkDelete(Request $request)
@@ -677,18 +655,14 @@ class TransaksiController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $rawOrder = strtolower(
-            (string) $request->input('order', 'desc')
-        );
-        $order = in_array($rawOrder, ['asc', 'desc'], true)
-            ? $rawOrder
-            : 'desc';
+        $rawOrder = strtolower((string) $request->input('order', 'desc'));
+        $order = in_array($rawOrder, ['asc', 'desc'], true) ? $rawOrder : 'desc';
 
         $query = Transaksi::with([
             'gudangAsal',
             'gudangTujuan',
             'details.barang',
-            'details.serials'
+            'details.serials',
         ])->orderBy('tanggal', $order);
 
         if ($jenis === 'TRANSFER') {
@@ -754,7 +728,7 @@ class TransaksiController extends Controller
             'Nama Customer',
             'Gudang Asal / Pihak Asal',
             'Gudang Tujuan / Site',
-            'Serial Numbers'
+            'Serial Numbers',
         ];
 
         $callback = function () use ($transaksis, $columns) {
@@ -787,12 +761,8 @@ class TransaksiController extends Controller
                     $barang?->deskripsi ?? 'Unit',
                     $t->tanggal ? date('Y-m-d', strtotime($t->tanggal)) : '-',
                     $detail?->qty ?? 0,
-                    $hargaSatuan > 0
-                        ? number_format($hargaSatuan, 0, ',', '.')
-                        : '-',
-                    $totalNilai > 0
-                        ? number_format($totalNilai, 0, ',', '.')
-                        : '-',
+                    $hargaSatuan > 0 ? number_format($hargaSatuan, 0, ',', '.') : '-',
+                    $totalNilai > 0 ? number_format($totalNilai, 0, ',', '.') : '-',
                     $t->kondisi ?? '-',
                     $t->nomor_imc ?? '-',
                     $t->nomor_omc ?? '-',
@@ -807,10 +777,6 @@ class TransaksiController extends Controller
             fclose($file);
         };
 
-        return response()->stream(
-            $callback,
-            200,
-            $headers
-        );
+        return response()->stream($callback, 200, $headers);
     }
 }
