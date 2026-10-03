@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import { Truck, Wrench } from 'lucide-react';
 
@@ -20,6 +20,8 @@ export const LIST_KEPERLUAN_PATEN = [
     'Gudang'
 ];
 
+const CUSTOMER_HISTORY_KEY = 'barang_keluar_customer_history';
+
 const isBooleanFlag = value =>
     value === true || value === 1 || value === '1' ||
     String(value).toLowerCase() === 'true';
@@ -29,9 +31,7 @@ const resolveGudangId = (gudangs, gudangIdOrName) => {
 
     const target = gudangs.find(g =>
         String(g.id) === String(gudangIdOrName) ||
-        (g.nama_gudang &&
-            g.nama_gudang.toLowerCase().trim() ===
-            String(gudangIdOrName).toLowerCase().trim())
+        (g.nama_gudang && g.nama_gudang.toLowerCase().trim() === String(gudangIdOrName).toLowerCase().trim())
     );
 
     return target ? String(target.id) : String(gudangIdOrName);
@@ -57,12 +57,9 @@ export function useModalBarangKeluarControl({
             return barang.serials.filter(s => {
                 if (!s || typeof s !== 'object') return false;
 
-                const sGudangId =
-                    s.gudang_id !== null &&
-                    s.gudang_id !== undefined &&
-                    String(s.gudang_id).trim() !== ''
-                        ? String(s.gudang_id)
-                        : null;
+                const sGudangId = s.gudang_id !== null && s.gudang_id !== undefined && String(s.gudang_id).trim() !== ''
+                    ? String(s.gudang_id)
+                    : null;
 
                 const status = String(s.status || '').toUpperCase().trim();
                 const kondisi = String(s.kondisi || '').toUpperCase().trim();
@@ -78,31 +75,21 @@ export function useModalBarangKeluarControl({
         const kondisiStok = barang.kondisi_stok?.[targetGudangId];
 
         if (kondisiStok) {
-            return Number(
-                kondisiStok.aktif ??
-                (Number(kondisiStok.baru || 0) + Number(kondisiStok.bekas || 0))
-            );
+            return Number(kondisiStok.aktif ?? (Number(kondisiStok.baru || 0) + Number(kondisiStok.bekas || 0)));
         }
 
         const stoksArray = barang.stoks || barang.stok || [];
 
         if (Array.isArray(stoksArray) && stoksArray.length > 0) {
-            const stokRec = stoksArray.find(
-                st => String(st.gudang_id || st.id || '') === targetGudangId
-            );
-
-            if (stokRec) {
-                return parseInt(stokRec.jumlah || stokRec.qty || 0, 10);
-            }
+            const stokRec = stoksArray.find(st => String(st.gudang_id || st.id || '') === targetGudangId);
+            if (stokRec) return parseInt(stokRec.jumlah || stokRec.qty || 0, 10);
         }
 
         return 0;
     }, [gudangs]);
 
     const getBarangKondisiStok = useCallback((barang, gudangIdOrName) => {
-        if (!barang || !gudangIdOrName) {
-            return { baru: 0, bekas: 0, rusak: 0, aktif: 0 };
-        }
+        if (!barang || !gudangIdOrName) return { baru: 0, bekas: 0, rusak: 0, aktif: 0 };
 
         const targetGudangId = resolveGudangId(gudangs, gudangIdOrName);
         const kondisiStok = barang.kondisi_stok?.[targetGudangId];
@@ -112,29 +99,16 @@ export function useModalBarangKeluarControl({
                 baru: Number(kondisiStok.baru || 0),
                 bekas: Number(kondisiStok.bekas || 0),
                 rusak: Number(kondisiStok.rusak || 0),
-                aktif: Number(
-                    kondisiStok.aktif ??
-                    (Number(kondisiStok.baru || 0) + Number(kondisiStok.bekas || 0))
-                )
+                aktif: Number(kondisiStok.aktif ?? (Number(kondisiStok.baru || 0) + Number(kondisiStok.bekas || 0)))
             };
         }
 
-        return {
-            baru: 0,
-            bekas: 0,
-            rusak: 0,
-            aktif: getBarangStockInWarehouse(barang, gudangIdOrName)
-        };
+        return { baru: 0, bekas: 0, rusak: 0, aktif: getBarangStockInWarehouse(barang, gudangIdOrName) };
     }, [gudangs, getBarangStockInWarehouse]);
 
     const createEmptyRow = useCallback(() => {
-        const gudangWithStock = gudangs.find(g =>
-            barangs.some(b => getBarangStockInWarehouse(b, g.id) > 0)
-        );
-
-        const defaultGudangId = gudangWithStock
-            ? String(gudangWithStock.id)
-            : (gudangs[0]?.id ? String(gudangs[0].id) : '');
+        const gudangWithStock = gudangs.find(g => barangs.some(b => getBarangStockInWarehouse(b, g.id) > 0));
+        const defaultGudangId = gudangWithStock ? String(gudangWithStock.id) : (gudangs[0]?.id ? String(gudangs[0].id) : '');
 
         return {
             sub_jenis: 'BARANG_KE_SITE',
@@ -155,6 +129,23 @@ export function useModalBarangKeluarControl({
     }, [gudangs, barangs, getBarangStockInWarehouse]);
 
     const [rows, setRows] = useState([createEmptyRow()]);
+
+    const [customerHistory, setCustomerHistory] = useState(() => {
+        if (typeof window === 'undefined') return [];
+
+        try {
+            const saved = localStorage.getItem(CUSTOMER_HISTORY_KEY);
+            const parsed = saved ? JSON.parse(saved) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    });
+
+    const customerOptions = useMemo(() => {
+        const values = [...customerHistory, ...rows.map(row => row.nama_customer).filter(Boolean)];
+        return [...new Set(values.map(value => String(value).trim()).filter(Boolean))].map(value => ({ value, label: value }));
+    }, [customerHistory, rows]);
 
     const gudangOptions = useMemo(() => {
         if (!isOpen) return [];
@@ -217,8 +208,7 @@ export function useModalBarangKeluarControl({
             .filter(b => getBarangStockInWarehouse(b, gudangId) > 0)
             .map(b => {
                 const stok = getBarangStockInWarehouse(b, gudangId);
-                const nama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') ||
-                    b.nama_barang || b.kode_barang;
+                const nama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
 
                 return {
                     value: nama,
@@ -228,9 +218,7 @@ export function useModalBarangKeluarControl({
                     subLabel: (
                         <div className="flex items-center gap-1 text-[8.5px] leading-none mt-0.5 font-sans">
                             <span className="text-slate-400 dark:text-slate-500 font-medium">Tersedia:</span>
-                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                {stok} {b.deskripsi || b.satuan || 'Unit'}
-                            </span>
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{stok} {b.deskripsi || b.satuan || 'Unit'}</span>
                         </div>
                     )
                 };
@@ -242,38 +230,26 @@ export function useModalBarangKeluarControl({
 
         if (isEditMode && selectedItem) {
             const detail = selectedItem.details?.[0] || {};
-            const targetBarang = barangs.find(
-                b => String(b.id) === String(detail.barang_id)
-            );
+            const targetBarang = barangs.find(b => String(b.id) === String(detail.barang_id));
             const isSn = isBooleanFlag(targetBarang?.is_wajib_sn);
 
             const existingSns = detail.serials
-                ? detail.serials.map(s =>
-                    typeof s === 'string'
-                        ? s
-                        : (s.serial_number || s.sn || s)
-                )
+                ? detail.serials.map(s => typeof s === 'string' ? s : (s.serial_number || s.sn || s))
                 : [];
 
             setRows([{
                 id: selectedItem.id,
                 sub_jenis: selectedItem.sub_jenis || 'BARANG_KE_SITE',
-                tanggal: selectedItem.tanggal
-                    ? String(selectedItem.tanggal).split('T')[0]
-                    : new Date().toISOString().slice(0, 10),
+                tanggal: selectedItem.tanggal ? String(selectedItem.tanggal).split('T')[0] : new Date().toISOString().slice(0, 10),
                 nomor_omc: selectedItem.nomor_omc || '',
                 nomor_imc: selectedItem.nomor_imc || '',
                 pihak_asal: selectedItem.pihak_asal || '',
                 kode_projek: selectedItem.kode_projek || '',
                 nama_customer: selectedItem.nama_customer || '',
-                gudang_asal_id: selectedItem.gudang_asal_id
-                    ? String(selectedItem.gudang_asal_id)
-                    : '',
+                gudang_asal_id: selectedItem.gudang_asal_id ? String(selectedItem.gudang_asal_id) : '',
                 barang_id: detail.barang_id ? String(detail.barang_id) : '',
                 qty: detail.qty || 1,
-                kondisi: selectedItem.kondisi && selectedItem.kondisi !== '-'
-                    ? selectedItem.kondisi
-                    : 'Baru',
+                kondisi: selectedItem.kondisi && selectedItem.kondisi !== '-' ? selectedItem.kondisi : 'Baru',
                 serials: isSn ? existingSns : [],
                 non_sn_selections: {}
             }]);
@@ -288,25 +264,15 @@ export function useModalBarangKeluarControl({
                 alert(`Maksimal penambahan transaksi adalah ${MAX_ROWS_LIMIT} baris.`);
                 const allowed = MAX_ROWS_LIMIT - prev.length;
                 if (allowed <= 0) return prev;
-
-                return [
-                    ...prev,
-                    ...Array.from({ length: allowed }, () => createEmptyRow())
-                ];
+                return [...prev, ...Array.from({ length: allowed }, () => createEmptyRow())];
             }
 
-            return [
-                ...prev,
-                ...Array.from({ length: count }, () => createEmptyRow())
-            ];
+            return [...prev, ...Array.from({ length: count }, () => createEmptyRow())];
         });
     }, [createEmptyRow]);
 
     const handleRemoveRow = useCallback(index => {
-        setRows(prev => prev.length <= 1
-            ? prev
-            : prev.filter((_, i) => i !== index)
-        );
+        setRows(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== index));
     }, []);
 
     const handleRowFieldChange = useCallback((rowIdx, field, value) => {
@@ -323,9 +289,7 @@ export function useModalBarangKeluarControl({
             let selections = current.non_sn_selections || {};
 
             if (field === 'gudang_asal_id') {
-                const targetG = gudangs.find(
-                    g => String(g.id) === String(value) || g.nama_gudang === value
-                );
+                const targetG = gudangs.find(g => String(g.id) === String(value) || g.nama_gudang === value);
 
                 gudangAsalId = targetG ? String(targetG.id) : String(value);
                 barangId = '';
@@ -337,9 +301,7 @@ export function useModalBarangKeluarControl({
 
             if (field === 'sub_jenis') {
                 if (value === 'PEMAKAIAN_INTERNAL') {
-                    if (!LIST_KEPERLUAN_PATEN.includes(pihakAsal)) {
-                        pihakAsal = LIST_KEPERLUAN_PATEN[0];
-                    }
+                    if (!LIST_KEPERLUAN_PATEN.includes(pihakAsal)) pihakAsal = LIST_KEPERLUAN_PATEN[0];
                 } else if (LIST_KEPERLUAN_PATEN.includes(pihakAsal)) {
                     pihakAsal = '';
                 }
@@ -350,9 +312,7 @@ export function useModalBarangKeluarControl({
             updated[rowIdx] = {
                 ...current,
                 [field]: value,
-                gudang_asal_id: field === 'gudang_asal_id'
-                    ? gudangAsalId
-                    : current.gudang_asal_id,
+                gudang_asal_id: field === 'gudang_asal_id' ? gudangAsalId : current.gudang_asal_id,
                 barang_id: barangId,
                 serials,
                 qty,
@@ -390,12 +350,7 @@ export function useModalBarangKeluarControl({
             if (b.kode_barang && String(b.kode_barang).toLowerCase().trim() === searchStr) return true;
             if (b.nama_barang && String(b.nama_barang).toLowerCase().trim() === searchStr) return true;
 
-            const combo = [b.brand, b.tipe, b.kategori]
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase()
-                .trim();
-
+            const combo = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ').toLowerCase().trim();
             return Boolean(combo && combo === searchStr);
         });
 
@@ -437,10 +392,7 @@ export function useModalBarangKeluarControl({
             }
 
             if (!r.pihak_asal?.trim()) {
-                const labelTarget = r.sub_jenis === 'BARANG_KE_SITE'
-                    ? 'Site Tujuan / Teknisi'
-                    : 'Departemen Keperluan';
-
+                const labelTarget = r.sub_jenis === 'BARANG_KE_SITE' ? 'Site Tujuan / Teknisi' : 'Departemen Keperluan';
                 alert(`Baris #${rowNum}: ${labelTarget} wajib diisi.`);
                 return;
             }
@@ -455,15 +407,10 @@ export function useModalBarangKeluarControl({
                 return;
             }
 
-            const targetBarang = barangs.find(
-                b => String(b.id) === String(r.barang_id)
-            );
+            const targetBarang = barangs.find(b => String(b.id) === String(r.barang_id));
 
             if (targetBarang) {
-                const stockAvailable = getBarangStockInWarehouse(
-                    targetBarang,
-                    r.gudang_asal_id
-                );
+                const stockAvailable = getBarangStockInWarehouse(targetBarang, r.gudang_asal_id);
 
                 if (stockAvailable <= 0) {
                     alert(`Baris #${rowNum}: Tidak ada stok aktif yang dapat dikeluarkan dari gudang asal.`);
@@ -471,9 +418,7 @@ export function useModalBarangKeluarControl({
                 }
 
                 if (r.qty > stockAvailable) {
-                    alert(
-                        `Baris #${rowNum}: Kuantitas pengeluaran (${r.qty}) melebihi stok yang dapat dikeluarkan (${stockAvailable} unit).`
-                    );
+                    alert(`Baris #${rowNum}: Kuantitas pengeluaran (${r.qty}) melebihi stok yang dapat dikeluarkan (${stockAvailable} unit).`);
                     return;
                 }
             }
@@ -522,34 +467,43 @@ export function useModalBarangKeluarControl({
                 }))
             };
 
-        const targetUrl = isEditMode
-            ? `/transaksi-keluar/${selectedItem.id}`
-            : '/transaksi-keluar';
+        const targetUrl = isEditMode ? `/transaksi-keluar/${selectedItem.id}` : '/transaksi-keluar';
 
         router[isEditMode ? 'put' : 'post'](targetUrl, payload, {
             preserveScroll: true,
             only: ['transaksis', 'filters', 'barangs', 'gudangs'],
             onSuccess: page => {
                 setIsProcessing(false);
-                if (!page.props.flash?.error) onClose();
+
+                if (!page.props.flash?.error) {
+                    const newCustomers = rows.map(row => String(row.nama_customer || '').trim()).filter(Boolean);
+
+                    if (newCustomers.length > 0) {
+                        setCustomerHistory(prev => {
+                            const merged = [...new Set([...prev, ...newCustomers])];
+
+                            try {
+                                localStorage.setItem(CUSTOMER_HISTORY_KEY, JSON.stringify(merged));
+                            } catch {}
+
+                            return merged;
+                        });
+                    }
+
+                    onClose();
+                }
             },
             onError: () => setIsProcessing(false),
             onFinish: () => setIsProcessing(false)
         });
-    }, [
-        rows,
-        barangs,
-        isEditMode,
-        selectedItem,
-        getBarangStockInWarehouse,
-        onClose
-    ]);
+    }, [rows, barangs, isEditMode, selectedItem, getBarangStockInWarehouse, onClose]);
 
     return {
         isProcessing,
         rows,
         setRows,
         gudangOptions,
+        customerOptions,
         getBarangPplOptions: getBarangPplOptionsForRow,
         getBarangPplOptionsForRow,
         getBarangNamaOptions: getBarangNamaOptionsForRow,
