@@ -22,13 +22,14 @@ import {
 import { router, usePage } from '@inertiajs/react';
 import { useConfirm } from '@/Layouts/AuthenticatedLayout';
 
-const TRANSAKSI_PROPS = ['transaksis', 'filters', 'barangs', 'gudangs'];
+const TRANSAKSI_PROPS = ['transaksis', 'filters', 'barangs', 'gudangs', 'customerOptions'];
 
 export default function TabTransaksi({
     transaksis,
     gudangs = [],
     suppliers = [],
     barangs = [],
+    customerOptions = [],
     filters = {}
 }) {
     const { auth, flash } = usePage().props;
@@ -282,8 +283,7 @@ export default function TabTransaksi({
             ? `&end_date=${endDate}`
             : '';
 
-        const exportUrl =
-            `/transaksi/export?jenis_transaksi=${mainTab}&order=${sortOrder}${gudangParam}${startParam}${endParam}`;
+        const exportUrl = `/transaksi/export?jenis_transaksi=${mainTab}&order=${sortOrder}${gudangParam}${startParam}${endParam}`;
 
         window.open(exportUrl, '_blank');
     };
@@ -312,18 +312,12 @@ export default function TabTransaksi({
     };
 
     const handleCancelSelected = () => {
-        if (
-            !canWrite ||
-            selectedIds.length === 0 ||
-            !['KELUAR', 'TRANSFER'].includes(mainTab)
-        ) {
+        if (!canWrite || selectedIds.length === 0 || !['KELUAR', 'TRANSFER'].includes(mainTab)) {
             return;
         }
 
         const selectedItems = dataList.filter(
-            item =>
-                selectedIds.includes(item.id) &&
-                item.status !== 'CANCELLED'
+            item => selectedIds.includes(item.id) && item.status !== 'CANCELLED'
         );
 
         if (selectedItems.length === 0) return;
@@ -349,9 +343,7 @@ export default function TabTransaksi({
                             preserveScroll: true,
                             only: TRANSAKSI_PROPS,
                             onSuccess: page => {
-                                if (!page.props.flash?.error) {
-                                    successCount++;
-                                }
+                                if (!page.props.flash?.error) successCount++;
                             },
                             onError: () => {},
                             onFinish: resolve
@@ -365,9 +357,7 @@ export default function TabTransaksi({
                 setToast({
                     isOpen: true,
                     type: successCount > 0 ? 'success' : 'error',
-                    title: successCount > 0
-                        ? 'Transaksi Dibatalkan'
-                        : 'Gagal Membatalkan',
+                    title: successCount > 0 ? 'Transaksi Dibatalkan' : 'Gagal Membatalkan',
                     message: successCount > 0
                         ? `${successCount} transaksi berhasil dibatalkan dan stok dikembalikan.`
                         : 'Tidak ada transaksi yang berhasil dibatalkan.'
@@ -416,10 +406,7 @@ export default function TabTransaksi({
 
         if (item.jenis_transaksi === 'KELUAR') {
             setIsModalKeluarOpen(true);
-        } else if (
-            item.jenis_transaksi === 'TRANSFER' ||
-            item.sub_jenis === 'TRANSFER_GUDANG'
-        ) {
+        } else if (item.jenis_transaksi === 'TRANSFER' || item.sub_jenis === 'TRANSFER_GUDANG') {
             setIsModalTransferOpen(true);
         } else {
             setIsModalMasukOpen(true);
@@ -533,7 +520,6 @@ export default function TabTransaksi({
 
                     <div className="relative w-full sm:w-48">
                         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-
                         <Input
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
@@ -567,7 +553,6 @@ export default function TabTransaksi({
                             }`}
                         >
                             <Plus className="w-3.5 h-3.5" />
-
                             <span>
                                 {mainTab === 'MASUK'
                                     ? 'Tambah Data Masuk'
@@ -628,17 +613,11 @@ export default function TabTransaksi({
 
                     <div className="text-slate-500">
                         Menampilkan{' '}
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                            {transaksis.from || 0}
-                        </span>{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">{transaksis.from || 0}</span>{' '}
                         -{' '}
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                            {transaksis.to || 0}
-                        </span>{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">{transaksis.to || 0}</span>{' '}
                         dari{' '}
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                            {transaksis.total || 0}
-                        </span>{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">{transaksis.total || 0}</span>{' '}
                         data
                     </div>
 
@@ -704,6 +683,7 @@ export default function TabTransaksi({
                 selectedItem={selectedItem}
                 gudangs={gudangs}
                 barangs={barangs}
+                customerOptions={customerOptions}
             />
 
             <ModalTransferGudang

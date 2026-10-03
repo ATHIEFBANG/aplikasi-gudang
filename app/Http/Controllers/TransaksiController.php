@@ -255,6 +255,7 @@ class TransaksiController extends Controller
                 $ensureMap($kondisiByBarangGudang, $bId, $gId);
 
                 $kondisiByGudang[$gId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+
                 foreach ($conditionQty as $key => $jumlah) {
                     $kondisiByBarangGudang[$bId][$gId][$key] += $jumlah;
                     $kondisiByGudang[$gId][$key] += $jumlah;
@@ -266,6 +267,7 @@ class TransaksiController extends Controller
                 $ensureMap($kondisiByBarangGudang, $bId, $gId);
 
                 $kondisiByGudang[$gId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+
                 foreach ($conditionQty as $key => $jumlah) {
                     $kondisiByBarangGudang[$bId][$gId][$key] = max(
                         0,
@@ -284,6 +286,7 @@ class TransaksiController extends Controller
                     $ensureMap($kondisiByBarangGudang, $bId, $gId);
 
                     $kondisiByGudang[$gId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+
                     foreach ($conditionQty as $key => $jumlah) {
                         $kondisiByBarangGudang[$bId][$gId][$key] = max(
                             0,
@@ -303,6 +306,7 @@ class TransaksiController extends Controller
                     $ensureMap($kondisiByBarangGudang, $bId, $gId);
 
                     $kondisiByGudang[$gId] ??= ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+
                     foreach ($conditionQty as $key => $jumlah) {
                         $kondisiByBarangGudang[$bId][$gId][$key] += $jumlah;
                         $kondisiByGudang[$gId][$key] += $jumlah;
@@ -416,6 +420,14 @@ class TransaksiController extends Controller
 
                 return $g;
             });
+
+        $customerOptions = Transaksi::query()
+            ->whereNotNull('nama_customer')
+            ->where('nama_customer', '!=', '')
+            ->distinct()
+            ->orderBy('nama_customer')
+            ->pluck('nama_customer')
+            ->values();
 
         $barangList = Barang::select([
             'id', 'kode_barang', 'nama_barang', 'part_number',
@@ -539,6 +551,7 @@ class TransaksiController extends Controller
             'transaksis' => $query->paginate($perPage)->withQueryString(),
             'gudangs' => $gudangList,
             'suppliers' => Supplier::all(['id', 'nama_supplier']),
+            'customerOptions' => $customerOptions,
             'barangs' => $barangList,
             'filters' => [
                 'jenis_transaksi' => $jenis,

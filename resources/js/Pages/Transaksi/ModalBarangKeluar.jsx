@@ -13,14 +13,14 @@ export default function ModalBarangKeluar({
     isEditMode = false,
     selectedItem = null,
     gudangs = [],
-    barangs = []
+    barangs = [],
+    customerOptions = []
 }) {
     const {
         isProcessing,
         rows,
         setRows,
         gudangOptions,
-        customerOptions,
         getBarangPplOptionsForRow,
         getBarangNamaOptionsForRow,
         getBarangStockInWarehouse,
