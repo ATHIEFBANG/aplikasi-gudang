@@ -146,7 +146,7 @@ export function useModalBarangKeluarControl({
             nama_customer: '',
             gudang_asal_id: defaultGudangId,
             barang_id: '',
-            qty: 1,
+            qty: 0,
             harga: '',
             kondisi: 'Baru',
             serials: [],
@@ -330,7 +330,7 @@ export function useModalBarangKeluarControl({
                 gudangAsalId = targetG ? String(targetG.id) : String(value);
                 barangId = '';
                 serials = [];
-                qty = 1;
+                qty = 0;
                 nomorImc = '';
                 selections = {};
             }
@@ -372,7 +372,7 @@ export function useModalBarangKeluarControl({
                 updated[rowIdx] = {
                     ...updated[rowIdx],
                     barang_id: '',
-                    qty: 1,
+                    qty: 0,
                     serials: [],
                     nomor_imc: '',
                     kondisi: 'Baru',
@@ -404,23 +404,11 @@ export function useModalBarangKeluarControl({
         setRows(prev => {
             const updated = [...prev];
             const current = updated[rowIdx];
-            let currentQty = 1;
-
-            if (current.gudang_asal_id) {
-                const maxStok = getBarangStockInWarehouse(
-                    targetBarang,
-                    current.gudang_asal_id
-                );
-
-                if (currentQty > maxStok && maxStok > 0) {
-                    currentQty = maxStok;
-                }
-            }
 
             updated[rowIdx] = {
                 ...current,
                 barang_id: String(targetBarang.id),
-                qty: currentQty,
+                qty: 0,
                 serials: [],
                 nomor_imc: targetBarang.kode_barang || '',
                 kondisi: 'Baru',
@@ -429,43 +417,7 @@ export function useModalBarangKeluarControl({
 
             return updated;
         });
-    }, [barangs, getBarangStockInWarehouse]);
-
-    const handleQtyChange = useCallback((rowIdx, val) => {
-        let count = parseInt(val, 10);
-        if (isNaN(count) || count < 1) count = 1;
-
-        setRows(prev => {
-            const updated = [...prev];
-            const current = updated[rowIdx];
-            const targetBarang = barangs.find(
-                b => String(b.id) === String(current.barang_id)
-            );
-
-            const isSn = isBooleanFlag(targetBarang?.is_wajib_sn);
-
-            if (targetBarang && current.gudang_asal_id) {
-                const maxStok = getBarangStockInWarehouse(
-                    targetBarang,
-                    current.gudang_asal_id
-                );
-
-                if (maxStok > 0 && count > maxStok) {
-                    count = maxStok;
-                }
-            }
-
-            updated[rowIdx] = {
-                ...current,
-                qty: count,
-                serials: isSn
-                    ? (current.serials || []).slice(0, count)
-                    : current.serials
-            };
-
-            return updated;
-        });
-    }, [barangs, getBarangStockInWarehouse]);
+    }, [barangs]);
 
     const handleSubmitForm = useCallback(e => {
         e?.preventDefault();
@@ -495,6 +447,11 @@ export function useModalBarangKeluarControl({
 
             if (!r.barang_id) {
                 alert(`Baris #${rowNum}: Harap pilih barang terlebih dahulu.`);
+                return;
+            }
+
+            if (Number(r.qty) <= 0) {
+                alert(`Baris #${rowNum}: Silakan pilih minimal 1 unit barang.`);
                 return;
             }
 
@@ -603,7 +560,6 @@ export function useModalBarangKeluarControl({
         handleRemoveRow,
         handleRowFieldChange,
         handleBarangChange,
-        handleQtyChange,
         handleSubmitForm
     };
 }

@@ -11,9 +11,9 @@ const REKONSILIASI_COLUMNS = [
     { key: 'masuk', label: 'MASUK (+)' },
     { key: 'keluar', label: 'KELUAR (-)' },
     { key: 'transfer_net', label: 'TRF NET' },
-    { key: 'stok_akhir', label: 'STOK AKHIR' },
+    { key: 'stok_akhir', label: 'STOK USABLE' },
     { key: 'sisa_fisik', label: 'SISA FISIK DI GUDANG' },
-    { key: 'grand_total', label: 'GRAND TOTAL' },
+    { key: 'grand_total', label: 'STOK KESELURUHAN' },
 ];
 
 function useDropdownPosition(isOpen, buttonRef, menuRef, menuWidth = 224) {

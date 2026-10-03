@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Trash2, Minus, Plus } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import HybridDropdown from '@/components/HybridDropdown';
 import DatePicker from '@/components/DatePicker';
 import ModalBarangSelectorUI from './ModalBarangSelectorUI';
@@ -23,8 +23,7 @@ export default function ModalTransferGudangRow({
     setRows,
     onRemoveRow,
     onFieldChange,
-    onBarangChange,
-    onQtyChange
+    onBarangChange
 }) {
     const targetBarang = useMemo(() => {
         if (!row.barang_id) return null;
@@ -82,7 +81,6 @@ export default function ModalTransferGudangRow({
 
             {/* 1. RUTE GUDANG & SURAT JALAN */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
-
                 <div className="space-y-2.5">
                     <div className="space-y-1">
                         <Label className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
@@ -215,9 +213,7 @@ export default function ModalTransferGudangRow({
 
             {/* 2. DETAIL BARANG */}
             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-
                     <div className="sm:col-span-4 space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                             Kode PPL *
@@ -228,21 +224,15 @@ export default function ModalTransferGudangRow({
                             options={pplOptions}
                             onChange={(val, selectedOpt) => {
                                 if (!val) {
-                                    onBarangChange(
-                                        rowIdx,
-                                        ''
-                                    );
+                                    onBarangChange(rowIdx, '');
                                     return;
                                 }
 
                                 const targetId =
                                     selectedOpt?.id ||
                                     barangs.find(b =>
-                                        String(b.id) ===
-                                            String(selectedOpt?.id) ||
-                                        String(
-                                            b.kode_barang || ''
-                                        )
+                                        String(b.id) === String(selectedOpt?.id) ||
+                                        String(b.kode_barang || '')
                                             .toLowerCase()
                                             .trim() ===
                                         String(val)
@@ -286,10 +276,7 @@ export default function ModalTransferGudangRow({
                             options={namaOptions}
                             onChange={(val, selectedOpt) => {
                                 if (!val) {
-                                    onBarangChange(
-                                        rowIdx,
-                                        ''
-                                    );
+                                    onBarangChange(rowIdx, '');
                                     return;
                                 }
 
@@ -346,7 +333,6 @@ export default function ModalTransferGudangRow({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-
                     <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                             Tanggal *
@@ -376,69 +362,19 @@ export default function ModalTransferGudangRow({
                             {stockInOrigin !== null &&
                                 stockInOrigin !== undefined && (
                                     <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                                        (Stok: {stockInOrigin})
+                                        (Maks: {stockInOrigin})
                                     </span>
                                 )}
                         </div>
 
-                        <div className="flex items-center">
-                            <button
-                                type="button"
-                                disabled={
-                                    isProcessing ||
-                                    row.qty <= 1
-                                }
-                                onClick={() =>
-                                    onQtyChange(
-                                        rowIdx,
-                                        row.qty - 1
-                                    )
-                                }
-                                className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs cursor-pointer disabled:opacity-40 transition-colors"
-                            >
-                                <Minus className="w-3 h-3" />
-                            </button>
-
-                            <Input
-                                type="number"
-                                min={1}
-                                max={stockInOrigin || 1}
-                                disabled={isProcessing}
-                                value={row.qty}
-                                onFocus={e =>
-                                    e.target.select()
-                                }
-                                onChange={e =>
-                                    onQtyChange(
-                                        rowIdx,
-                                        e.target.value
-                                    )
-                                }
-                                className="h-8 w-full text-center font-bold text-xs rounded-none bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                                required
-                            />
-
-                            <button
-                                type="button"
-                                disabled={
-                                    isProcessing ||
-                                    (
-                                        stockInOrigin !== null &&
-                                        stockInOrigin !== undefined &&
-                                        row.qty >= stockInOrigin
-                                    )
-                                }
-                                onClick={() =>
-                                    onQtyChange(
-                                        rowIdx,
-                                        row.qty + 1
-                                    )
-                                }
-                                className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs cursor-pointer disabled:opacity-40 transition-colors"
-                            >
-                                <Plus className="w-3 h-3" />
-                            </button>
-                        </div>
+                        <Input
+                            type="number"
+                            value={row.qty ?? 0}
+                            readOnly
+                            tabIndex={-1}
+                            className="h-8 w-full text-center font-bold text-xs rounded-lg bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            required
+                        />
                     </div>
 
                     <div className="space-y-1">
@@ -464,11 +400,7 @@ export default function ModalTransferGudangRow({
 
                         <Input
                             disabled
-                            placeholder={
-                                isWajibPn
-                                    ? 'Part Number'
-                                    : '-'
-                            }
+                            placeholder={isWajibPn ? 'Part Number' : '-'}
                             value={
                                 isWajibPn
                                     ? (

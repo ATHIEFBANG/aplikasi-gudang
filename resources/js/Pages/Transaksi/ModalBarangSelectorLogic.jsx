@@ -1,10 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
 
-export const AVAILABLE_SERIAL_STATUSES = [
-    'IN_WAREHOUSE',
-    'READY',
-    'AVAILABLE'
-];
+export const AVAILABLE_SERIAL_STATUSES = ['IN_WAREHOUSE', 'READY', 'AVAILABLE'];
 
 export const isBooleanFlag = value =>
     value === true || value === 1 || value === '1' ||
@@ -18,17 +14,8 @@ export const isRusakCondition = kondisi => {
 export const normalizeKondisi = kondisi => {
     const value = String(kondisi || 'BARU').toUpperCase().trim();
 
-    if (value.includes('RUSAK') || value.includes('DAMAGED')) {
-        return 'Rusak';
-    }
-
-    if (
-        value.includes('BEKAS') ||
-        value.includes('SECOND') ||
-        value.includes('USED')
-    ) {
-        return 'Bekas';
-    }
+    if (value.includes('RUSAK') || value.includes('DAMAGED')) return 'Rusak';
+    if (value.includes('BEKAS') || value.includes('SECOND') || value.includes('USED')) return 'Bekas';
 
     return 'Baru';
 };
@@ -62,9 +49,7 @@ const resolveGudangId = (gudangs, gudangIdOrName) => {
         )
     );
 
-    return targetGudang
-        ? String(targetGudang.id)
-        : String(gudangIdOrName);
+    return targetGudang ? String(targetGudang.id) : String(gudangIdOrName);
 };
 
 export function useModalBarangSelectorLogic({
@@ -94,16 +79,14 @@ export function useModalBarangSelectorLogic({
     const currentNamaBarang = useMemo(() => {
         if (!targetBarang) return '';
 
-        return (
-            [
-                targetBarang.brand,
-                targetBarang.tipe,
-                targetBarang.kategori
-            ].filter(Boolean).join(' ') ||
+        return [
+            targetBarang.brand,
+            targetBarang.tipe,
+            targetBarang.kategori
+        ].filter(Boolean).join(' ') ||
             targetBarang.nama_barang ||
             targetBarang.kode_barang ||
-            ''
-        );
+            '';
     }, [targetBarang]);
 
     /* =========================================================
@@ -158,12 +141,7 @@ export function useModalBarangSelectorLogic({
 
             return true;
         });
-    }, [
-        isWajibSn,
-        targetBarang,
-        targetGudangId,
-        allowRusak
-    ]);
+    }, [isWajibSn, targetBarang, targetGudangId, allowRusak]);
 
     const getAvailableSerialsForOutbound = useCallback(
         () => availableEligibleSns,
@@ -233,10 +211,7 @@ export function useModalBarangSelectorLogic({
                 serial => String(serial) === String(snValue)
             );
 
-            if (
-                !exists &&
-                currentSerials.length >= availableEligibleSns.length
-            ) {
+            if (!exists && currentSerials.length >= availableEligibleSns.length) {
                 return prev;
             }
 
@@ -249,19 +224,12 @@ export function useModalBarangSelectorLogic({
             updated[rowIdx] = {
                 ...currentRow,
                 serials: newSerials,
-                qty: newSerials.length > 0
-                    ? newSerials.length
-                    : 1
+                qty: newSerials.length
             };
 
             return updated;
         });
-    }, [
-        availableEligibleSns,
-        isProcessing,
-        rowIdx,
-        setRows
-    ]);
+    }, [availableEligibleSns, isProcessing, rowIdx, setRows]);
 
     const handleClearSns = useCallback(() => {
         if (isProcessing || !setRows) return;
@@ -274,7 +242,7 @@ export function useModalBarangSelectorLogic({
             updated[rowIdx] = {
                 ...updated[rowIdx],
                 serials: [],
-                qty: 1
+                qty: 0
             };
 
             return updated;
@@ -291,7 +259,7 @@ export function useModalBarangSelectorLogic({
             if (!currentRow) return prev;
 
             const targetQty = Math.min(
-                Number(currentRow.qty || 1),
+                Number(currentRow.qty || 0),
                 availableEligibleSns.length
             );
 
@@ -303,34 +271,23 @@ export function useModalBarangSelectorLogic({
             updated[rowIdx] = {
                 ...currentRow,
                 serials: selected,
-                qty: selected.length > 0 ? selected.length : 1
+                qty: selected.length
             };
 
             return updated;
         });
-    }, [
-        availableEligibleSns,
-        isProcessing,
-        rowIdx,
-        setRows
-    ]);
+    }, [availableEligibleSns, isProcessing, rowIdx, setRows]);
 
     /* =========================================================
      * NON-SN BATCH
      * ========================================================= */
 
     const groupedNonSnBatches = useMemo(() => {
-        if (
-            isWajibSn ||
-            !targetBarang ||
-            !targetGudangId
-        ) {
+        if (isWajibSn || !targetBarang || !targetGudangId) {
             return [];
         }
 
-        const kondisiStok =
-            targetBarang.kondisi_stok?.[targetGudangId];
-
+        const kondisiStok = targetBarang.kondisi_stok?.[targetGudangId];
         if (!kondisiStok) return [];
 
         const details =
@@ -416,12 +373,7 @@ export function useModalBarangSelectorLogic({
         }
 
         return result;
-    }, [
-        isWajibSn,
-        targetBarang,
-        targetGudangId,
-        allowRusak
-    ]);
+    }, [isWajibSn, targetBarang, targetGudangId, allowRusak]);
 
     const filteredBatches = useMemo(() => {
         const search = String(nonSnSearch || '').toLowerCase().trim();
@@ -429,14 +381,8 @@ export function useModalBarangSelectorLogic({
         if (!search) return groupedNonSnBatches;
 
         return groupedNonSnBatches.filter(batch => {
-            const nomorImc = String(
-                batch.nomor_imc || ''
-            ).toLowerCase();
-
-            const kondisi = String(
-                batch.kondisi || ''
-            ).toLowerCase();
-
+            const nomorImc = String(batch.nomor_imc || '').toLowerCase();
+            const kondisi = String(batch.kondisi || '').toLowerCase();
             const namaBarang = currentNamaBarang.toLowerCase();
 
             return (
@@ -445,18 +391,13 @@ export function useModalBarangSelectorLogic({
                 namaBarang.includes(search)
             );
         });
-    }, [
-        groupedNonSnBatches,
-        nonSnSearch,
-        currentNamaBarang
-    ]);
+    }, [groupedNonSnBatches, nonSnSearch, currentNamaBarang]);
 
     const nonSnSelections = row?.non_sn_selections || {};
 
     const selectedBatchTotal = useMemo(
         () => Object.values(nonSnSelections).reduce(
-            (total, item) =>
-                total + (parseInt(item?.qty, 10) || 0),
+            (total, item) => total + (parseInt(item?.qty, 10) || 0),
             0
         ),
         [nonSnSelections]
@@ -467,26 +408,18 @@ export function useModalBarangSelectorLogic({
             return Number(stockInOrigin || 0);
         }
 
-        const kondisiStok =
-            targetBarang.kondisi_stok?.[targetGudangId];
+        const kondisiStok = targetBarang.kondisi_stok?.[targetGudangId];
 
         if (kondisiStok) {
             const baru = Number(kondisiStok.baru || 0);
             const bekas = Number(kondisiStok.bekas || 0);
-            const rusak = allowRusak
-                ? Number(kondisiStok.rusak || 0)
-                : 0;
+            const rusak = allowRusak ? Number(kondisiStok.rusak || 0) : 0;
 
             return baru + bekas + rusak;
         }
 
         return Number(stockInOrigin || 0);
-    }, [
-        targetBarang,
-        targetGudangId,
-        stockInOrigin,
-        allowRusak
-    ]);
+    }, [targetBarang, targetGudangId, stockInOrigin, allowRusak]);
 
     /* =========================================================
      * NON-SN SEARCH
@@ -510,9 +443,7 @@ export function useModalBarangSelectorLogic({
     );
 
     const getBatchSelectedQty = useCallback(
-        batchKey => Number(
-            nonSnSelections?.[batchKey]?.qty || 0
-        ),
+        batchKey => Number(nonSnSelections?.[batchKey]?.qty || 0),
         [nonSnSelections]
     );
 
@@ -521,131 +452,102 @@ export function useModalBarangSelectorLogic({
         [getBatchSelectedQty]
     );
 
-    const updateNonSnBatchQty = useCallback(
-        (batch, nextQty) => {
-            if (!batch || isProcessing || !setRows) return;
+    const updateNonSnBatchQty = useCallback((batch, nextQty) => {
+        if (!batch || isProcessing || !setRows) return;
 
-            setRows(prev => {
-                const updated = [...prev];
-                const currentRow = updated[rowIdx];
+        setRows(prev => {
+            const updated = [...prev];
+            const currentRow = updated[rowIdx];
 
-                if (!currentRow) return prev;
+            if (!currentRow) return prev;
 
-                const selections = {
-                    ...(currentRow.non_sn_selections || {})
-                };
+            const selections = {
+                ...(currentRow.non_sn_selections || {})
+            };
 
-                const otherSelectedTotal = Object.entries(
-                    selections
-                ).reduce((total, [key, selection]) => {
+            const otherSelectedTotal = Object.entries(selections).reduce(
+                (total, [key, selection]) => {
                     if (key === batch.key) return total;
+                    return total + (parseInt(selection?.qty, 10) || 0);
+                },
+                0
+            );
 
-                    return total + (
-                        parseInt(selection?.qty, 10) || 0
-                    );
-                }, 0);
+            const remainingTotal = Math.max(
+                0,
+                availableNonSnStock - otherSelectedTotal
+            );
 
-                const remainingTotal = Math.max(
-                    0,
-                    availableNonSnStock - otherSelectedTotal
-                );
+            const batchMax = Number(batch.max_stock || 0);
+            const safeMax = Math.min(batchMax, remainingTotal);
 
-                const batchMax = Number(batch.max_stock || 0);
-                const safeMax = Math.min(
-                    batchMax,
-                    remainingTotal
-                );
+            let safeQty = parseInt(nextQty, 10);
 
-                let safeQty = parseInt(nextQty, 10);
+            if (Number.isNaN(safeQty) || safeQty <= 0) {
+                delete selections[batch.key];
+            } else {
+                safeQty = Math.min(safeQty, safeMax);
 
-                if (Number.isNaN(safeQty) || safeQty <= 0) {
+                if (safeQty <= 0) {
                     delete selections[batch.key];
                 } else {
-                    safeQty = Math.min(safeQty, safeMax);
-
-                    if (safeQty <= 0) {
-                        delete selections[batch.key];
-                    } else {
-                        selections[batch.key] = {
-                            nomor_imc: batch.nomor_imc || '',
-                            kondisi: normalizeKondisi(batch.kondisi),
-                            qty: safeQty
-                        };
-                    }
+                    selections[batch.key] = {
+                        nomor_imc: batch.nomor_imc || '',
+                        kondisi: normalizeKondisi(batch.kondisi),
+                        qty: safeQty
+                    };
                 }
+            }
 
-                const activeSelections = Object.values(
-                    selections
-                ).filter(
-                    selection =>
-                        (parseInt(selection?.qty, 10) || 0) > 0
-                );
+            const activeSelections = Object.values(selections).filter(
+                selection => (parseInt(selection?.qty, 10) || 0) > 0
+            );
 
-                const totalQty = activeSelections.reduce(
-                    (total, selection) =>
-                        total + (parseInt(selection?.qty, 10) || 0),
-                    0
-                );
+            const totalQty = activeSelections.reduce(
+                (total, selection) =>
+                    total + (parseInt(selection?.qty, 10) || 0),
+                0
+            );
 
-                const conditionSummary = activeSelections.reduce(
-                    (result, selection) => {
-                        const kondisi = normalizeKondisi(
-                            selection?.kondisi
-                        );
-
-                        const qty =
-                            parseInt(selection?.qty, 10) || 0;
-
-                        const existing = result.find(
-                            item => item.kondisi === kondisi
-                        );
-
-                        if (existing) {
-                            existing.qty += qty;
-                        } else {
-                            result.push({
-                                kondisi,
-                                qty
-                            });
-                        }
-
-                        return result;
-                    },
-                    []
-                );
-
-                const imcParts = activeSelections
-                    .map(selection =>
-                        String(selection?.nomor_imc || '').trim()
-                    )
-                    .filter(Boolean)
-                    .filter(
-                        (value, index, arr) =>
-                            arr.indexOf(value) === index
+            const conditionSummary = activeSelections.reduce(
+                (result, selection) => {
+                    const kondisi = normalizeKondisi(selection?.kondisi);
+                    const qty = parseInt(selection?.qty, 10) || 0;
+                    const existing = result.find(
+                        item => item.kondisi === kondisi
                     );
 
-                updated[rowIdx] = {
-                    ...currentRow,
-                    non_sn_selections: selections,
-                    qty: totalQty,
-                    kondisi: conditionSummary.length > 0
-                        ? conditionSummary
-                            .map(item => `${item.qty} ${item.kondisi}`)
-                            .join(', ')
-                        : 'Baru',
-                    nomor_imc: imcParts.join(', ')
-                };
+                    if (existing) {
+                        existing.qty += qty;
+                    } else {
+                        result.push({ kondisi, qty });
+                    }
 
-                return updated;
-            });
-        },
-        [
-            availableNonSnStock,
-            isProcessing,
-            rowIdx,
-            setRows
-        ]
-    );
+                    return result;
+                },
+                []
+            );
+
+            const imcParts = activeSelections
+                .map(selection => String(selection?.nomor_imc || '').trim())
+                .filter(Boolean)
+                .filter((value, index, arr) => arr.indexOf(value) === index);
+
+            updated[rowIdx] = {
+                ...currentRow,
+                non_sn_selections: selections,
+                qty: totalQty,
+                kondisi: conditionSummary.length > 0
+                    ? conditionSummary
+                        .map(item => `${item.qty} ${item.kondisi}`)
+                        .join(', ')
+                    : 'Baru',
+                nomor_imc: imcParts.join(', ')
+            };
+
+            return updated;
+        });
+    }, [availableNonSnStock, isProcessing, rowIdx, setRows]);
 
     const handleNonSnBatchQtyChange = useCallback(
         (batch, nextQty) => {
@@ -654,72 +556,44 @@ export function useModalBarangSelectorLogic({
         [updateNonSnBatchQty]
     );
 
-    const handleToggleNonSnBatch = useCallback(
-        batch => {
-            if (!batch || isProcessing) return;
+    const handleToggleNonSnBatch = useCallback(batch => {
+        if (!batch || isProcessing) return;
 
-            const currentQty = getBatchSelectedQty(batch.key);
+        const currentQty = getBatchSelectedQty(batch.key);
 
-            updateNonSnBatchQty(
-                batch,
-                currentQty > 0 ? 0 : 1
-            );
-        },
-        [
-            getBatchSelectedQty,
-            isProcessing,
-            updateNonSnBatchQty
-        ]
-    );
+        updateNonSnBatchQty(
+            batch,
+            currentQty > 0 ? 0 : 1
+        );
+    }, [getBatchSelectedQty, isProcessing, updateNonSnBatchQty]);
 
-    const incrementNonSnBatch = useCallback(
-        batch => {
-            if (!batch || isProcessing) return;
+    const incrementNonSnBatch = useCallback(batch => {
+        if (!batch || isProcessing) return;
 
-            const currentQty = getBatchSelectedQty(batch.key);
+        const currentQty = getBatchSelectedQty(batch.key);
 
-            if (currentQty >= Number(batch.max_stock || 0)) {
-                return;
-            }
+        if (currentQty >= Number(batch.max_stock || 0)) {
+            return;
+        }
 
-            updateNonSnBatchQty(
-                batch,
-                currentQty + 1
-            );
-        },
-        [
-            getBatchSelectedQty,
-            isProcessing,
-            updateNonSnBatchQty
-        ]
-    );
+        updateNonSnBatchQty(batch, currentQty + 1);
+    }, [getBatchSelectedQty, isProcessing, updateNonSnBatchQty]);
 
-    const decrementNonSnBatch = useCallback(
-        batch => {
-            if (!batch || isProcessing) return;
+    const decrementNonSnBatch = useCallback(batch => {
+        if (!batch || isProcessing) return;
 
-            const currentQty = getBatchSelectedQty(batch.key);
+        const currentQty = getBatchSelectedQty(batch.key);
 
-            if (currentQty <= 0) return;
+        if (currentQty <= 0) return;
 
-            updateNonSnBatchQty(
-                batch,
-                currentQty - 1
-            );
-        },
-        [
-            getBatchSelectedQty,
-            isProcessing,
-            updateNonSnBatchQty
-        ]
-    );
+        updateNonSnBatchQty(batch, currentQty - 1);
+    }, [getBatchSelectedQty, isProcessing, updateNonSnBatchQty]);
 
     return {
         isWajibSn,
         isNonSn: !isWajibSn,
         isEditMode,
         allowRusak,
-
         currentNamaBarang,
 
         snSearch,

@@ -141,7 +141,7 @@ export function useModalTransferGudangControl({
             gudang_asal_id: defaultAsal,
             gudang_tujuan_id: defaultTujuan,
             barang_id: '',
-            qty: 1,
+            qty: 0,
             kondisi: 'Baru',
             serials: [],
             non_sn_selections: {}
@@ -403,7 +403,7 @@ export function useModalTransferGudangControl({
                         ? String(targetGudang.id)
                         : String(value),
                     barang_id: '',
-                    qty: 1,
+                    qty: 0,
                     serials: [],
                     kondisi: 'Baru',
                     nomor_imc: '',
@@ -430,7 +430,7 @@ export function useModalTransferGudangControl({
                 updated[rowIdx] = {
                     ...updated[rowIdx],
                     barang_id: '',
-                    qty: 1,
+                    qty: 0,
                     serials: [],
                     kondisi: 'Baru',
                     nomor_imc: '',
@@ -479,15 +479,10 @@ export function useModalTransferGudangControl({
             const updated = [...prev];
             const current = updated[rowIdx];
 
-            const maxStok = getBarangStockInWarehouse(
-                targetBarang,
-                current.gudang_asal_id
-            );
-
             updated[rowIdx] = {
                 ...current,
                 barang_id: String(targetBarang.id),
-                qty: maxStok > 0 ? 1 : 1,
+                qty: 0,
                 serials: [],
                 kondisi: 'Baru',
                 nomor_imc: targetBarang.kode_barang || '',
@@ -496,49 +491,7 @@ export function useModalTransferGudangControl({
 
             return updated;
         });
-    }, [barangs, getBarangStockInWarehouse]);
-
-    const handleQtyChange = useCallback((rowIdx, val) => {
-        let count = parseInt(val, 10);
-
-        if (isNaN(count) || count < 1) {
-            count = 1;
-        }
-
-        setRows(prev => {
-            const updated = [...prev];
-            const current = updated[rowIdx];
-
-            const targetBarang = barangs.find(
-                b => String(b.id) === String(current.barang_id)
-            );
-
-            if (targetBarang && current.gudang_asal_id) {
-                const maxStok = getBarangStockInWarehouse(
-                    targetBarang,
-                    current.gudang_asal_id
-                );
-
-                if (maxStok > 0 && count > maxStok) {
-                    count = maxStok;
-                }
-            }
-
-            const isSn =
-                isBooleanFlag(targetBarang?.is_wajib_sn) ||
-                isBooleanFlag(targetBarang?.is_sn);
-
-            updated[rowIdx] = {
-                ...current,
-                qty: count,
-                serials: isSn
-                    ? (current.serials || []).slice(0, count)
-                    : current.serials
-            };
-
-            return updated;
-        });
-    }, [barangs, getBarangStockInWarehouse]);
+    }, [barangs]);
 
     const handleSubmit = useCallback(e => {
         e?.preventDefault();
@@ -574,6 +527,11 @@ export function useModalTransferGudangControl({
 
             if (!r.barang_id) {
                 alert(`Baris #${rowNum}: Harap pilih barang terlebih dahulu.`);
+                return;
+            }
+
+            if (Number(r.qty) <= 0) {
+                alert(`Baris #${rowNum}: Silakan pilih minimal 1 unit barang.`);
                 return;
             }
 
@@ -617,6 +575,13 @@ export function useModalTransferGudangControl({
                 if (serials.length !== Number(r.qty)) {
                     alert(
                         `Baris #${rowNum}: Silakan pilih Serial Number tepat ${r.qty} unit.`
+                    );
+                    return;
+                }
+
+                if (new Set(serials).size !== serials.length) {
+                    alert(
+                        `Baris #${rowNum}: Serial Number tidak boleh dipilih lebih dari satu kali.`
                     );
                     return;
                 }
@@ -728,7 +693,6 @@ export function useModalTransferGudangControl({
         handleRemoveRow,
         handleRowFieldChange,
         handleBarangChange,
-        handleQtyChange,
         handleSubmit,
         createEmptyRow
     };
