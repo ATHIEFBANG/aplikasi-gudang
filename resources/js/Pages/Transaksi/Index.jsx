@@ -1,7 +1,9 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import TabTransaksi from './TabTransaksi';
+import { Button } from '@/components/ui/button';
+import { Boxes } from 'lucide-react';
 
 export default function TransaksiIndex({
     transaksis,
@@ -16,7 +18,6 @@ export default function TransaksiIndex({
             <Head title="Transaksi Stok - Logistik" />
 
             <div className="space-y-6 max-w-7xl mx-auto">
-                {/* HEADER CAPTION & TITLE */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
@@ -27,9 +28,18 @@ export default function TransaksiIndex({
                             Pusat pencatatan stok barang masuk, pengeluaran, dan transfer antar-gudang secara terintegrasi.
                         </p>
                     </div>
+
+                    <Link href="/rincian-aset">
+                        <Button
+                            type="button"
+                            className="h-9 text-xs gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-sm shadow-rose-600/20 cursor-pointer"
+                        >
+                            <Boxes className="w-4 h-4" />
+                            <span>Rincian Aset</span>
+                        </Button>
+                    </Link>
                 </div>
 
-                {/* TAB TRANSAKSI UTAMA */}
                 <TabTransaksi
                     transaksis={transaksis}
                     gudangs={gudangs}

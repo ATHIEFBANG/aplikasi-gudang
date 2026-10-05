@@ -10,7 +10,7 @@ const REKONSILIASI_COLUMNS = [
     { key: 'stok_awal', label: 'STOK AWAL' },
     { key: 'masuk', label: 'MASUK (+)' },
     { key: 'keluar', label: 'KELUAR (-)' },
-    { key: 'transfer_net', label: 'TRF NET' },
+    { key: 'transfer_net', label: 'TRF' },
     { key: 'stok_akhir', label: 'STOK USABLE' },
     { key: 'sisa_fisik', label: 'SISA FISIK DI GUDANG' },
     { key: 'grand_total', label: 'STOK KESELURUHAN' },
@@ -44,10 +44,7 @@ function useDropdownPosition(isOpen, buttonRef, menuRef, menuWidth = 224) {
             if (topAbove >= padding) {
                 top = topAbove;
             } else {
-                top = Math.max(
-                    padding,
-                    window.innerHeight - menuHeight - padding
-                );
+                top = Math.max(padding, window.innerHeight - menuHeight - padding);
             }
         }
 
@@ -60,7 +57,7 @@ function useDropdownPosition(isOpen, buttonRef, menuRef, menuWidth = 224) {
     useLayoutEffect(() => {
         if (!isOpen) return;
 
-        const frame = requestAnimationFrame(updatePosition);
+        updatePosition();
 
         const handleScroll = () => updatePosition();
         const handleResize = () => updatePosition();
@@ -69,7 +66,6 @@ function useDropdownPosition(isOpen, buttonRef, menuRef, menuWidth = 224) {
         window.addEventListener('resize', handleResize);
 
         return () => {
-            cancelAnimationFrame(frame);
             window.removeEventListener('scroll', handleScroll, true);
             window.removeEventListener('resize', handleResize);
         };
@@ -106,19 +102,9 @@ function KeluarDropdown({ item }) {
     const buttonRef = useRef(null);
     const menuRef = useRef(null);
 
-    const menuPosition = useDropdownPosition(
-        isOpen,
-        buttonRef,
-        menuRef,
-        224
-    );
+    const menuPosition = useDropdownPosition(isOpen, buttonRef, menuRef, 224);
 
-    useDropdownOutside(
-        isOpen,
-        setIsOpen,
-        buttonRef,
-        menuRef
-    );
+    useDropdownOutside(isOpen, setIsOpen, buttonRef, menuRef);
 
     const val = item.keluar || 0;
 
@@ -134,11 +120,7 @@ function KeluarDropdown({ item }) {
         <div
             ref={menuRef}
             className="fixed w-56 rounded-xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 font-mono text-xs"
-            style={{
-                top: menuPosition.top,
-                left: menuPosition.left,
-                zIndex: 99999,
-            }}
+            style={{ top: menuPosition.top, left: menuPosition.left, zIndex: 99999 }}
         >
             <div className="text-[10px] font-sans font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 pb-1 border-b border-slate-100 dark:border-slate-800">
                 Rincian Keluar
@@ -146,27 +128,21 @@ function KeluarDropdown({ item }) {
 
             <div className="space-y-1">
                 <div className="flex justify-between items-center rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/70">
-                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">
-                        Baru
-                    </span>
+                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Baru</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">
                         {(item.keluar_baru || 0).toLocaleString('id-ID')} Unit
                     </span>
                 </div>
 
                 <div className="flex justify-between items-center rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/70">
-                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">
-                        Bekas
-                    </span>
+                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Bekas</span>
                     <span className="font-bold text-amber-600 dark:text-amber-400">
                         {(item.keluar_bekas || 0).toLocaleString('id-ID')} Unit
                     </span>
                 </div>
 
                 <div className="flex justify-between items-center rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/70">
-                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">
-                        Rusak
-                    </span>
+                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Rusak</span>
                     <span className="font-bold text-rose-600 dark:text-rose-400">
                         {(item.keluar_rusak || 0).toLocaleString('id-ID')} Unit
                     </span>
@@ -189,15 +165,11 @@ function KeluarDropdown({ item }) {
             >
                 <span>-{val.toLocaleString('id-ID')}</span>
                 <ChevronDown
-                    className={`w-3 h-3 transition-transform duration-200 ${
-                        isOpen ? 'rotate-180' : ''
-                    }`}
+                    className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
 
-            {isOpen &&
-                typeof document !== 'undefined' &&
-                createPortal(menu, document.body)}
+            {isOpen && typeof document !== 'undefined' && createPortal(menu, document.body)}
         </>
     );
 }
@@ -207,26 +179,13 @@ function TransferNetDropdown({ item }) {
     const buttonRef = useRef(null);
     const menuRef = useRef(null);
 
-    const menuPosition = useDropdownPosition(
-        isOpen,
-        buttonRef,
-        menuRef,
-        240
-    );
+    const menuPosition = useDropdownPosition(isOpen, buttonRef, menuRef, 240);
 
-    useDropdownOutside(
-        isOpen,
-        setIsOpen,
-        buttonRef,
-        menuRef
-    );
+    useDropdownOutside(isOpen, setIsOpen, buttonRef, menuRef);
 
     const trfIn = item.transfer_in || 0;
     const trfOut = item.transfer_out || 0;
-    const trfNet = item.transfer_net !== undefined
-        ? item.transfer_net
-        : trfIn - trfOut;
-
+    const trfNet = item.transfer_net !== undefined ? item.transfer_net : trfIn - trfOut;
     const hasTransfer = trfIn > 0 || trfOut > 0;
 
     if (!hasTransfer && trfNet === 0) {
@@ -241,11 +200,7 @@ function TransferNetDropdown({ item }) {
         <div
             ref={menuRef}
             className="fixed w-60 rounded-xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 font-mono text-xs"
-            style={{
-                top: menuPosition.top,
-                left: menuPosition.left,
-                zIndex: 99999,
-            }}
+            style={{ top: menuPosition.top, left: menuPosition.left, zIndex: 99999 }}
         >
             <div className="text-[10px] font-sans font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 pb-1 border-b border-slate-100 dark:border-slate-800">
                 Rincian Transfer
@@ -253,18 +208,14 @@ function TransferNetDropdown({ item }) {
 
             <div className="space-y-1">
                 <div className="flex justify-between items-center rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/70">
-                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">
-                        Trf Masuk (+)
-                    </span>
+                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Trf Masuk (+)</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">
                         +{trfIn.toLocaleString('id-ID')} Unit
                     </span>
                 </div>
 
                 <div className="flex justify-between items-center rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/70">
-                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">
-                        Trf Keluar (-)
-                    </span>
+                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Trf Keluar (-)</span>
                     <span className="font-bold text-rose-600 dark:text-rose-400">
                         -{trfOut.toLocaleString('id-ID')} Unit
                     </span>
@@ -275,9 +226,7 @@ function TransferNetDropdown({ item }) {
                         Net Transfer
                     </span>
                     <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                        {trfNet >= 0
-                            ? `+${trfNet.toLocaleString('id-ID')}`
-                            : trfNet.toLocaleString('id-ID')} Unit
+                        {trfNet >= 0 ? `+${trfNet.toLocaleString('id-ID')}` : trfNet.toLocaleString('id-ID')} Unit
                     </span>
                 </div>
             </div>
@@ -293,21 +242,15 @@ function TransferNetDropdown({ item }) {
                 className="inline-flex items-center gap-1 font-mono font-bold text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline cursor-pointer focus:outline-none"
             >
                 <span>
-                    {trfNet >= 0
-                        ? `+${trfNet.toLocaleString('id-ID')}`
-                        : trfNet.toLocaleString('id-ID')}
+                    {trfNet >= 0 ? `+${trfNet.toLocaleString('id-ID')}` : trfNet.toLocaleString('id-ID')}
                 </span>
 
                 <ChevronDown
-                    className={`w-3 h-3 transition-transform duration-200 ${
-                        isOpen ? 'rotate-180' : ''
-                    }`}
+                    className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
 
-            {isOpen &&
-                typeof document !== 'undefined' &&
-                createPortal(menu, document.body)}
+            {isOpen && typeof document !== 'undefined' && createPortal(menu, document.body)}
         </>
     );
 }
@@ -318,35 +261,17 @@ function kondisiLabel(kondisi) {
     return 'Rusak';
 }
 
-function KondisiGudangDropdown({
-    item,
-    kondisi,
-    value,
-    colorClass,
-    hoverClass
-}) {
+function KondisiGudangDropdown({ item, kondisi, value, colorClass, hoverClass }) {
     const [isOpen, setIsOpen] = useState(false);
     const buttonRef = useRef(null);
     const menuRef = useRef(null);
 
-    const menuPosition = useDropdownPosition(
-        isOpen,
-        buttonRef,
-        menuRef,
-        280
-    );
+    const menuPosition = useDropdownPosition(isOpen, buttonRef, menuRef, 280);
 
-    useDropdownOutside(
-        isOpen,
-        setIsOpen,
-        buttonRef,
-        menuRef
-    );
+    useDropdownOutside(isOpen, setIsOpen, buttonRef, menuRef);
 
     const gudangData = Array.isArray(item.kondisi_per_gudang)
-        ? item.kondisi_per_gudang.filter(
-            g => Number(g?.[kondisi] || 0) > 0
-        )
+        ? item.kondisi_per_gudang.filter(g => Number(g?.[kondisi] || 0) > 0)
         : [];
 
     const total = Number(value || 0);
@@ -357,9 +282,7 @@ function KondisiGudangDropdown({
         return (
             <span className={`font-bold ${colorClass}`}>
                 {total.toLocaleString('id-ID')}{' '}
-                <span className="font-sans font-medium text-[10px] text-slate-400">
-                    {label}
-                </span>
+                <span className="font-sans font-medium text-[10px] text-slate-400">{label}</span>
             </span>
         );
     }
@@ -368,20 +291,11 @@ function KondisiGudangDropdown({
         <div
             ref={menuRef}
             className="fixed w-72 max-h-[min(70vh,360px)] overflow-y-auto rounded-xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-3 font-mono text-xs"
-            style={{
-                top: menuPosition.top,
-                left: menuPosition.left,
-                zIndex: 99999,
-            }}
+            style={{ top: menuPosition.top, left: menuPosition.left, zIndex: 99999 }}
         >
             <div className="flex items-center justify-between gap-2 text-[10px] font-sans font-bold uppercase tracking-wider mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                <span className={colorClass}>
-                    {label}
-                </span>
-
-                <span className="text-slate-400 dark:text-slate-500">
-                    Semua Gudang
-                </span>
+                <span className={colorClass}>{label}</span>
+                <span className="text-slate-400 dark:text-slate-500">Semua Gudang</span>
             </div>
 
             <div className="space-y-1">
@@ -430,33 +344,23 @@ function KondisiGudangDropdown({
                 onClick={() => setIsOpen(prev => !prev)}
                 className={`inline-flex items-center gap-1 font-mono text-xs cursor-pointer hover:underline focus:outline-none ${colorClass} ${hoverClass}`}
             >
-                <span className="font-bold">
-                    {total.toLocaleString('id-ID')}
-                </span>
+                <span className="font-bold">{total.toLocaleString('id-ID')}</span>
 
                 <span className="font-sans font-medium text-[10px] text-slate-400">
                     {label}
                 </span>
 
                 <ChevronDown
-                    className={`w-3 h-3 transition-transform duration-200 ${
-                        isOpen ? 'rotate-180' : ''
-                    }`}
+                    className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
 
-            {isOpen &&
-                typeof document !== 'undefined' &&
-                createPortal(menu, document.body)}
+            {isOpen && typeof document !== 'undefined' && createPortal(menu, document.body)}
         </>
     );
 }
 
-export default function TabelRekonsiliasi({
-    dataList = [],
-    zoomLevel = 100,
-    getRowNumber
-}) {
+export default function TabelRekonsiliasi({ dataList = [], zoomLevel = 100, getRowNumber }) {
     const getItemId = item => item?.id || item?.kode_barang;
 
     const formattedColumns = useMemo(() => {
@@ -528,9 +432,7 @@ export default function TabelRekonsiliasi({
                                     hoverClass="hover:text-emerald-700 dark:hover:text-emerald-300"
                                 />
 
-                                <span className="text-slate-300 dark:text-slate-700 font-sans">
-                                    &bull;
-                                </span>
+                                <span className="text-slate-300 dark:text-slate-700 font-sans">&bull;</span>
 
                                 <KondisiGudangDropdown
                                     item={item}
@@ -540,9 +442,7 @@ export default function TabelRekonsiliasi({
                                     hoverClass="hover:text-amber-700 dark:hover:text-amber-300"
                                 />
 
-                                <span className="text-slate-300 dark:text-slate-700 font-sans">
-                                    &bull;
-                                </span>
+                                <span className="text-slate-300 dark:text-slate-700 font-sans">&bull;</span>
 
                                 <KondisiGudangDropdown
                                     item={item}
@@ -557,9 +457,7 @@ export default function TabelRekonsiliasi({
                     case 'grand_total': {
                         const total = item.grand_total !== undefined
                             ? item.grand_total
-                            : (item.kondisi_baru || 0) +
-                              (item.kondisi_bekas || 0) +
-                              (item.kondisi_rusak || 0);
+                            : (item.kondisi_baru || 0) + (item.kondisi_bekas || 0) + (item.kondisi_rusak || 0);
 
                         return (
                             <Badge

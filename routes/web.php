@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HistoryMovingController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RincianAsetController;
 use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\TransaksiBarangMasukController;
 use App\Http\Controllers\TransaksiBarangKeluarController;
@@ -20,6 +21,7 @@ Route::middleware(['auth'])->group(function () {
     // DASHBOARD & LOKASI GUDANG
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/home', fn() => redirect()->route('dashboard'))->name('home');
+
     Route::prefix('gudang')->name('gudang.')->group(function () {
         Route::post('/', [DashboardController::class, 'storeGudang'])->name('store');
         Route::put('/{id}', [DashboardController::class, 'updateGudang'])->name('update');
@@ -47,17 +49,17 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('transaksi-keluar')->name('transaksi.keluar.')->controller(TransaksiBarangKeluarController::class)->group(function () {
         Route::post('/', 'store')->name('store');
         Route::put('/{id}', 'update')->name('update');
-        Route::post('/{id}/cancel', 'cancel')->name('cancel'); // <-- Route Pembatalan Barang Keluar
+        Route::post('/{id}/cancel', 'cancel')->name('cancel');
     });
 
     // ACTION: TRANSFER GUDANG
     Route::prefix('transaksi-transfer')->name('transaksi.transfer.')->controller(TransaksiTransferController::class)->group(function () {
         Route::post('/', 'store')->name('store');
         Route::put('/{id}', 'update')->name('update');
-        Route::post('/{id}/cancel', 'cancel')->name('cancel'); // <-- Route Pembatalan Transfer Gudang
+        Route::post('/{id}/cancel', 'cancel')->name('cancel');
     });
 
-    // HALAMAN UTAMA TRANSAKSI STOK & MANAGEMENT (READ / EXPORT / DELETE / FETCH SERIALS)
+    // HALAMAN UTAMA TRANSAKSI STOK & MANAGEMENT
     Route::prefix('transaksi')->name('transaksi.')->controller(TransaksiController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/barangs/{barangId}/serials', 'getSerialsByBarang')->name('barangs.serials');
@@ -67,13 +69,17 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{id}', 'destroy')->name('destroy');
     });
 
-    // HISTORY MOVING (PELACAKAN MUTASI & RIWAYAT PERJALANAN BARANG)
+    // RINCIAN ASET BARANG KELUAR
+    Route::get('/rincian-aset', [RincianAsetController::class, 'index'])
+        ->name('rincian-aset.index');
+
+    // HISTORY MOVING
     Route::prefix('history-moving')->name('history-moving.')->controller(HistoryMovingController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/export', 'export')->name('export');
     });
 
-    // LAPORAN BULANAN (REKONSILIASI STOK & BUKU JURNAL MUTASI)
+    // LAPORAN BULANAN
     Route::prefix('laporan')->name('laporan.')->controller(LaporanController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/export', 'export')->name('export');
