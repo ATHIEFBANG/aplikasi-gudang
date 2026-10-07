@@ -35,49 +35,29 @@ const geometricHeader = `
 
 const geometricHeaderUrl = `url("data:image/svg+xml,${encodeURIComponent(geometricHeader)}")`;
 
-const defaultFormatNumber = value =>
-    Number(value || 0).toLocaleString('id-ID');
+const defaultFormatNumber = value => Number(value || 0).toLocaleString('id-ID');
 
 const defaultFormatCurrency = value => {
     const amount = Number(value || 0);
-
     if (!amount) return 'Rp -';
-
     return `Rp ${amount.toLocaleString('id-ID')}`;
 };
 
 const getAccessorValue = (row, config) => {
-    if (typeof config?.getValue === 'function') {
-        return config.getValue(row);
-    }
-
-    if (config?.key) {
-        return row?.[config.key];
-    }
-
+    if (typeof config?.getValue === 'function') return config.getValue(row);
+    if (config?.key) return row?.[config.key];
     return null;
 };
 
 const formatValue = (value, config) => {
-    if (typeof config?.format === 'function') {
-        return config.format(value);
-    }
-
-    if (config?.format === 'currency') {
-        return defaultFormatCurrency(value);
-    }
-
-    if (config?.format === 'number') {
-        return defaultFormatNumber(value);
-    }
-
+    if (typeof config?.format === 'function') return config.format(value);
+    if (config?.format === 'currency') return defaultFormatCurrency(value);
+    if (config?.format === 'number') return defaultFormatNumber(value);
     return value ?? '-';
 };
 
 const aggregateValues = (rows, config) => {
-    if (typeof config?.aggregate === 'function') {
-        return config.aggregate(rows);
-    }
+    if (typeof config?.aggregate === 'function') return config.aggregate(rows);
 
     const values = rows.map(row => {
         const value = Number(getAccessorValue(row, config));
@@ -88,9 +68,7 @@ const aggregateValues = (rows, config) => {
         case 'count':
             return rows.length;
         case 'avg':
-            return values.length
-                ? values.reduce((sum, value) => sum + value, 0) / values.length
-                : 0;
+            return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
         case 'min':
             return values.length ? Math.min(...values) : 0;
         case 'max':
@@ -102,17 +80,12 @@ const aggregateValues = (rows, config) => {
 };
 
 const normalizeGroupValue = (value, config) => {
-    if (value === undefined || value === null || value === '') {
-        return config?.emptyLabel || '-';
-    }
-
+    if (value === undefined || value === null || value === '') return config?.emptyLabel || '-';
     return String(value);
 };
 
 const buildTree = (rows, levels, levelIndex = 0, parentKey = '') => {
-    if (levelIndex >= levels.length) {
-        return [];
-    }
+    if (levelIndex >= levels.length) return [];
 
     const level = levels[levelIndex];
     const groups = new Map();
@@ -121,31 +94,20 @@ const buildTree = (rows, levels, levelIndex = 0, parentKey = '') => {
         const rawValue = getAccessorValue(row, level);
         const value = normalizeGroupValue(rawValue, level);
 
-        if (!groups.has(value)) {
-            groups.set(value, []);
-        }
-
+        if (!groups.has(value)) groups.set(value, []);
         groups.get(value).push(row);
     });
 
     return [...groups.entries()].map(([value, groupRows], index) => {
         const key = `${parentKey}${level.key}::${value}::${index}`;
-
-        const children = buildTree(
-            groupRows,
-            levels,
-            levelIndex + 1,
-            `${key}::`
-        );
+        const children = buildTree(groupRows, levels, levelIndex + 1, `${key}::`);
 
         return {
             type: level.type || 'group',
             level: levelIndex,
             key,
             value,
-            label: typeof level.format === 'function'
-                ? level.format(value, groupRows)
-                : value,
+            label: typeof level.format === 'function' ? level.format(value, groupRows) : value,
             rows: groupRows,
             children,
         };
@@ -165,7 +127,6 @@ const collectExpandableKeys = nodes => {
     };
 
     walk(nodes);
-
     return keys;
 };
 
@@ -178,13 +139,8 @@ const resolveAlign = align => {
 const getRowStyles = (node, levels) => {
     const levelConfig = levels[node.level] || {};
 
-    if (typeof levelConfig.rowClassName === 'function') {
-        return levelConfig.rowClassName(node);
-    }
-
-    if (levelConfig.rowClassName) {
-        return levelConfig.rowClassName;
-    }
+    if (typeof levelConfig.rowClassName === 'function') return levelConfig.rowClassName(node);
+    if (levelConfig.rowClassName) return levelConfig.rowClassName;
 
     const defaults = [
         'bg-slate-50 dark:bg-slate-800/60 font-bold',
@@ -199,13 +155,8 @@ const getRowStyles = (node, levels) => {
 const getLabelStyles = (node, levels) => {
     const levelConfig = levels[node.level] || {};
 
-    if (typeof levelConfig.labelClassName === 'function') {
-        return levelConfig.labelClassName(node);
-    }
-
-    if (levelConfig.labelClassName) {
-        return levelConfig.labelClassName;
-    }
+    if (typeof levelConfig.labelClassName === 'function') return levelConfig.labelClassName(node);
+    if (levelConfig.labelClassName) return levelConfig.labelClassName;
 
     const defaults = [
         'text-slate-900 dark:text-white',
@@ -217,29 +168,18 @@ const getLabelStyles = (node, levels) => {
     return defaults[Math.min(node.level, defaults.length - 1)];
 };
 
-function PivotRow({
-    node,
-    levels,
-    valueColumns,
-    expandedKeys,
-    onToggle,
-    indentation,
-}) {
+function PivotRow({ node, levels, valueColumns, expandedKeys, onToggle, indentation }) {
     const hasChildren = node.children?.length > 0;
     const isExpanded = expandedKeys.has(node.key);
     const rowClassName = getRowStyles(node, levels);
     const labelClassName = getLabelStyles(node, levels);
+    const showValues = levels[node.level]?.showValues !== false;
 
     return (
         <>
             <tr className={`${rowClassName} border-b border-slate-100 dark:border-slate-800/70 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors`}>
                 <td className="py-2.5 px-3 overflow-hidden">
-                    <div
-                        className="flex items-center min-w-0"
-                        style={{
-                            paddingLeft: `${node.level * indentation}px`,
-                        }}
-                    >
+                    <div className="flex items-center min-w-0" style={{ paddingLeft: `${node.level * indentation}px` }}>
                         {hasChildren ? (
                             <button
                                 type="button"
@@ -282,11 +222,9 @@ function PivotRow({
                         <td
                             key={column.key}
                             className={`py-2.5 px-3 text-[11px] font-mono font-semibold ${column.cellClassName || 'text-slate-700 dark:text-slate-300'}`}
-                            style={{
-                                textAlign: resolveAlign(column.align),
-                            }}
+                            style={{ textAlign: resolveAlign(column.align) }}
                         >
-                            {formatValue(value, column)}
+                            {showValues ? formatValue(value, column) : ''}
                         </td>
                     );
                 })}
@@ -330,32 +268,17 @@ const TabelPivot = forwardRef(function TabelPivot({
 }, ref) {
     const safeData = Array.isArray(data) ? data : [];
 
-    const tree = useMemo(
-        () => buildTree(safeData, levels),
-        [safeData, levels]
-    );
-
-    const allExpandableKeys = useMemo(
-        () => collectExpandableKeys(tree),
-        [tree]
-    );
+    const tree = useMemo(() => buildTree(safeData, levels), [safeData, levels]);
+    const allExpandableKeys = useMemo(() => collectExpandableKeys(tree), [tree]);
 
     const [expandedKeys, setExpandedKeys] = useState(() =>
         defaultExpanded ? allExpandableKeys : new Set()
     );
 
-    useImperativeHandle(
-        ref,
-        () => ({
-            expandAll: () => {
-                setExpandedKeys(new Set(allExpandableKeys));
-            },
-            collapseAll: () => {
-                setExpandedKeys(new Set());
-            },
-        }),
-        [allExpandableKeys]
-    );
+    useImperativeHandle(ref, () => ({
+        expandAll: () => setExpandedKeys(new Set(allExpandableKeys)),
+        collapseAll: () => setExpandedKeys(new Set()),
+    }), [allExpandableKeys]);
 
     const grandTotals = useMemo(() => {
         return valueColumns.map(column => ({
@@ -378,34 +301,18 @@ const TabelPivot = forwardRef(function TabelPivot({
         });
     };
 
-    const zoomScale = Math.max(
-        10,
-        Math.min(16, zoomLevel * 0.11)
-    );
+    const zoomScale = Math.max(10, Math.min(16, zoomLevel * 0.11));
 
     return (
         <div className="w-full overflow-x-auto transition-all duration-200 ease-out">
-            <table
-                className="w-full table-fixed border-collapse text-left text-xs"
-                style={{
-                    fontSize: `${zoomScale}px`,
-                }}
-            >
+            <table className="w-full table-fixed border-collapse text-left text-xs" style={{ fontSize: `${zoomScale}px` }}>
                 <colgroup>
-                    <col
-                        style={{
-                            width: `${labelColumnWidth}px`,
-                        }}
-                    />
+                    <col style={{ width: `${labelColumnWidth}px` }} />
 
                     {valueColumns.map(column => (
                         <col
                             key={column.key}
-                            style={{
-                                width: column.width
-                                    ? `${column.width}px`
-                                    : undefined,
-                            }}
+                            style={{ width: column.width ? `${column.width}px` : undefined }}
                         />
                     ))}
                 </colgroup>
@@ -430,9 +337,7 @@ const TabelPivot = forwardRef(function TabelPivot({
                             <th
                                 key={column.key}
                                 className="py-2.5 px-3 whitespace-nowrap"
-                                style={{
-                                    textAlign: resolveAlign(column.align),
-                                }}
+                                style={{ textAlign: resolveAlign(column.align) }}
                             >
                                 {column.label}
                             </th>
@@ -455,17 +360,9 @@ const TabelPivot = forwardRef(function TabelPivot({
                         ))
                     ) : (
                         <tr>
-                            <td
-                                colSpan={valueColumns.length + 1}
-                                className="py-10 text-center text-xs text-slate-400"
-                            >
-                                <div className="font-semibold">
-                                    {emptyMessage}
-                                </div>
-
-                                <div className="mt-1 text-[10px]">
-                                    {emptySubMessage}
-                                </div>
+                            <td colSpan={valueColumns.length + 1} className="py-10 text-center text-xs text-slate-400">
+                                <div className="font-semibold">{emptyMessage}</div>
+                                <div className="mt-1 text-[10px]">{emptySubMessage}</div>
                             </td>
                         </tr>
                     )}
@@ -480,11 +377,7 @@ const TabelPivot = forwardRef(function TabelPivot({
                                 <td
                                     key={column.key}
                                     className={`py-2.5 px-3 text-[11px] font-black font-mono ${grandTotalCellClassName}`}
-                                    style={{
-                                        textAlign: resolveAlign(
-                                            column.grandTotalAlign ?? column.align
-                                        ),
-                                    }}
+                                    style={{ textAlign: resolveAlign(column.grandTotalAlign ?? column.align) }}
                                 >
                                     {formatValue(column.value, column)}
                                 </td>

@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import TabelRincianAset from './TabelRincianAset';
-import { ArrowLeft } from 'lucide-react';
 
 const TAB_CONFIG = {
     PROYEK: 'Proyek',
@@ -45,19 +44,6 @@ export default function AnalisisBarangKeluarIndex({
         setEndDate(filters?.end_date || '');
         setZoomLevel(Number(filters?.zoom || 100));
     }, [filters]);
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (searchTerm === (filters?.search || '')) return;
-
-            navigateWithFilters({
-                search: searchTerm,
-                page: 1,
-            });
-        }, 400);
-
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
 
     const gudangOptions = useMemo(() => [
         { value: 'ALL', label: 'Semua Gudang' },
@@ -120,6 +106,15 @@ export default function AnalisisBarangKeluarIndex({
             preserveScroll: true,
             replace: true,
             onFinish: () => setIsProcessing(false),
+        });
+    };
+
+    const handleSearch = value => {
+        setSearchTerm(value);
+
+        navigateWithFilters({
+            search: value,
+            page: 1,
         });
     };
 
@@ -196,24 +191,14 @@ export default function AnalisisBarangKeluarIndex({
 
             <div className="max-w-[1500px] mx-auto">
                 <div className="px-1 sm:px-2">
-                    <div className="flex items-start gap-3">
-                        <Link
-                            href="/transaksi"
-                            title="Kembali ke Transaksi"
-                            className="mt-1 w-10 h-10 shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/70 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        >
-                            <ArrowLeft className="w-4 h-4" />
-                        </Link>
+                    <div>
+                        <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white">
+                            Analisis Barang Keluar
+                        </h1>
 
-                        <div>
-                            <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white">
-                                Analisis Barang Keluar
-                            </h1>
-
-                            <p className="mt-1 text-sm sm:text-base text-slate-500 dark:text-slate-400">
-                                Analisis pengeluaran barang berdasarkan proyek dan kebutuhan non proyek.
-                            </p>
-                        </div>
+                        <p className="mt-1 text-sm sm:text-base text-slate-500 dark:text-slate-400">
+                            Analisis pengeluaran barang berdasarkan proyek dan kebutuhan non proyek.
+                        </p>
                     </div>
                 </div>
 
@@ -230,6 +215,7 @@ export default function AnalisisBarangKeluarIndex({
                         gudangOptions={gudangOptions}
                         searchTerm={searchTerm}
                         setSearchTerm={setSearchTerm}
+                        onSearch={handleSearch}
                         startDate={startDate}
                         endDate={endDate}
                         onFilterApply={handleFilterApply}

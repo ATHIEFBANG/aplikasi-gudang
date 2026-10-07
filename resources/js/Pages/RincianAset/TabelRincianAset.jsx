@@ -3,9 +3,9 @@ import TabelPivot from '@/components/TabelPivot';
 import FilterPanel from '@/components/FilterPanel';
 import HybridDropdown from '@/components/HybridDropdown';
 import DateRangeFilter from '@/components/DateRangeFilter';
+import Search from '@/components/Search';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { BriefcaseBusiness, Building2, Search } from 'lucide-react';
+import { BriefcaseBusiness, Building2 } from 'lucide-react';
 
 const getBarangName = item => [
     item?.brand,
@@ -20,7 +20,6 @@ const normalizeSerials = value => {
                 if (typeof item === 'object' && item !== null) {
                     return item.serial_number || item.serial || item.sn || item.value || '';
                 }
-
                 return String(item || '');
             })
             .map(item => String(item).trim())
@@ -117,6 +116,7 @@ export default function TabelRincianAset({
     isProcessing = false,
     searchTerm = '',
     setSearchTerm,
+    onSearch,
     project = '',
     projectOptions = [],
     department = '',
@@ -159,18 +159,22 @@ export default function TabelRincianAset({
                     key: 'project',
                     getValue: row => row?.project || '-',
                     emptyLabel: 'Tanpa Project',
+                    showValues: true,
                 },
                 {
                     key: 'barang',
                     getValue: row => row?.nama_barang_display || '-',
+                    showValues: true,
                 },
                 {
                     key: 'kode_ppl',
                     getValue: row => row?.kode_ppl || '-',
+                    showValues: false,
                 },
                 {
                     key: 'serial_number',
                     getValue: row => row?.serial_number || '-',
+                    showValues: true,
                 },
             ];
         }
@@ -180,18 +184,22 @@ export default function TabelRincianAset({
                 key: 'department',
                 getValue: row => row?.department || row?.pihak_asal || '-',
                 emptyLabel: 'Tanpa Departemen',
+                showValues: true,
             },
             {
                 key: 'barang',
                 getValue: row => row?.nama_barang_display || '-',
+                showValues: true,
             },
             {
                 key: 'kode_ppl',
                 getValue: row => row?.kode_ppl || '-',
+                showValues: false,
             },
             {
                 key: 'serial_number',
                 getValue: row => row?.serial_number || '-',
+                showValues: true,
             },
         ];
     }, [isProject]);
@@ -199,7 +207,7 @@ export default function TabelRincianAset({
     const valueColumns = useMemo(() => [
         {
             key: 'jumlah',
-            label: 'SUM OF JUMLAH',
+            label: 'JUMLAH',
             getValue: row => row?.pivot_qty || 0,
             aggregate: 'sum',
             format: 'number',
@@ -209,7 +217,7 @@ export default function TabelRincianAset({
         },
         {
             key: 'harga',
-            label: 'SUM OF HARGA (RP)',
+            label: 'HARGA (RP)',
             getValue: row => row?.pivot_nilai || 0,
             aggregate: 'sum',
             format: 'currency',
@@ -420,32 +428,26 @@ export default function TabelRincianAset({
                                 </p>
                             </div>
 
-                            <div className="relative w-56 hidden lg:block shrink-0">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-
-                                <Input
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm?.(e.target.value)}
-                                    placeholder="Cari barang / kode PPL / SN..."
-                                    disabled={isProcessing}
-                                    className="h-8 pl-8 pr-3 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                                />
-                            </div>
+                            <Search
+                                value={searchTerm}
+                                onChange={setSearchTerm}
+                                onSearch={onSearch}
+                                placeholder="Cari barang / kode PPL / SN..."
+                                disabled={isProcessing}
+                                className="w-72 hidden lg:block"
+                            />
                         </div>
                     </div>
 
                     <div className="lg:hidden px-5 py-3 border-b border-slate-200 dark:border-slate-800">
-                        <div className="relative w-full">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-
-                            <Input
-                                value={searchTerm}
-                                onChange={e => setSearchTerm?.(e.target.value)}
-                                placeholder="Cari barang / kode PPL / SN..."
-                                disabled={isProcessing}
-                                className="h-8 pl-8 pr-3 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                            />
-                        </div>
+                        <Search
+                            value={searchTerm}
+                            onChange={setSearchTerm}
+                            onSearch={onSearch}
+                            placeholder="Cari barang / kode PPL / SN..."
+                            disabled={isProcessing}
+                            className="w-full"
+                        />
                     </div>
 
                     <TabelPivot
