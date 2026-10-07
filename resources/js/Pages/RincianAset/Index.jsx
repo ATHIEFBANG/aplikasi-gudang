@@ -1,66 +1,67 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import StatistikRincianAset from './StatistikRincianAset';
 import TabelRincianAset from './TabelRincianAset';
-import {
-    ArrowLeft,
-    Box,
-    Boxes,
-    Warehouse,
-} from 'lucide-react';
+import { ArrowLeft, BriefcaseBusiness, Building2 } from 'lucide-react';
 
 const TAB_CONFIG = {
-    TERPASANG: { label: 'Aset Project Terpasang', icon: Boxes },
-    GUDANG: { label: 'Aset Project di Gudang', icon: Box },
-    STOK: { label: 'Stok per Gudang', icon: Warehouse },
+    PROYEK: {
+        label: 'Proyek',
+        icon: BriefcaseBusiness,
+        activeClass: 'bg-rose-600 text-white shadow-sm shadow-rose-600/20 hover:bg-rose-700',
+    },
+    NON_PROYEK: {
+        label: 'Non Proyek',
+        icon: Building2,
+        activeClass: 'bg-blue-600 text-white shadow-sm shadow-blue-600/20 hover:bg-blue-700',
+    },
 };
 
-const getPageData = (tab, terpasang, asetGudang, stokGudang) => {
-    if (tab === 'GUDANG') return asetGudang || { data: [] };
-    if (tab === 'STOK') return stokGudang || { data: [] };
-    return terpasang || { data: [] };
-};
+const getPivotData = data => Array.isArray(data) ? data : data?.data || [];
 
-export default function RincianAsetIndex({
-    activeTab = 'TERPASANG',
-    terpasang = { data: [] },
-    asetGudang = { data: [] },
-    stokGudang = { data: [] },
-    summary = {},
-    gudangs = [],
+export default function AnalisisBarangKeluarIndex({
+    activeTab = 'PROYEK',
+    projectPivot = [],
+    nonProjectPivot = [],
     projectOptions = [],
+    departmentOptions = [],
+    gudangs = [],
     filters = {},
 }) {
-    const initialTab = TAB_CONFIG[activeTab] ? activeTab : 'TERPASANG';
+    const initialTab = TAB_CONFIG[activeTab] ? activeTab : 'PROYEK';
+
     const [currentTab, setCurrentTab] = useState(initialTab);
     const [searchTerm, setSearchTerm] = useState(filters?.search || '');
     const [project, setProject] = useState(filters?.project || '');
+    const [department, setDepartment] = useState(filters?.department || '');
     const [gudangId, setGudangId] = useState(filters?.gudang_id || 'ALL');
     const [startDate, setStartDate] = useState(filters?.start_date || '');
     const [endDate, setEndDate] = useState(filters?.end_date || '');
-    const [perPage, setPerPage] = useState(filters?.per_page || 10);
-    const [sortOrder, setSortOrder] = useState('desc');
-    const [zoomLevel, setZoomLevel] = useState(100);
+    const [zoomLevel, setZoomLevel] = useState(Number(filters?.zoom || 100));
     const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
-        setCurrentTab(TAB_CONFIG[activeTab] ? activeTab : 'TERPASANG');
+        setCurrentTab(TAB_CONFIG[activeTab] ? activeTab : 'PROYEK');
     }, [activeTab]);
 
     useEffect(() => {
         setSearchTerm(filters?.search || '');
         setProject(filters?.project || '');
+        setDepartment(filters?.department || '');
         setGudangId(filters?.gudang_id || 'ALL');
         setStartDate(filters?.start_date || '');
         setEndDate(filters?.end_date || '');
-        setPerPage(filters?.per_page || 10);
+        setZoomLevel(Number(filters?.zoom || 100));
     }, [filters]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             if (searchTerm === (filters?.search || '')) return;
-            navigateWithFilters({ search: searchTerm, page: 1 });
+
+            navigateWithFilters({
+                search: searchTerm,
+                page: 1,
+            });
         }, 400);
 
         return () => clearTimeout(timer);
@@ -79,7 +80,14 @@ export default function RincianAsetIndex({
         [projectOptions]
     );
 
-    const activeData = getPageData(currentTab, terpasang, asetGudang, stokGudang);
+    const departmentFilterOptions = useMemo(
+        () => departmentOptions.map(item => ({ value: item, label: item })),
+        [departmentOptions]
+    );
+
+    const activeData = currentTab === 'PROYEK'
+        ? getPivotData(projectPivot)
+        : getPivotData(nonProjectPivot);
 
     const navigateWithFilters = (params = {}) => {
         setIsProcessing(true);
@@ -88,15 +96,29 @@ export default function RincianAsetIndex({
             tab: params.tab ?? currentTab,
             search: params.search ?? searchTerm,
             project: params.project ?? project,
+            department: params.department ?? department,
             gudang_id: params.gudang_id ?? gudangId,
             start_date: params.start_date ?? startDate,
             end_date: params.end_date ?? endDate,
-            per_page: params.per_page ?? perPage,
+            zoom: params.zoom ?? zoomLevel,
             page: params.page ?? 1,
         };
 
+        if (query.tab === 'PROYEK') {
+            delete query.department;
+        }
+
+        if (query.tab === 'NON_PROYEK') {
+            delete query.project;
+        }
+
         Object.keys(query).forEach(key => {
-            if (query[key] === '' || query[key] === 'ALL' || query[key] === undefined || query[key] === null) {
+            if (
+                query[key] === '' ||
+                query[key] === 'ALL' ||
+                query[key] === undefined ||
+                query[key] === null
+            ) {
                 delete query[key];
             }
         });
@@ -111,51 +133,97 @@ export default function RincianAsetIndex({
 
     const handleTabChange = tab => {
         setCurrentTab(tab);
-        navigateWithFilters({ tab, page: 1 });
+
+        if (tab === 'PROYEK') {
+            setDepartment('');
+        } else {
+            setProject('');
+        }
+
+        navigateWithFilters({
+            tab,
+            project: tab === 'PROYEK' ? project : '',
+            department: tab === 'NON_PROYEK' ? department : '',
+            page: 1,
+        });
     };
 
     const handleProjectChange = value => {
         setProject(value);
-        navigateWithFilters({ project: value, page: 1 });
+
+        navigateWithFilters({
+            project: value,
+            page: 1,
+        });
+    };
+
+    const handleDepartmentChange = value => {
+        setDepartment(value);
+
+        navigateWithFilters({
+            department: value,
+            page: 1,
+        });
     };
 
     const handleGudangChange = value => {
         setGudangId(value);
-        navigateWithFilters({ gudang_id: value, page: 1 });
+
+        navigateWithFilters({
+            gudang_id: value,
+            page: 1,
+        });
     };
 
     const handleDateApply = (start, end) => {
         setStartDate(start);
         setEndDate(end);
-        navigateWithFilters({ start_date: start, end_date: end, page: 1 });
+
+        navigateWithFilters({
+            start_date: start,
+            end_date: end,
+            page: 1,
+        });
     };
 
     const handleDateReset = () => {
         setStartDate('');
         setEndDate('');
-        navigateWithFilters({ start_date: '', end_date: '', page: 1 });
+
+        navigateWithFilters({
+            start_date: '',
+            end_date: '',
+            page: 1,
+        });
     };
 
-    const handlePerPageChange = value => {
-        const nextPerPage = Number(value);
-        setPerPage(nextPerPage);
-        navigateWithFilters({ per_page: nextPerPage, page: 1 });
-    };
+    const handleResetFilters = () => {
+        setSearchTerm('');
+        setProject('');
+        setDepartment('');
+        setGudangId('ALL');
+        setStartDate('');
+        setEndDate('');
+        setZoomLevel(100);
 
-    const handlePageChange = page => {
-        navigateWithFilters({ page });
-    };
-
-    const handleToggleSort = () => {
-        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        navigateWithFilters({
+            search: '',
+            project: '',
+            department: '',
+            gudang_id: 'ALL',
+            start_date: '',
+            end_date: '',
+            zoom: 100,
+            page: 1,
+        });
     };
 
     const handleZoomIn = () => {
-        setZoomLevel(prev => Math.min(prev + 10, 120));
+        setZoomLevel(prev => Math.min(prev + 10, 125));
     };
 
     const handleZoomOut = () => {
-        setZoomLevel(prev => Math.max(prev - 10, 50));
+        setZoomLevel(prev => Math.max(prev - 10, 60));
     };
 
     const handleResetZoom = () => {
@@ -163,87 +231,12 @@ export default function RincianAsetIndex({
     };
 
     const handleFitZoom = () => {
-        setZoomLevel(85);
-    };
-
-    const handleResetFilters = () => {
-        setSearchTerm('');
-        setProject('');
-        setGudangId('ALL');
-        setStartDate('');
-        setEndDate('');
-        navigateWithFilters({
-            search: '',
-            project: '',
-            gudang_id: 'ALL',
-            start_date: '',
-            end_date: '',
-            page: 1,
-        });
-    };
-
-    const handleExport = () => {
-        const rows = activeData?.data || [];
-        if (!rows.length) return;
-
-        let headers = [];
-        let dataRows = [];
-
-        if (currentTab === 'TERPASANG') {
-            headers = ['Kode PPL', 'Barang', 'Project', 'Jumlah', 'Harga Satuan', 'Nilai Aset', 'Status'];
-            dataRows = rows.map(item => [
-                item.kode_barang || '-',
-                item.nama_barang || '-',
-                item.project || '-',
-                item.jumlah || 0,
-                item.harga || 0,
-                item.nilai_aset || 0,
-                item.status || 'Terpasang',
-            ]);
-        } else if (currentTab === 'GUDANG') {
-            headers = ['Keluar Terakhir', 'Kode PPL', 'Barang', 'Gudang', 'Jumlah', 'Harga Satuan', 'Nilai Aset'];
-            dataRows = rows.map(item => [
-                item.keluar_data || '-',
-                item.kode_barang || '-',
-                item.nama_barang || '-',
-                item.nama_gudang || '-',
-                item.jumlah || 0,
-                item.harga || 0,
-                item.nilai_aset || 0,
-            ]);
-        } else {
-            headers = ['Gudang', 'Kode PPL', 'Barang', 'Total Stok', 'Harga Satuan', 'Nilai Aset'];
-            dataRows = rows.map(item => [
-                item.nama_gudang || '-',
-                item.kode_barang || '-',
-                item.nama_barang || '-',
-                item.total_stok || 0,
-                item.harga || 0,
-                item.nilai_aset || 0,
-            ]);
-        }
-
-        const csv = [
-            headers.join(';'),
-            ...dataRows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(';')),
-        ].join('\n');
-
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-
-        link.href = url;
-        link.download = `Rincian_Aset_${currentTab}_${new Date().toISOString().slice(0, 10)}.csv`;
-
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+        setZoomLevel(90);
     };
 
     return (
-        <AuthenticatedLayout header="Rincian Aset">
-            <Head title="Rincian Aset - Panca Pilar Laksana" />
+        <AuthenticatedLayout header="Analisis Barang Keluar">
+            <Head title="Analisis Barang Keluar - Panca Pilar Laksana" />
 
             <div className="max-w-[1500px] mx-auto">
                 <div className="px-1 sm:px-2">
@@ -258,78 +251,69 @@ export default function RincianAsetIndex({
 
                         <div>
                             <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white">
-                                Rincian Aset
+                                Analisis Barang Keluar
                             </h1>
 
                             <p className="mt-1 text-sm sm:text-base text-slate-500 dark:text-slate-400">
-                                Monitoring aset project, aset di gudang, dan stok di setiap gudang.
+                                Analisis pengeluaran barang berdasarkan proyek dan kebutuhan non proyek.
                             </p>
                         </div>
                     </div>
 
-                    <div className="mt-5 grid grid-cols-3 border-b border-slate-200 dark:border-slate-800">
-                        {Object.entries(TAB_CONFIG).map(([key, config]) => {
-                            const Icon = config.icon;
-                            const isActive = currentTab === key;
+                    <div className="mt-5">
+                        <div className="inline-flex items-center gap-1 p-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-900/80 shadow-sm">
+                            {Object.entries(TAB_CONFIG).map(([key, config]) => {
+                                const Icon = config.icon;
+                                const isActive = currentTab === key;
 
-                            return (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    onClick={() => handleTabChange(key)}
-                                    disabled={isProcessing}
-                                    className={`relative flex items-center justify-center gap-2.5 px-4 py-4 text-sm sm:text-base font-semibold transition-all cursor-pointer ${isActive ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'}`}
-                                >
-                                    <Icon className="w-5 h-5" />
-                                    <span>{config.label}</span>
-
-                                    {isActive && (
-                                        <span className="absolute left-0 right-0 -bottom-px h-[3px] bg-rose-600 rounded-t-full" />
-                                    )}
-                                </button>
-                            );
-                        })}
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => handleTabChange(key)}
+                                        disabled={isProcessing}
+                                        className={`inline-flex items-center justify-center gap-2 min-w-[150px] h-9 px-4 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                                            isActive
+                                                ? config.activeClass
+                                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/70 dark:hover:bg-slate-800/70'
+                                        }`}
+                                    >
+                                        <Icon className="w-4 h-4" strokeWidth={2} />
+                                        <span>{config.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
                 <div className="pt-5">
-                    <StatistikRincianAset
-                        summary={summary}
+                    <TabelRincianAset
                         activeTab={currentTab}
+                        dataList={activeData}
+                        project={project}
+                        projectOptions={projectFilterOptions}
+                        onProjectChange={handleProjectChange}
+                        department={department}
+                        departmentOptions={departmentFilterOptions}
+                        onDepartmentChange={handleDepartmentChange}
+                        gudangId={gudangId}
+                        gudangOptions={gudangOptions}
+                        onGudangChange={handleGudangChange}
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        startDate={startDate}
+                        endDate={endDate}
+                        onDateApply={handleDateApply}
+                        onDateReset={handleDateReset}
+                        onReset={handleResetFilters}
+                        isProcessing={isProcessing}
+                        zoomLevel={zoomLevel}
+                        onZoomIn={handleZoomIn}
+                        onZoomOut={handleZoomOut}
+                        onResetZoom={handleResetZoom}
+                        onFitZoom={handleFitZoom}
                     />
-
-                    <div className="mt-5">
-                        <TabelRincianAset
-                            activeTab={currentTab}
-                            dataList={activeData?.data || []}
-                            pagination={activeData}
-                            isProcessing={isProcessing}
-                            searchTerm={searchTerm}
-                            setSearchTerm={setSearchTerm}
-                            project={project}
-                            projectOptions={projectFilterOptions}
-                            onProjectChange={handleProjectChange}
-                            gudangId={gudangId}
-                            gudangOptions={gudangOptions}
-                            onGudangChange={handleGudangChange}
-                            startDate={startDate}
-                            endDate={endDate}
-                            onDateApply={handleDateApply}
-                            onDateReset={handleDateReset}
-                            onReset={handleResetFilters}
-                            onExport={handleExport}
-                            sortOrder={sortOrder}
-                            onToggleSort={handleToggleSort}
-                            zoomLevel={zoomLevel}
-                            onZoomIn={handleZoomIn}
-                            onZoomOut={handleZoomOut}
-                            onResetZoom={handleResetZoom}
-                            onFitZoom={handleFitZoom}
-                            onPageChange={handlePageChange}
-                            onPerPageChange={handlePerPageChange}
-                            perPage={perPage}
-                        />
-                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>
