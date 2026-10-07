@@ -1,18 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TabelPivot from '@/components/TabelPivot';
+import FilterPanel from '@/components/FilterPanel';
 import HybridDropdown from '@/components/HybridDropdown';
 import DateRangeFilter from '@/components/DateRangeFilter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { RotateCcw, Search, Layers3 } from 'lucide-react';
+import { BriefcaseBusiness, Building2, Search } from 'lucide-react';
 
-const getBarangName = item => {
-    return [
-        item?.brand,
-        item?.tipe,
-        item?.kategori,
-    ].filter(Boolean).join(' ') || item?.nama_barang || '-';
-};
+const getBarangName = item => [
+    item?.brand,
+    item?.tipe,
+    item?.kategori,
+].filter(Boolean).join(' ') || item?.nama_barang || '-';
 
 const normalizeSerials = value => {
     if (Array.isArray(value)) {
@@ -41,7 +40,7 @@ const normalizeSerials = value => {
             return normalizeSerials(parsed);
         }
     } catch {
-        // Bukan JSON, lanjut parsing biasa.
+        //
     }
 
     return raw
@@ -80,7 +79,6 @@ const buildPivotRows = dataList => {
             _source_index: index,
             nama_barang_display: getBarangName(item),
             kode_ppl: item?.kode_barang || '-',
-            harga_satuan: harga,
         };
 
         if (!serials.length) {
@@ -114,26 +112,39 @@ const buildPivotRows = dataList => {
 
 export default function TabelRincianAset({
     activeTab = 'PROYEK',
+    onTabChange,
     dataList = [],
     isProcessing = false,
     searchTerm = '',
     setSearchTerm,
     project = '',
     projectOptions = [],
-    onProjectChange,
     department = '',
     departmentOptions = [],
-    onDepartmentChange,
     gudangId = 'ALL',
     gudangOptions = [],
-    onGudangChange,
     startDate = '',
     endDate = '',
-    onDateApply,
-    onDateReset,
     onReset,
+    onFilterApply,
     zoomLevel = 100,
 }) {
+    const pivotRef = useRef(null);
+
+    const [draftProject, setDraftProject] = useState(project);
+    const [draftDepartment, setDraftDepartment] = useState(department);
+    const [draftGudangId, setDraftGudangId] = useState(gudangId);
+    const [draftStartDate, setDraftStartDate] = useState(startDate);
+    const [draftEndDate, setDraftEndDate] = useState(endDate);
+
+    useEffect(() => {
+        setDraftProject(project);
+        setDraftDepartment(department);
+        setDraftGudangId(gudangId);
+        setDraftStartDate(startDate);
+        setDraftEndDate(endDate);
+    }, [project, department, gudangId, startDate, endDate]);
+
     const pivotRows = useMemo(
         () => buildPivotRows(dataList),
         [dataList]
@@ -193,7 +204,8 @@ export default function TabelRincianAset({
             aggregate: 'sum',
             format: 'number',
             align: 'center',
-            width: 150,
+            grandTotalAlign: 'center',
+            width: 135,
         },
         {
             key: 'harga',
@@ -202,9 +214,16 @@ export default function TabelRincianAset({
             aggregate: 'sum',
             format: 'currency',
             align: 'right',
-            width: 200,
+            grandTotalAlign: 'right',
+            width: 185,
         },
     ], []);
+
+    const activeFilterCount = [
+        isProject ? draftProject : draftDepartment,
+        draftGudangId !== 'ALL' ? draftGudangId : '',
+        draftStartDate || draftEndDate ? 'periode' : '',
+    ].filter(Boolean).length;
 
     const contextLabel = isProject ? 'KODE PROJECT' : 'DEPARTEMEN';
 
@@ -212,108 +231,212 @@ export default function TabelRincianAset({
         ? project || 'Semua Project'
         : department || 'Semua Departemen';
 
-    const handleReset = () => {
+    const handleApplyFilters = () => {
+        onFilterApply?.({
+            project: isProject ? draftProject : '',
+            department: isProject ? '' : draftDepartment,
+            gudang_id: draftGudangId,
+            start_date: draftStartDate,
+            end_date: draftEndDate,
+        });
+    };
+
+    const handleResetFilters = () => {
+        setDraftProject('');
+        setDraftDepartment('');
+        setDraftGudangId('ALL');
+        setDraftStartDate('');
+        setDraftEndDate('');
         onReset?.();
     };
 
+    const handleDateApply = (start, end) => {
+        setDraftStartDate(start);
+        setDraftEndDate(end);
+    };
+
+    const handleDateReset = () => {
+        setDraftStartDate('');
+        setDraftEndDate('');
+    };
+
+    const handleExpandAll = () => {
+        pivotRef.current?.expandAll();
+    };
+
+    const handleCollapseAll = () => {
+        pivotRef.current?.collapseAll();
+    };
+
     return (
-        <Card className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <CardContent className="p-0">
-                <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-                    <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 shrink-0 rounded-xl bg-rose-50 dark:bg-rose-950/30 flex items-center justify-center">
-                                <Layers3 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
-                            </div>
-
-                            <div className="min-w-0">
-                                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                                    Pivot Analisis Barang Keluar
-                                </h2>
-
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    {isProject
-                                        ? 'Project → Barang → Kode PPL → Serial Number'
-                                        : 'Departemen → Barang → Kode PPL → Serial Number'}
-                                </p>
-                            </div>
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={handleReset}
-                            disabled={isProcessing}
-                            title="Reset Filter"
-                            className="w-9 h-9 shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
-                        >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
-                    </div>
+        <div className="w-full">
+            <div className="flex items-start justify-between gap-4 mb-3">
+                <div className="pt-2 text-[10px] font-bold tracking-wider text-slate-500 dark:text-slate-400 uppercase">
+                    {contextLabel}
+                    <span className="mx-1.5 text-slate-300 dark:text-slate-600">•</span>
+                    <span className="text-slate-800 dark:text-slate-200 normal-case tracking-normal">
+                        {contextValue}
+                    </span>
                 </div>
 
-                <div className="px-5 py-3 bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800">
-                    <div className="flex flex-col xl:flex-row xl:items-center gap-2.5">
-                        <div className="flex items-center gap-2 text-[10px] font-bold tracking-wider text-slate-500 dark:text-slate-400 uppercase shrink-0">
-                            <span>{contextLabel}</span>
-                            <span className="text-slate-300 dark:text-slate-600">•</span>
-                            <span className="text-slate-800 dark:text-slate-200 normal-case tracking-normal">
-                                {contextValue}
-                            </span>
-                        </div>
+                <div className="shrink-0">
+                    <FilterPanel
+                        mode="panel"
+                        columns={2}
+                        activeCount={activeFilterCount}
+                        title="Filter"
+                        applyLabel="Terapkan"
+                        resetLabel="Reset"
+                        onApply={handleApplyFilters}
+                        onReset={handleResetFilters}
+                        isProcessing={isProcessing}
+                        triggerPosition="right"
+                    >
+                        {isProject ? (
+                            <HybridDropdown
+                                value={draftProject}
+                                options={projectOptions}
+                                allowCustom={false}
+                                onChange={setDraftProject}
+                                placeholder="Pilih Project..."
+                                searchPlaceholder="Cari Project..."
+                                disabled={isProcessing}
+                                inputClassName="h-9 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
+                            />
+                        ) : (
+                            <HybridDropdown
+                                value={draftDepartment}
+                                options={departmentOptions}
+                                allowCustom={false}
+                                onChange={setDraftDepartment}
+                                placeholder="Pilih Departemen..."
+                                searchPlaceholder="Cari Departemen..."
+                                disabled={isProcessing}
+                                inputClassName="h-9 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
+                            />
+                        )}
 
-                        <div className="flex-1" />
+                        <HybridDropdown
+                            value={draftGudangId}
+                            options={gudangOptions}
+                            allowCustom={false}
+                            onChange={setDraftGudangId}
+                            placeholder="Pilih Gudang..."
+                            searchPlaceholder="Cari Gudang..."
+                            disabled={isProcessing}
+                            inputClassName="h-9 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
+                        />
 
                         <DateRangeFilter
-                            startDate={startDate}
-                            endDate={endDate}
-                            onApply={onDateApply}
-                            onReset={onDateReset}
+                            startDate={draftStartDate}
+                            endDate={draftEndDate}
+                            onApply={handleDateApply}
+                            onReset={handleDateReset}
                             isProcessing={isProcessing}
                         />
 
-                        {isProject ? (
-                            <div className="w-full xl:w-48">
-                                <HybridDropdown
-                                    value={project}
-                                    options={projectOptions}
-                                    allowCustom={false}
-                                    onChange={onProjectChange}
-                                    placeholder="Semua Project..."
-                                    searchPlaceholder="Cari Project..."
-                                    disabled={isProcessing}
-                                    inputClassName="h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
-                                />
-                            </div>
-                        ) : (
-                            <div className="w-full xl:w-48">
-                                <HybridDropdown
-                                    value={department}
-                                    options={departmentOptions}
-                                    allowCustom={false}
-                                    onChange={onDepartmentChange}
-                                    placeholder="Semua Departemen..."
-                                    searchPlaceholder="Cari Departemen..."
-                                    disabled={isProcessing}
-                                    inputClassName="h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
-                                />
-                            </div>
-                        )}
+                        <div className="flex flex-col justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 dark:text-slate-500">
+                                Filter aktif
+                            </span>
 
-                        <div className="w-full xl:w-48">
-                            <HybridDropdown
-                                value={gudangId}
-                                options={gudangOptions}
-                                allowCustom={false}
-                                onChange={onGudangChange}
-                                placeholder="Semua Gudang..."
-                                searchPlaceholder="Cari Gudang..."
-                                disabled={isProcessing}
-                                inputClassName="h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
-                            />
+                            <span className="mt-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                {activeFilterCount
+                                    ? `${activeFilterCount} filter dipilih`
+                                    : 'Belum ada filter'}
+                            </span>
                         </div>
+                    </FilterPanel>
+                </div>
+            </div>
 
-                        <div className="relative w-full xl:w-56">
-                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Card className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                <CardContent className="p-0">
+                    <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
+                                <button
+                                    type="button"
+                                    onClick={() => onTabChange?.('PROYEK')}
+                                    disabled={isProcessing}
+                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        activeTab === 'PROYEK'
+                                            ? 'bg-rose-600 text-white shadow-xs'
+                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                    }`}
+                                >
+                                    <BriefcaseBusiness className="w-3.5 h-3.5" />
+                                    <span>Proyek</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => onTabChange?.('NON_PROYEK')}
+                                    disabled={isProcessing}
+                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        activeTab === 'NON_PROYEK'
+                                            ? 'bg-blue-600 text-white shadow-xs'
+                                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                    }`}
+                                >
+                                    <Building2 className="w-3.5 h-3.5" />
+                                    <span>Non Proyek</span>
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleExpandAll}
+                                    disabled={!pivotRows.length || isProcessing}
+                                    className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    Expand Semua
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleCollapseAll}
+                                    disabled={!pivotRows.length || isProcessing}
+                                    className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    Collapse
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                                    Analisis Barang Keluar
+                                </h2>
+
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                    {isProject
+                                        ? 'Proyek → Barang → Kode PPL → Serial Number'
+                                        : 'Non Proyek → Barang → Kode PPL → Serial Number'}
+                                </p>
+                            </div>
+
+                            <div className="relative w-56 hidden lg:block shrink-0">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+
+                                <Input
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm?.(e.target.value)}
+                                    placeholder="Cari barang / kode PPL / SN..."
+                                    disabled={isProcessing}
+                                    className="h-8 pl-8 pr-3 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="lg:hidden px-5 py-3 border-b border-slate-200 dark:border-slate-800">
+                        <div className="relative w-full">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
 
                             <Input
                                 value={searchTerm}
@@ -324,26 +447,25 @@ export default function TabelRincianAset({
                             />
                         </div>
                     </div>
-                </div>
 
-                <TabelPivot
-                    data={pivotRows}
-                    levels={pivotLevels}
-                    valueColumns={valueColumns}
-                    rowLabelHeader="ROW LABELS"
-                    grandTotalLabel="Grand Total"
-                    emptyMessage="Tidak ada data barang keluar."
-                    emptySubMessage="Coba ubah filter atau periode yang digunakan."
-                    indentation={28}
-                    zoomLevel={zoomLevel}
-                    defaultExpanded={false}
-                    showControls
-                    showGrandTotal
-                    showFooter
-                    footerLeftText="Klik ikon › untuk melihat rincian."
-                    rowKeyPrefix={activeTab}
-                />
-            </CardContent>
-        </Card>
+                    <TabelPivot
+                        ref={pivotRef}
+                        data={pivotRows}
+                        levels={pivotLevels}
+                        valueColumns={valueColumns}
+                        rowLabelHeader="ROW LABELS"
+                        grandTotalLabel="Grand Total"
+                        emptyMessage="Tidak ada data barang keluar."
+                        emptySubMessage="Coba ubah filter atau periode yang digunakan."
+                        indentation={24}
+                        zoomLevel={Math.min(zoomLevel, 95)}
+                        defaultExpanded={false}
+                        showGrandTotal
+                        showFooter
+                        footerLeftText="Klik ikon › untuk melihat rincian."
+                    />
+                </CardContent>
+            </Card>
+        </div>
     );
 }

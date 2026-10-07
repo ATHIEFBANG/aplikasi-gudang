@@ -2,19 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import TabelRincianAset from './TabelRincianAset';
-import { ArrowLeft, BriefcaseBusiness, Building2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 const TAB_CONFIG = {
-    PROYEK: {
-        label: 'Proyek',
-        icon: BriefcaseBusiness,
-        activeClass: 'bg-rose-600 text-white shadow-sm shadow-rose-600/20 hover:bg-rose-700',
-    },
-    NON_PROYEK: {
-        label: 'Non Proyek',
-        icon: Building2,
-        activeClass: 'bg-blue-600 text-white shadow-sm shadow-blue-600/20 hover:bg-blue-700',
-    },
+    PROYEK: 'Proyek',
+    NON_PROYEK: 'Non Proyek',
 };
 
 const getPivotData = data => Array.isArray(data) ? data : data?.data || [];
@@ -134,65 +126,45 @@ export default function AnalisisBarangKeluarIndex({
     const handleTabChange = tab => {
         setCurrentTab(tab);
 
-        if (tab === 'PROYEK') {
-            setDepartment('');
-        } else {
-            setProject('');
-        }
+        const nextProject = tab === 'PROYEK' ? project : '';
+        const nextDepartment = tab === 'NON_PROYEK' ? department : '';
+
+        setProject(nextProject);
+        setDepartment(nextDepartment);
 
         navigateWithFilters({
             tab,
-            project: tab === 'PROYEK' ? project : '',
-            department: tab === 'NON_PROYEK' ? department : '',
+            project: nextProject,
+            department: nextDepartment,
             page: 1,
         });
     };
 
-    const handleProjectChange = value => {
-        setProject(value);
+    const handleFilterApply = values => {
+        const nextProject = currentTab === 'PROYEK'
+            ? values?.project || ''
+            : '';
+
+        const nextDepartment = currentTab === 'NON_PROYEK'
+            ? values?.department || ''
+            : '';
+
+        const nextGudangId = values?.gudang_id || 'ALL';
+        const nextStartDate = values?.start_date || '';
+        const nextEndDate = values?.end_date || '';
+
+        setProject(nextProject);
+        setDepartment(nextDepartment);
+        setGudangId(nextGudangId);
+        setStartDate(nextStartDate);
+        setEndDate(nextEndDate);
 
         navigateWithFilters({
-            project: value,
-            page: 1,
-        });
-    };
-
-    const handleDepartmentChange = value => {
-        setDepartment(value);
-
-        navigateWithFilters({
-            department: value,
-            page: 1,
-        });
-    };
-
-    const handleGudangChange = value => {
-        setGudangId(value);
-
-        navigateWithFilters({
-            gudang_id: value,
-            page: 1,
-        });
-    };
-
-    const handleDateApply = (start, end) => {
-        setStartDate(start);
-        setEndDate(end);
-
-        navigateWithFilters({
-            start_date: start,
-            end_date: end,
-            page: 1,
-        });
-    };
-
-    const handleDateReset = () => {
-        setStartDate('');
-        setEndDate('');
-
-        navigateWithFilters({
-            start_date: '',
-            end_date: '',
+            project: nextProject,
+            department: nextDepartment,
+            gudang_id: nextGudangId,
+            start_date: nextStartDate,
+            end_date: nextEndDate,
             page: 1,
         });
     };
@@ -216,22 +188,6 @@ export default function AnalisisBarangKeluarIndex({
             zoom: 100,
             page: 1,
         });
-    };
-
-    const handleZoomIn = () => {
-        setZoomLevel(prev => Math.min(prev + 10, 125));
-    };
-
-    const handleZoomOut = () => {
-        setZoomLevel(prev => Math.max(prev - 10, 60));
-    };
-
-    const handleResetZoom = () => {
-        setZoomLevel(100);
-    };
-
-    const handleFitZoom = () => {
-        setZoomLevel(90);
     };
 
     return (
@@ -259,60 +215,27 @@ export default function AnalisisBarangKeluarIndex({
                             </p>
                         </div>
                     </div>
-
-                    <div className="mt-5">
-                        <div className="inline-flex items-center gap-1 p-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-900/80 shadow-sm">
-                            {Object.entries(TAB_CONFIG).map(([key, config]) => {
-                                const Icon = config.icon;
-                                const isActive = currentTab === key;
-
-                                return (
-                                    <button
-                                        key={key}
-                                        type="button"
-                                        onClick={() => handleTabChange(key)}
-                                        disabled={isProcessing}
-                                        className={`inline-flex items-center justify-center gap-2 min-w-[150px] h-9 px-4 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                                            isActive
-                                                ? config.activeClass
-                                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/70 dark:hover:bg-slate-800/70'
-                                        }`}
-                                    >
-                                        <Icon className="w-4 h-4" strokeWidth={2} />
-                                        <span>{config.label}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
                 </div>
 
                 <div className="pt-5">
                     <TabelRincianAset
                         activeTab={currentTab}
+                        onTabChange={handleTabChange}
                         dataList={activeData}
                         project={project}
                         projectOptions={projectFilterOptions}
-                        onProjectChange={handleProjectChange}
                         department={department}
                         departmentOptions={departmentFilterOptions}
-                        onDepartmentChange={handleDepartmentChange}
                         gudangId={gudangId}
                         gudangOptions={gudangOptions}
-                        onGudangChange={handleGudangChange}
                         searchTerm={searchTerm}
                         setSearchTerm={setSearchTerm}
                         startDate={startDate}
                         endDate={endDate}
-                        onDateApply={handleDateApply}
-                        onDateReset={handleDateReset}
+                        onFilterApply={handleFilterApply}
                         onReset={handleResetFilters}
                         isProcessing={isProcessing}
                         zoomLevel={zoomLevel}
-                        onZoomIn={handleZoomIn}
-                        onZoomOut={handleZoomOut}
-                        onResetZoom={handleResetZoom}
-                        onFitZoom={handleFitZoom}
                     />
                 </div>
             </div>

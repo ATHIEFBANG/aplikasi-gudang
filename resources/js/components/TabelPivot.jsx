@@ -1,12 +1,48 @@
-import React, { useMemo, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+
+const DEFAULT_INDENTATION = 24;
+
+const geometricHeader = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 100" preserveAspectRatio="none">
+    <defs>
+        <linearGradient id="pivotBase" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0d3978"/>
+            <stop offset="50%" stop-color="#092b5c"/>
+            <stop offset="100%" stop-color="#061c3c"/>
+        </linearGradient>
+        <linearGradient id="pivotBlueAccent" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#147cff"/>
+            <stop offset="100%" stop-color="#0752c9"/>
+        </linearGradient>
+    </defs>
+
+    <rect width="1600" height="100" fill="url(#pivotBase)"/>
+
+    <polygon points="0,0 155,0 80,100 0,100" fill="url(#pivotBlueAccent)" opacity=".95"/>
+    <polygon points="55,0 185,0 110,100 25,100" fill="#0a5fd8" opacity=".55"/>
+    <polygon points="145,0 175,0 100,100 72,100" fill="#38a0ff" opacity=".25"/>
+    <polygon points="650,0 660,0 585,100 575,100" fill="#2386f5" opacity=".10"/>
+    <polygon points="1510,0 1600,0 1600,100 1435,100" fill="#0d58c7" opacity=".55"/>
+    <polygon points="1560,0 1600,0 1600,100 1490,100" fill="url(#pivotBlueAccent)" opacity=".95"/>
+    <polygon points="1525,0 1555,0 1480,100 1450,100" fill="#49a5ff" opacity=".35"/>
+
+    <line x1="0" y1="99" x2="1600" y2="99" stroke="#4da5ff" stroke-opacity=".45" stroke-width="1"/>
+    <line x1="160" y1="0" x2="85" y2="100" stroke="#56aeff" stroke-opacity=".25" stroke-width="1"/>
+    <line x1="1515" y1="0" x2="1440" y2="100" stroke="#56aeff" stroke-opacity=".25" stroke-width="1"/>
+</svg>
+`;
+
+const geometricHeaderUrl = `url("data:image/svg+xml,${encodeURIComponent(geometricHeader)}")`;
 
 const defaultFormatNumber = value =>
     Number(value || 0).toLocaleString('id-ID');
 
 const defaultFormatCurrency = value => {
     const amount = Number(value || 0);
+
     if (!amount) return 'Rp -';
+
     return `Rp ${amount.toLocaleString('id-ID')}`;
 };
 
@@ -51,18 +87,14 @@ const aggregateValues = (rows, config) => {
     switch (config?.aggregate) {
         case 'count':
             return rows.length;
-
         case 'avg':
             return values.length
                 ? values.reduce((sum, value) => sum + value, 0) / values.length
                 : 0;
-
         case 'min':
             return values.length ? Math.min(...values) : 0;
-
         case 'max':
             return values.length ? Math.max(...values) : 0;
-
         case 'sum':
         default:
             return values.reduce((sum, value) => sum + value, 0);
@@ -98,6 +130,7 @@ const buildTree = (rows, levels, levelIndex = 0, parentKey = '') => {
 
     return [...groups.entries()].map(([value, groupRows], index) => {
         const key = `${parentKey}${level.key}::${value}::${index}`;
+
         const children = buildTree(
             groupRows,
             levels,
@@ -134,6 +167,12 @@ const collectExpandableKeys = nodes => {
     walk(nodes);
 
     return keys;
+};
+
+const resolveAlign = align => {
+    if (align === 'left') return 'left';
+    if (align === 'center') return 'center';
+    return 'right';
 };
 
 const getRowStyles = (node, levels) => {
@@ -188,16 +227,15 @@ function PivotRow({
 }) {
     const hasChildren = node.children?.length > 0;
     const isExpanded = expandedKeys.has(node.key);
-
     const rowClassName = getRowStyles(node, levels);
     const labelClassName = getLabelStyles(node, levels);
 
     return (
         <>
-            <tr className={`${rowClassName} border-b border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors`}>
-                <td className="min-w-[420px] px-4 py-2.5">
+            <tr className={`${rowClassName} border-b border-slate-100 dark:border-slate-800/70 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors`}>
+                <td className="py-2.5 px-3 overflow-hidden">
                     <div
-                        className="flex items-center"
+                        className="flex items-center min-w-0"
                         style={{
                             paddingLeft: `${node.level * indentation}px`,
                         }}
@@ -206,28 +244,28 @@ function PivotRow({
                             <button
                                 type="button"
                                 onClick={() => onToggle(node.key)}
-                                className="w-6 h-6 mr-1.5 shrink-0 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                className="w-5 h-5 mr-1.5 shrink-0 rounded-md flex items-center justify-center text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
                             >
                                 {isExpanded ? (
-                                    <ChevronDown className="w-4 h-4" />
+                                    <ChevronDown className="w-3.5 h-3.5" />
                                 ) : (
-                                    <ChevronRight className="w-4 h-4" />
+                                    <ChevronRight className="w-3.5 h-3.5" />
                                 )}
                             </button>
                         ) : (
-                            <span className="w-6 mr-1.5 shrink-0" />
+                            <span className="w-5 mr-1.5 shrink-0" />
                         )}
 
                         <div className="min-w-0">
                             <div
-                                className={`${labelClassName} text-xs sm:text-sm truncate`}
+                                className={`${labelClassName} text-[11px] sm:text-xs truncate`}
                                 title={String(node.label)}
                             >
                                 {node.label}
                             </div>
 
                             {levels[node.level]?.subLabel && (
-                                <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                <div className="mt-0.5 text-[9px] text-slate-400 dark:text-slate-500 truncate">
                                     {typeof levels[node.level].subLabel === 'function'
                                         ? levels[node.level].subLabel(node)
                                         : levels[node.level].subLabel}
@@ -243,13 +281,10 @@ function PivotRow({
                     return (
                         <td
                             key={column.key}
-                            className={`px-4 py-2.5 text-xs font-mono font-semibold ${
-                                column.align === 'left'
-                                    ? 'text-left'
-                                    : column.align === 'center'
-                                        ? 'text-center'
-                                        : 'text-right'
-                            } ${column.cellClassName || 'text-slate-800 dark:text-slate-200'}`}
+                            className={`py-2.5 px-3 text-[11px] font-mono font-semibold ${column.cellClassName || 'text-slate-700 dark:text-slate-300'}`}
+                            style={{
+                                textAlign: resolveAlign(column.align),
+                            }}
                         >
                             {formatValue(value, column)}
                         </td>
@@ -272,7 +307,7 @@ function PivotRow({
     );
 }
 
-export default function TabelPivot({
+const TabelPivot = forwardRef(function TabelPivot({
     data = [],
     levels = [],
     valueColumns = [],
@@ -280,15 +315,19 @@ export default function TabelPivot({
     grandTotalLabel = 'Grand Total',
     emptyMessage = 'Tidak ada data.',
     emptySubMessage = 'Coba ubah filter atau periode yang digunakan.',
-    indentation = 28,
-    zoomLevel = 100,
+    indentation = DEFAULT_INDENTATION,
+    zoomLevel = 95,
     defaultExpanded = false,
-    showControls = true,
     showGrandTotal = true,
     showFooter = true,
     footerLeftText = 'Klik ikon › untuk melihat rincian.',
-    rowKeyPrefix = 'pivot',
-}) {
+    headerClassName = '',
+    headerStyle = {},
+    labelColumnWidth = 360,
+    grandTotalClassName = 'border-t border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/25',
+    grandTotalLabelClassName = 'text-amber-800 dark:text-amber-200',
+    grandTotalCellClassName = 'text-amber-900 dark:text-amber-100',
+}, ref) {
     const safeData = Array.isArray(data) ? data : [];
 
     const tree = useMemo(
@@ -301,17 +340,26 @@ export default function TabelPivot({
         [tree]
     );
 
-    const [expandedKeys, setExpandedKeys] = useState(() => {
-        if (!defaultExpanded) {
-            return new Set();
-        }
+    const [expandedKeys, setExpandedKeys] = useState(() =>
+        defaultExpanded ? allExpandableKeys : new Set()
+    );
 
-        return allExpandableKeys;
-    });
+    useImperativeHandle(
+        ref,
+        () => ({
+            expandAll: () => {
+                setExpandedKeys(new Set(allExpandableKeys));
+            },
+            collapseAll: () => {
+                setExpandedKeys(new Set());
+            },
+        }),
+        [allExpandableKeys]
+    );
 
     const grandTotals = useMemo(() => {
         return valueColumns.map(column => ({
-            key: column.key,
+            ...column,
             value: aggregateValues(safeData, column),
         }));
     }, [safeData, valueColumns]);
@@ -330,68 +378,60 @@ export default function TabelPivot({
         });
     };
 
-    const handleExpandAll = () => {
-        setExpandedKeys(new Set(allExpandableKeys));
-    };
-
-    const handleCollapseAll = () => {
-        setExpandedKeys(new Set());
-    };
-
     const zoomScale = Math.max(
         10,
-        Math.min(18, zoomLevel * 0.12)
+        Math.min(16, zoomLevel * 0.11)
     );
 
     return (
-        <div className="w-full overflow-x-auto border-t border-slate-200 dark:border-slate-800">
-            {showControls && (
-                <div className="flex items-center justify-end gap-2 px-4 py-2.5 bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800">
-                    <button
-                        type="button"
-                        onClick={handleExpandAll}
-                        disabled={!tree.length}
-                        className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                        Expand Semua
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={handleCollapseAll}
-                        disabled={!tree.length}
-                        className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                        Collapse
-                    </button>
-                </div>
-            )}
-
+        <div className="w-full overflow-x-auto transition-all duration-200 ease-out">
             <table
-                key={rowKeyPrefix}
-                className="w-full border-collapse"
-                style={{ fontSize: `${zoomScale}px` }}
+                className="w-full table-fixed border-collapse text-left text-xs"
+                style={{
+                    fontSize: `${zoomScale}px`,
+                }}
             >
+                <colgroup>
+                    <col
+                        style={{
+                            width: `${labelColumnWidth}px`,
+                        }}
+                    />
+
+                    {valueColumns.map(column => (
+                        <col
+                            key={column.key}
+                            style={{
+                                width: column.width
+                                    ? `${column.width}px`
+                                    : undefined,
+                            }}
+                        />
+                    ))}
+                </colgroup>
+
                 <thead>
-                    <tr className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                        <th className="px-4 py-3.5 text-left text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                    <tr
+                        className={`border-b border-blue-400/40 text-white font-bold uppercase tracking-wider text-[10px] select-none ${headerClassName}`}
+                        style={{
+                            backgroundColor: '#092b5c',
+                            backgroundImage: geometricHeaderUrl,
+                            backgroundSize: '100% 100%',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            ...headerStyle,
+                        }}
+                    >
+                        <th className="py-2.5 px-3 text-left">
                             {rowLabelHeader}
                         </th>
 
                         {valueColumns.map(column => (
                             <th
                                 key={column.key}
-                                className={`w-[${column.width || 180}px] px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 ${
-                                    column.align === 'left'
-                                        ? 'text-left'
-                                        : column.align === 'center'
-                                            ? 'text-center'
-                                            : 'text-right'
-                                }`}
+                                className="py-2.5 px-3 whitespace-nowrap"
                                 style={{
-                                    width: column.width
-                                        ? `${column.width}px`
-                                        : undefined,
+                                    textAlign: resolveAlign(column.align),
                                 }}
                             >
                                 {column.label}
@@ -400,7 +440,7 @@ export default function TabelPivot({
                     </tr>
                 </thead>
 
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 text-slate-700 dark:text-slate-300">
                     {tree.length ? (
                         tree.map(node => (
                             <PivotRow
@@ -417,57 +457,52 @@ export default function TabelPivot({
                         <tr>
                             <td
                                 colSpan={valueColumns.length + 1}
-                                className="px-6 py-16 text-center"
+                                className="py-10 text-center text-xs text-slate-400"
                             >
-                                <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                <div className="font-semibold">
                                     {emptyMessage}
                                 </div>
 
-                                <div className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                                <div className="mt-1 text-[10px]">
                                     {emptySubMessage}
                                 </div>
                             </td>
                         </tr>
                     )}
-                </tbody>
 
-                {showGrandTotal && (
-                    <tfoot>
-                        <tr className="border-t-2 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80">
-                            <td className="px-4 py-3.5 text-sm font-black text-slate-900 dark:text-white">
+                    {showGrandTotal && (
+                        <tr className={`${grandTotalClassName} font-black`}>
+                            <td className={`py-2.5 px-3 text-[11px] ${grandTotalLabelClassName}`}>
                                 {grandTotalLabel}
                             </td>
 
                             {grandTotals.map(column => (
                                 <td
                                     key={column.key}
-                                    className={`px-4 py-3.5 text-sm font-black font-mono text-slate-900 dark:text-white ${
-                                        column.align === 'left'
-                                            ? 'text-left'
-                                            : column.align === 'center'
-                                                ? 'text-center'
-                                                : 'text-right'
-                                    }`}
+                                    className={`py-2.5 px-3 text-[11px] font-black font-mono ${grandTotalCellClassName}`}
+                                    style={{
+                                        textAlign: resolveAlign(
+                                            column.grandTotalAlign ?? column.align
+                                        ),
+                                    }}
                                 >
                                     {formatValue(column.value, column)}
                                 </td>
                             ))}
                         </tr>
-                    </tfoot>
-                )}
+                    )}
+                </tbody>
             </table>
 
             {showFooter && (
-                <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between gap-3">
-                    <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                <div className="px-4 py-2.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500">
                         {footerLeftText}
-                    </div>
-
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {tree.length.toLocaleString('id-ID')} kelompok utama
                     </div>
                 </div>
             )}
         </div>
     );
-}
+});
+
+export default TabelPivot;
