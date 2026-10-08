@@ -1,15 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Filter } from 'lucide-react';
+import { Check, Filter, RotateCcw, X } from 'lucide-react';
 import Search from '@/components/Search';
 import DateRangeFilter from '@/components/DateRangeFilter';
-import Card from '@/components/Button';
+import Button from '@/components/Button';
+
+const FILTER_BUTTON_ID = 'filter-panel-trigger';
 
 const normalizeOptions = options => {
     return (options || [])
         .map(item => {
             if (typeof item === 'string') return { value: item, label: item };
-            return { value: item?.value ?? item?.id ?? item?.kode ?? item?.code ?? '', label: item?.label ?? item?.name ?? item?.nama ?? item?.kode ?? item?.code ?? '' };
+
+            return {
+                value: item?.value ?? item?.id ?? item?.kode ?? item?.code ?? '',
+                label: item?.label ?? item?.name ?? item?.nama ?? item?.kode ?? item?.code ?? '',
+            };
         })
         .filter(item => item.value !== '' && item.label !== '');
 };
@@ -23,8 +29,11 @@ const normalizeSelected = value => {
 const groupByAlphabet = options => {
     return options.reduce((groups, item) => {
         const letter = String(item.label).trim().charAt(0).toUpperCase() || '#';
+
         if (!groups[letter]) groups[letter] = [];
+
         groups[letter].push(item);
+
         return groups;
     }, {});
 };
@@ -87,7 +96,9 @@ function AlphabetSection({ letter, options, selected, onChange }) {
                             className="min-w-0 h-9 flex items-center gap-2.5 px-2.5 rounded-lg text-left hover:bg-blue-500/10 transition-colors cursor-pointer"
                         >
                             <Checkbox checked={checked} />
-                            <span className={`truncate text-xs ${checked ? 'font-semibold text-white' : 'text-slate-300'}`}>{item.label}</span>
+                            <span className={`truncate text-xs ${checked ? 'font-semibold text-white' : 'text-slate-300'}`}>
+                                {item.label}
+                            </span>
                         </button>
                     );
                 })}
@@ -99,7 +110,9 @@ function AlphabetSection({ letter, options, selected, onChange }) {
 function OptionPicker({ options, selected, onChange, searchTerm }) {
     const filteredOptions = useMemo(() => {
         const keyword = searchTerm.trim().toLowerCase();
+
         if (!keyword) return options;
+
         return options.filter(item => item.label.toLowerCase().includes(keyword));
     }, [options, searchTerm]);
 
@@ -120,12 +133,18 @@ function OptionPicker({ options, selected, onChange, searchTerm }) {
     return (
         <div className="flex-1 min-h-0 flex flex-col">
             <div className="flex items-center justify-between h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 mb-3">
-                <button type="button" onClick={toggleAllVisible} className="flex items-center gap-2.5 cursor-pointer">
+                <button
+                    type="button"
+                    onClick={toggleAllVisible}
+                    className="flex items-center gap-2.5 cursor-pointer"
+                >
                     <Checkbox checked={allVisibleSelected} indeterminate={partiallyVisibleSelected} />
                     <span className="text-xs font-bold text-slate-200">Semua</span>
                 </button>
 
-                <span className="text-[10px] font-semibold text-slate-500">{selected.length} dipilih</span>
+                <span className="text-[10px] font-semibold text-slate-500">
+                    {selected.length} dipilih
+                </span>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
@@ -172,6 +191,7 @@ export default function FilterPanel({
     const [draftDepartment, setDraftDepartment] = useState(normalizeSelected(department));
     const [draftStartDate, setDraftStartDate] = useState(startDate || '');
     const [draftEndDate, setDraftEndDate] = useState(endDate || '');
+    const [triggerRect, setTriggerRect] = useState(null);
 
     const isProject = activeTab === 'PROYEK';
 
@@ -199,6 +219,42 @@ export default function FilterPanel({
             setSearchTerm('');
         }
     }, [activeTab, activeCategory]);
+
+    useEffect(() => {
+        const updateTriggerPosition = () => {
+            const trigger = document.getElementById(FILTER_BUTTON_ID);
+
+            if (!trigger) {
+                setTriggerRect(null);
+                return;
+            }
+
+            const rect = trigger.getBoundingClientRect();
+
+            setTriggerRect({
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+            });
+        };
+
+        updateTriggerPosition();
+
+        window.addEventListener('resize', updateTriggerPosition);
+        window.addEventListener('scroll', updateTriggerPosition, true);
+
+        const observer = new ResizeObserver(updateTriggerPosition);
+        const trigger = document.getElementById(FILTER_BUTTON_ID);
+
+        if (trigger) observer.observe(trigger);
+
+        return () => {
+            window.removeEventListener('resize', updateTriggerPosition);
+            window.removeEventListener('scroll', updateTriggerPosition, true);
+            observer.disconnect();
+        };
+    }, []);
 
     const activeSelected = activeCategory === 'project' ? draftProject : draftDepartment;
 
@@ -232,11 +288,18 @@ export default function FilterPanel({
         setIsOpen(false);
     };
 
-    const categoryTitle = activeCategory === 'project' ? 'Project' : activeCategory === 'department' ? 'Departemen' : 'Periode';
+    const categoryTitle = activeCategory === 'project'
+        ? 'Project'
+        : activeCategory === 'department'
+            ? 'Departemen'
+            : 'Periode';
 
     const filterModal = (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[3px]" onClick={handleClose} />
+            <div
+                className="absolute inset-0 bg-slate-950/65 backdrop-blur-[3px]"
+                onClick={handleClose}
+            />
 
             <div className="relative z-[10000] w-full max-w-[920px] h-[590px] max-h-[calc(100vh-80px)] flex flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-white shadow-2xl">
                 <div className="h-[64px] shrink-0 flex items-center justify-center px-5 border-b border-slate-700 bg-slate-900">
@@ -281,7 +344,9 @@ export default function FilterPanel({
                             <div className="h-full flex flex-col">
                                 <div className="mb-3">
                                     <h3 className="text-sm font-black text-white">Periode</h3>
-                                    <p className="mt-1 text-[11px] text-slate-400">Tentukan rentang tanggal transaksi.</p>
+                                    <p className="mt-1 text-[11px] text-slate-400">
+                                        Tentukan rentang tanggal transaksi.
+                                    </p>
                                 </div>
 
                                 <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
@@ -305,8 +370,13 @@ export default function FilterPanel({
                                 <div className="shrink-0 mb-3">
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="min-w-0">
-                                            <h3 className="text-sm font-black text-white">{categoryTitle}</h3>
-                                            <p className="mt-1 text-[11px] text-slate-400">Pilih satu atau beberapa {categoryTitle.toLowerCase()}.</p>
+                                            <h3 className="text-sm font-black text-white">
+                                                {categoryTitle}
+                                            </h3>
+
+                                            <p className="mt-1 text-[11px] text-slate-400">
+                                                Pilih satu atau beberapa {categoryTitle.toLowerCase()}.
+                                            </p>
                                         </div>
 
                                         <Search
@@ -333,73 +403,104 @@ export default function FilterPanel({
                     </div>
                 </div>
 
-                <div className="h-[76px] shrink-0 flex items-center justify-between px-5 border-t border-slate-700 bg-slate-950">
-                    <Card
-                        variant="oval-3d"
+                <div className="h-[64px] shrink-0 flex items-center justify-between px-5 border-t border-slate-700 bg-slate-950">
+                    <Button
+                        variant="3d"
+                        color="slate"
                         size="none"
                         radius="full"
                         width="fit"
-                        clickable={!isProcessing}
-                        hover={!isProcessing}
                         onClick={handleReset}
-                        className={`h-10 px-5 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                        disabled={isProcessing}
+                        className="h-9 px-5 gap-2"
                     >
+                        <RotateCcw className="w-4 h-4 shrink-0" strokeWidth={2.5} />
                         <span className="text-sm font-bold">{resetLabel}</span>
-                    </Card>
+                    </Button>
 
                     <div className="flex items-center gap-2">
-                        <Card
-                            variant="oval-3d"
+                        <Button
+                            variant="3d"
+                            color="red"
                             size="none"
                             radius="full"
                             width="fit"
-                            clickable={!isProcessing}
-                            hover={!isProcessing}
                             onClick={handleClose}
-                            className={`h-10 px-5 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                            disabled={isProcessing}
+                            className="h-9 px-5 gap-2"
                         >
+                            <X className="w-4 h-4 shrink-0" strokeWidth={2.5} />
                             <span className="text-sm font-bold">Batal</span>
-                        </Card>
+                        </Button>
 
-                        <Card
-                            variant="oval-3d"
+                        <Button
+                            variant="3d"
+                            color="blue"
                             size="none"
                             radius="full"
                             width="fit"
-                            clickable={!isProcessing}
-                            hover={!isProcessing}
                             onClick={handleApply}
-                            className={`h-10 px-6 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                            disabled={isProcessing}
+                            className="h-9 px-6 gap-2"
                         >
-                            <span className="text-sm font-bold">{isProcessing ? 'Memproses...' : applyLabel}</span>
-                        </Card>
+                            <Check className="w-4 h-4 shrink-0" strokeWidth={2.5} />
+                            <span className="text-sm font-bold">
+                                {isProcessing ? 'Memproses...' : applyLabel}
+                            </span>
+                        </Button>
                     </div>
                 </div>
             </div>
         </div>
     );
 
+    const triggerHitbox = triggerRect && !isProcessing ? (
+        <button
+            type="button"
+            aria-label={title}
+            onClick={handleOpen}
+            style={{
+                position: 'fixed',
+                top: triggerRect.top,
+                left: triggerRect.left,
+                width: triggerRect.width,
+                height: triggerRect.height,
+                zIndex: 9998,
+            }}
+            className="opacity-0 cursor-pointer"
+        />
+    ) : null;
+
     return (
         <>
-            <Card
-                variant="oval-3d"
+            <Button
+                id={FILTER_BUTTON_ID}
+                variant="neon"
+                color="blue"
                 size="none"
-                radius="full"
+                radius="sm"
                 width="fit"
-                clickable={!isProcessing}
-                hover={!isProcessing}
+                edge="top-right"
+                edgeOffset={14}
+                layer="behind"
                 onClick={handleOpen}
+                disabled={isProcessing}
                 className={`h-9 px-3.5 gap-2 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
             >
                 <Filter className="w-4 h-4 shrink-0" />
-                <span className="text-sm font-bold whitespace-nowrap">{title}</span>
+
+                <span className="text-sm font-bold whitespace-nowrap">
+                    {title}
+                </span>
 
                 {activeCount > 0 && (
                     <span className="min-w-6 h-6 px-1.5 flex items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">
                         {activeCount}
                     </span>
                 )}
-            </Card>
+            </Button>
+
+            {typeof document !== 'undefined' && triggerHitbox && createPortal(triggerHitbox, document.body)}
 
             {isOpen && typeof document !== 'undefined' && createPortal(filterModal, document.body)}
         </>
