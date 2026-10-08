@@ -16,7 +16,6 @@ export default function AnalisisBarangKeluarIndex({
     nonProjectPivot = [],
     projectOptions = [],
     departmentOptions = [],
-    gudangs = [],
     filters = {},
 }) {
     const initialTab = TAB_CONFIG[activeTab] ? activeTab : 'PROYEK';
@@ -25,7 +24,6 @@ export default function AnalisisBarangKeluarIndex({
     const [searchTerm, setSearchTerm] = useState(filters?.search || '');
     const [project, setProject] = useState(filters?.project || '');
     const [department, setDepartment] = useState(filters?.department || '');
-    const [gudangId, setGudangId] = useState(filters?.gudang_id || 'ALL');
     const [startDate, setStartDate] = useState(filters?.start_date || '');
     const [endDate, setEndDate] = useState(filters?.end_date || '');
     const [zoomLevel, setZoomLevel] = useState(Number(filters?.zoom || 100));
@@ -39,19 +37,10 @@ export default function AnalisisBarangKeluarIndex({
         setSearchTerm(filters?.search || '');
         setProject(filters?.project || '');
         setDepartment(filters?.department || '');
-        setGudangId(filters?.gudang_id || 'ALL');
         setStartDate(filters?.start_date || '');
         setEndDate(filters?.end_date || '');
         setZoomLevel(Number(filters?.zoom || 100));
     }, [filters]);
-
-    const gudangOptions = useMemo(() => [
-        { value: 'ALL', label: 'Semua Gudang' },
-        ...gudangs.map(gudang => ({
-            value: String(gudang.id),
-            label: gudang.nama_gudang,
-        })),
-    ], [gudangs]);
 
     const projectFilterOptions = useMemo(
         () => projectOptions.map(item => ({ value: item, label: item })),
@@ -75,7 +64,6 @@ export default function AnalisisBarangKeluarIndex({
             search: params.search ?? searchTerm,
             project: params.project ?? project,
             department: params.department ?? department,
-            gudang_id: params.gudang_id ?? gudangId,
             start_date: params.start_date ?? startDate,
             end_date: params.end_date ?? endDate,
             zoom: params.zoom ?? zoomLevel,
@@ -91,11 +79,14 @@ export default function AnalisisBarangKeluarIndex({
         }
 
         Object.keys(query).forEach(key => {
+            const value = query[key];
+
             if (
-                query[key] === '' ||
-                query[key] === 'ALL' ||
-                query[key] === undefined ||
-                query[key] === null
+                value === '' ||
+                value === 'ALL' ||
+                value === undefined ||
+                value === null ||
+                (Array.isArray(value) && value.length === 0)
             ) {
                 delete query[key];
             }
@@ -144,20 +135,17 @@ export default function AnalisisBarangKeluarIndex({
             ? values?.department || ''
             : '';
 
-        const nextGudangId = values?.gudang_id || 'ALL';
         const nextStartDate = values?.start_date || '';
         const nextEndDate = values?.end_date || '';
 
         setProject(nextProject);
         setDepartment(nextDepartment);
-        setGudangId(nextGudangId);
         setStartDate(nextStartDate);
         setEndDate(nextEndDate);
 
         navigateWithFilters({
             project: nextProject,
             department: nextDepartment,
-            gudang_id: nextGudangId,
             start_date: nextStartDate,
             end_date: nextEndDate,
             page: 1,
@@ -168,7 +156,6 @@ export default function AnalisisBarangKeluarIndex({
         setSearchTerm('');
         setProject('');
         setDepartment('');
-        setGudangId('ALL');
         setStartDate('');
         setEndDate('');
         setZoomLevel(100);
@@ -177,7 +164,6 @@ export default function AnalisisBarangKeluarIndex({
             search: '',
             project: '',
             department: '',
-            gudang_id: 'ALL',
             start_date: '',
             end_date: '',
             zoom: 100,
@@ -211,8 +197,6 @@ export default function AnalisisBarangKeluarIndex({
                         projectOptions={projectFilterOptions}
                         department={department}
                         departmentOptions={departmentFilterOptions}
-                        gudangId={gudangId}
-                        gudangOptions={gudangOptions}
                         searchTerm={searchTerm}
                         setSearchTerm={setSearchTerm}
                         onSearch={handleSearch}

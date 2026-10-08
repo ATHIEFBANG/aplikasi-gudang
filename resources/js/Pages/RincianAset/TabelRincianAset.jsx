@@ -1,8 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef } from 'react';
 import TabelPivot from '@/components/TabelPivot';
 import FilterPanel from '@/components/FilterPanel';
-import HybridDropdown from '@/components/HybridDropdown';
-import DateRangeFilter from '@/components/DateRangeFilter';
 import Search from '@/components/Search';
 import { Card, CardContent } from '@/components/ui/card';
 import { BriefcaseBusiness, Building2 } from 'lucide-react';
@@ -109,6 +107,11 @@ const buildPivotRows = dataList => {
     });
 };
 
+const getFilterLength = value => {
+    if (Array.isArray(value)) return value.length;
+    return value ? 1 : 0;
+};
+
 export default function TabelRincianAset({
     activeTab = 'PROYEK',
     onTabChange,
@@ -121,8 +124,6 @@ export default function TabelRincianAset({
     projectOptions = [],
     department = '',
     departmentOptions = [],
-    gudangId = 'ALL',
-    gudangOptions = [],
     startDate = '',
     endDate = '',
     onReset,
@@ -131,24 +132,7 @@ export default function TabelRincianAset({
 }) {
     const pivotRef = useRef(null);
 
-    const [draftProject, setDraftProject] = useState(project);
-    const [draftDepartment, setDraftDepartment] = useState(department);
-    const [draftGudangId, setDraftGudangId] = useState(gudangId);
-    const [draftStartDate, setDraftStartDate] = useState(startDate);
-    const [draftEndDate, setDraftEndDate] = useState(endDate);
-
-    useEffect(() => {
-        setDraftProject(project);
-        setDraftDepartment(department);
-        setDraftGudangId(gudangId);
-        setDraftStartDate(startDate);
-        setDraftEndDate(endDate);
-    }, [project, department, gudangId, startDate, endDate]);
-
-    const pivotRows = useMemo(
-        () => buildPivotRows(dataList),
-        [dataList]
-    );
+    const pivotRows = useMemo(() => buildPivotRows(dataList), [dataList]);
 
     const isProject = activeTab === 'PROYEK';
 
@@ -228,44 +212,35 @@ export default function TabelRincianAset({
     ], []);
 
     const activeFilterCount = [
-        isProject ? draftProject : draftDepartment,
-        draftGudangId !== 'ALL' ? draftGudangId : '',
-        draftStartDate || draftEndDate ? 'periode' : '',
-    ].filter(Boolean).length;
+        getFilterLength(isProject ? project : department),
+        startDate || endDate ? 1 : 0,
+    ].reduce((total, value) => total + value, 0);
 
     const contextLabel = isProject ? 'KODE PROJECT' : 'DEPARTEMEN';
 
     const contextValue = isProject
-        ? project || 'Semua Project'
-        : department || 'Semua Departemen';
+        ? Array.isArray(project)
+            ? project.length > 1
+                ? `${project.length} Project dipilih`
+                : project[0] || 'Semua Project'
+            : project || 'Semua Project'
+        : Array.isArray(department)
+            ? department.length > 1
+                ? `${department.length} Departemen dipilih`
+                : department[0] || 'Semua Departemen'
+            : department || 'Semua Departemen';
 
-    const handleApplyFilters = () => {
+    const handleApplyFilters = values => {
         onFilterApply?.({
-            project: isProject ? draftProject : '',
-            department: isProject ? '' : draftDepartment,
-            gudang_id: draftGudangId,
-            start_date: draftStartDate,
-            end_date: draftEndDate,
+            project: isProject ? values?.project || '' : '',
+            department: isProject ? '' : values?.department || '',
+            start_date: values?.start_date || '',
+            end_date: values?.end_date || '',
         });
     };
 
     const handleResetFilters = () => {
-        setDraftProject('');
-        setDraftDepartment('');
-        setDraftGudangId('ALL');
-        setDraftStartDate('');
-        setDraftEndDate('');
         onReset?.();
-    };
-
-    const handleDateApply = (start, end) => {
-        setDraftStartDate(start);
-        setDraftEndDate(end);
-    };
-
-    const handleDateReset = () => {
-        setDraftStartDate('');
-        setDraftEndDate('');
     };
 
     const handleExpandAll = () => {
@@ -289,8 +264,6 @@ export default function TabelRincianAset({
 
                 <div className="shrink-0">
                     <FilterPanel
-                        mode="panel"
-                        columns={2}
                         activeCount={activeFilterCount}
                         title="Filter"
                         applyLabel="Terapkan"
@@ -298,63 +271,14 @@ export default function TabelRincianAset({
                         onApply={handleApplyFilters}
                         onReset={handleResetFilters}
                         isProcessing={isProcessing}
-                        triggerPosition="right"
-                    >
-                        {isProject ? (
-                            <HybridDropdown
-                                value={draftProject}
-                                options={projectOptions}
-                                allowCustom={false}
-                                onChange={setDraftProject}
-                                placeholder="Pilih Project..."
-                                searchPlaceholder="Cari Project..."
-                                disabled={isProcessing}
-                                inputClassName="h-9 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
-                            />
-                        ) : (
-                            <HybridDropdown
-                                value={draftDepartment}
-                                options={departmentOptions}
-                                allowCustom={false}
-                                onChange={setDraftDepartment}
-                                placeholder="Pilih Departemen..."
-                                searchPlaceholder="Cari Departemen..."
-                                disabled={isProcessing}
-                                inputClassName="h-9 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
-                            />
-                        )}
-
-                        <HybridDropdown
-                            value={draftGudangId}
-                            options={gudangOptions}
-                            allowCustom={false}
-                            onChange={setDraftGudangId}
-                            placeholder="Pilih Gudang..."
-                            searchPlaceholder="Cari Gudang..."
-                            disabled={isProcessing}
-                            inputClassName="h-9 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 font-semibold"
-                        />
-
-                        <DateRangeFilter
-                            startDate={draftStartDate}
-                            endDate={draftEndDate}
-                            onApply={handleDateApply}
-                            onReset={handleDateReset}
-                            isProcessing={isProcessing}
-                        />
-
-                        <div className="flex flex-col justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 px-3 py-2">
-                            <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 dark:text-slate-500">
-                                Filter aktif
-                            </span>
-
-                            <span className="mt-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                {activeFilterCount
-                                    ? `${activeFilterCount} filter dipilih`
-                                    : 'Belum ada filter'}
-                            </span>
-                        </div>
-                    </FilterPanel>
+                        activeTab={activeTab}
+                        projectOptions={projectOptions}
+                        departmentOptions={departmentOptions}
+                        project={project}
+                        department={department}
+                        startDate={startDate}
+                        endDate={endDate}
+                    />
                 </div>
             </div>
 

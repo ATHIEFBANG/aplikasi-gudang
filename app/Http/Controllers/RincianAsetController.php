@@ -46,33 +46,61 @@ class RincianAsetController extends Controller
         return $prices;
     }
 
+    private function normalizeFilterArray($value): array
+    {
+        if (is_array($value)) {
+            return collect($value)
+                ->map(fn($item) => trim((string) $item))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if ($value === null || $value === '' || $value === 'ALL') {
+            return [];
+        }
+
+        return [trim((string) $value)];
+    }
+
     private function applyPivotFilters($query, Request $request, string $type): void
     {
         $search = trim((string) $request->input('search', ''));
-        $project = trim((string) $request->input('project', ''));
-        $department = trim((string) $request->input('department', ''));
-        $gudangId = $request->input('gudang_id');
+
+        $projects = $this->normalizeFilterArray(
+            $request->input('project', [])
+        );
+
+        $departments = $this->normalizeFilterArray(
+            $request->input('department', [])
+        );
+
+        $gudangs = $this->normalizeFilterArray(
+            $request->input('gudang_id', [])
+        );
+
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
         if ($type === 'PROYEK') {
             $query->where('transaksis.sub_jenis', 'BARANG_KE_SITE');
 
-            if ($project !== '') {
-                $query->where('transaksis.kode_projek', $project);
+            if (!empty($projects)) {
+                $query->whereIn('transaksis.kode_projek', $projects);
             }
         }
 
         if ($type === 'NON_PROYEK') {
             $query->where('transaksis.sub_jenis', 'PEMAKAIAN_INTERNAL');
 
-            if ($department !== '') {
-                $query->where('transaksis.pihak_asal', $department);
+            if (!empty($departments)) {
+                $query->whereIn('transaksis.pihak_asal', $departments);
             }
         }
 
-        if ($gudangId && $gudangId !== 'ALL') {
-            $query->where('transaksis.gudang_asal_id', $gudangId);
+        if (!empty($gudangs)) {
+            $query->whereIn('transaksis.gudang_asal_id', $gudangs);
         }
 
         if ($startDate && $endDate) {
@@ -110,7 +138,12 @@ class RincianAsetController extends Controller
         $serialTable = (new BarangSerial())->getTable();
 
         $rows = DB::table('transaksi_detail_serials as tds')
-            ->join("{$serialTable} as bs", 'bs.id', '=', 'tds.barang_serial_id')
+            ->join(
+                "{$serialTable} as bs",
+                'bs.id',
+                '=',
+                'tds.barang_serial_id'
+            )
             ->whereIn('tds.transaksi_detail_id', $detailIds)
             ->select([
                 'tds.transaksi_detail_id',
@@ -129,7 +162,10 @@ class RincianAsetController extends Controller
                 $result[$detailId] = [];
             }
 
-            if ($row->serial_number !== null && trim((string) $row->serial_number) !== '') {
+            if (
+                $row->serial_number !== null &&
+                trim((string) $row->serial_number) !== ''
+            ) {
                 $result[$detailId][] = trim((string) $row->serial_number);
             }
         }
@@ -137,14 +173,30 @@ class RincianAsetController extends Controller
         return $result;
     }
 
-    private function getPivotRows(Request $request, string $type, array $priceMap): array
-    {
+    private function getPivotRows(
+        Request $request,
+        string $type,
+        array $priceMap
+    ): array {
         $query = TransaksiDetail::query()
-            ->join('transaksis', 'transaksis.id', '=', 'transaksi_details.transaksi_id')
-            ->join('barangs', 'barangs.id', '=', 'transaksi_details.barang_id')
+            ->join(
+                'transaksis',
+                'transaksis.id',
+                '=',
+                'transaksi_details.transaksi_id'
+            )
+            ->join(
+                'barangs',
+                'barangs.id',
+                '=',
+                'transaksi_details.barang_id'
+            )
             ->where('transaksis.jenis_transaksi', 'KELUAR')
             ->where(function ($q) {
-                $q->whereIn('transaksis.status', ['COMPLETED', 'completed'])
+                $q->whereIn(
+                    'transaksis.status',
+                    ['COMPLETED', 'completed']
+                )
                     ->orWhereNull('transaksis.status');
             });
 
@@ -190,7 +242,6 @@ class RincianAsetController extends Controller
             $barangId = (int) $row->barang_id;
             $qty = (int) $row->qty;
             $harga = (float) ($priceMap[$barangId] ?? 0);
-
             $serials = $serialMap[(int) $row->detail_id] ?? [];
 
             return [
@@ -206,7 +257,9 @@ class RincianAsetController extends Controller
                 'nama_customer' => $row->nama_customer,
                 'department' => $row->pihak_asal,
                 'pihak_asal' => $row->pihak_asal,
-                'gudang_asal_id' => $row->gudang_asal_id ? (int) $row->gudang_asal_id : null,
+                'gudang_asal_id' => $row->gudang_asal_id
+                    ? (int) $row->gudang_asal_id
+                    : null,
                 'tanggal' => $row->tanggal,
                 'no_transaksi' => $row->no_transaksi,
                 'qty' => $qty,
@@ -226,7 +279,10 @@ class RincianAsetController extends Controller
             ->whereNotNull('kode_projek')
             ->where('kode_projek', '!=', '')
             ->where(function ($q) {
-                $q->whereIn('status', ['COMPLETED', 'completed'])
+                $q->whereIn(
+                    'status',
+                    ['COMPLETED', 'completed']
+                )
                     ->orWhereNull('status');
             })
             ->distinct()
@@ -244,7 +300,10 @@ class RincianAsetController extends Controller
             ->whereNotNull('pihak_asal')
             ->where('pihak_asal', '!=', '')
             ->where(function ($q) {
-                $q->whereIn('status', ['COMPLETED', 'completed'])
+                $q->whereIn(
+                    'status',
+                    ['COMPLETED', 'completed']
+                )
                     ->orWhereNull('status');
             })
             ->distinct()
@@ -256,7 +315,9 @@ class RincianAsetController extends Controller
 
     public function index(Request $request): Response
     {
-        $tab = strtoupper((string) $request->input('tab', 'PROYEK'));
+        $tab = strtoupper(
+            (string) $request->input('tab', 'PROYEK')
+        );
 
         if (!in_array($tab, ['PROYEK', 'NON_PROYEK'], true)) {
             $tab = 'PROYEK';
@@ -300,10 +361,22 @@ class RincianAsetController extends Controller
                 'search' => $request->input('search', ''),
                 'project' => $request->input('project', ''),
                 'department' => $request->input('department', ''),
-                'gudang_id' => $request->input('gudang_id', 'ALL'),
-                'start_date' => $request->input('start_date', ''),
-                'end_date' => $request->input('end_date', ''),
-                'zoom' => (int) $request->input('zoom', 100),
+                'gudang_id' => $request->input(
+                    'gudang_id',
+                    'ALL'
+                ),
+                'start_date' => $request->input(
+                    'start_date',
+                    ''
+                ),
+                'end_date' => $request->input(
+                    'end_date',
+                    ''
+                ),
+                'zoom' => (int) $request->input(
+                    'zoom',
+                    100
+                ),
             ],
         ]);
     }

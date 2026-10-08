@@ -1,235 +1,407 @@
-import React, { useState } from 'react';
-import {
-    Filter,
-    RotateCcw,
-    ChevronDown,
-    ChevronUp,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, Filter } from 'lucide-react';
+import Search from '@/components/Search';
+import DateRangeFilter from '@/components/DateRangeFilter';
+import Card from '@/components/Button';
 
-const COLUMN_CLASS = {
-    1: 'grid-cols-1',
-    2: 'grid-cols-1 sm:grid-cols-2',
-    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-    4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
-    5: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-5',
-    6: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6',
+const normalizeOptions = options => {
+    return (options || [])
+        .map(item => {
+            if (typeof item === 'string') return { value: item, label: item };
+            return { value: item?.value ?? item?.id ?? item?.kode ?? item?.code ?? '', label: item?.label ?? item?.name ?? item?.nama ?? item?.kode ?? item?.code ?? '' };
+        })
+        .filter(item => item.value !== '' && item.label !== '');
 };
 
+const normalizeSelected = value => {
+    if (Array.isArray(value)) return value.map(String);
+    if (value === '' || value === null || value === undefined || value === 'ALL') return [];
+    return [String(value)];
+};
+
+const groupByAlphabet = options => {
+    return options.reduce((groups, item) => {
+        const letter = String(item.label).trim().charAt(0).toUpperCase() || '#';
+        if (!groups[letter]) groups[letter] = [];
+        groups[letter].push(item);
+        return groups;
+    }, {});
+};
+
+const Checkbox = ({ checked, indeterminate = false }) => (
+    <span className={`flex items-center justify-center w-4 h-4 shrink-0 rounded-[4px] border transition-colors ${checked || indeterminate ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 dark:border-slate-600 bg-transparent'}`}>
+        {checked && <Check className="w-3 h-3" strokeWidth={3} />}
+        {indeterminate && !checked && <span className="w-2 h-0.5 rounded-full bg-white" />}
+    </span>
+);
+
+function AlphabetSection({ letter, options, selected, onChange }) {
+    const values = options.map(item => String(item.value));
+    const selectedValues = values.filter(value => selected.includes(value));
+    const allSelected = values.length > 0 && selectedValues.length === values.length;
+    const partiallySelected = selectedValues.length > 0 && selectedValues.length < values.length;
+
+    const toggleAll = () => {
+        if (allSelected) {
+            onChange(selected.filter(value => !values.includes(value)));
+        } else {
+            onChange([...new Set([...selected, ...values])]);
+        }
+    };
+
+    const toggleOption = value => {
+        const stringValue = String(value);
+
+        if (selected.includes(stringValue)) {
+            onChange(selected.filter(item => item !== stringValue));
+        } else {
+            onChange([...selected, stringValue]);
+        }
+    };
+
+    return (
+        <div className="rounded-xl border border-slate-700 overflow-hidden bg-slate-900/40">
+            <div className="h-9 flex items-center justify-between px-3 bg-slate-800/80 border-b border-slate-700">
+                <span className="text-xs font-black text-blue-400">{letter}</span>
+
+                <button
+                    type="button"
+                    onClick={toggleAll}
+                    className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-slate-700 transition-colors cursor-pointer"
+                >
+                    <Checkbox checked={allSelected} indeterminate={partiallySelected} />
+                    <span className="text-[11px] font-semibold text-slate-300">Semua</span>
+                </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 p-2.5">
+                {options.map(item => {
+                    const checked = selected.includes(String(item.value));
+
+                    return (
+                        <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => toggleOption(item.value)}
+                            className="min-w-0 h-9 flex items-center gap-2.5 px-2.5 rounded-lg text-left hover:bg-blue-500/10 transition-colors cursor-pointer"
+                        >
+                            <Checkbox checked={checked} />
+                            <span className={`truncate text-xs ${checked ? 'font-semibold text-white' : 'text-slate-300'}`}>{item.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+function OptionPicker({ options, selected, onChange, searchTerm }) {
+    const filteredOptions = useMemo(() => {
+        const keyword = searchTerm.trim().toLowerCase();
+        if (!keyword) return options;
+        return options.filter(item => item.label.toLowerCase().includes(keyword));
+    }, [options, searchTerm]);
+
+    const groupedOptions = useMemo(() => groupByAlphabet(filteredOptions), [filteredOptions]);
+    const letters = Object.keys(groupedOptions).sort((a, b) => a.localeCompare(b));
+    const allVisibleValues = filteredOptions.map(item => String(item.value));
+    const allVisibleSelected = allVisibleValues.length > 0 && allVisibleValues.every(value => selected.includes(value));
+    const partiallyVisibleSelected = allVisibleValues.some(value => selected.includes(value)) && !allVisibleSelected;
+
+    const toggleAllVisible = () => {
+        if (allVisibleSelected) {
+            onChange(selected.filter(value => !allVisibleValues.includes(value)));
+        } else {
+            onChange([...new Set([...selected, ...allVisibleValues])]);
+        }
+    };
+
+    return (
+        <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center justify-between h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 mb-3">
+                <button type="button" onClick={toggleAllVisible} className="flex items-center gap-2.5 cursor-pointer">
+                    <Checkbox checked={allVisibleSelected} indeterminate={partiallyVisibleSelected} />
+                    <span className="text-xs font-bold text-slate-200">Semua</span>
+                </button>
+
+                <span className="text-[10px] font-semibold text-slate-500">{selected.length} dipilih</span>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
+                {letters.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                        Tidak ada data ditemukan.
+                    </div>
+                ) : (
+                    letters.map(letter => (
+                        <AlphabetSection
+                            key={letter}
+                            letter={letter}
+                            options={groupedOptions[letter]}
+                            selected={selected}
+                            onChange={onChange}
+                        />
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function FilterPanel({
-    children,
-    mode = 'panel',
-    columns = 2,
     activeCount = 0,
     title = 'Filter',
     applyLabel = 'Terapkan',
     resetLabel = 'Reset',
     onApply,
     onReset,
-    defaultOpen = false,
     isProcessing = false,
-    className = '',
-    buttonClassName = '',
-    showHeader = true,
-    showActions = true,
-    triggerPosition = 'left',
-    panelWidth = '680px',
+    activeTab = 'PROYEK',
+    projectOptions = [],
+    departmentOptions = [],
+    project = '',
+    department = '',
+    startDate = '',
+    endDate = '',
 }) {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
+    const [isOpen, setIsOpen] = useState(false);
+    const [activeCategory, setActiveCategory] = useState(activeTab === 'PROYEK' ? 'project' : 'department');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [draftProject, setDraftProject] = useState(normalizeSelected(project));
+    const [draftDepartment, setDraftDepartment] = useState(normalizeSelected(department));
+    const [draftStartDate, setDraftStartDate] = useState(startDate || '');
+    const [draftEndDate, setDraftEndDate] = useState(endDate || '');
 
-    const safeColumns = Math.min(
-        Math.max(Number(columns) || 2, 1),
-        6
-    );
+    const isProject = activeTab === 'PROYEK';
 
-    const columnClass = COLUMN_CLASS[safeColumns] || COLUMN_CLASS[2];
+    const activeOptions = useMemo(() => {
+        const options = isProject ? projectOptions : departmentOptions;
+        return normalizeOptions(options);
+    }, [isProject, projectOptions, departmentOptions]);
 
-    const handleToggle = () => {
-        setIsOpen(prev => !prev);
+    useEffect(() => {
+        if (!isOpen) return;
+
+        setDraftProject(normalizeSelected(project));
+        setDraftDepartment(normalizeSelected(department));
+        setDraftStartDate(startDate || '');
+        setDraftEndDate(endDate || '');
+        setActiveCategory(activeTab === 'PROYEK' ? 'project' : 'department');
+        setSearchTerm('');
+    }, [isOpen, project, department, startDate, endDate, activeTab]);
+
+    useEffect(() => {
+        const nextCategory = activeTab === 'PROYEK' ? 'project' : 'department';
+
+        if (activeCategory !== nextCategory && activeCategory !== 'periode') {
+            setActiveCategory(nextCategory);
+            setSearchTerm('');
+        }
+    }, [activeTab, activeCategory]);
+
+    const activeSelected = activeCategory === 'project' ? draftProject : draftDepartment;
+
+    const setActiveSelected = values => {
+        if (activeCategory === 'project') setDraftProject(values);
+        if (activeCategory === 'department') setDraftDepartment(values);
     };
 
-    const handleApply = () => {
-        onApply?.();
+    const handleOpen = () => setIsOpen(true);
 
-        if (mode === 'panel') {
-            setIsOpen(false);
-        }
+    const handleClose = () => {
+        if (!isProcessing) setIsOpen(false);
     };
 
     const handleReset = () => {
-        onReset?.();
+        setDraftProject([]);
+        setDraftDepartment([]);
+        setDraftStartDate('');
+        setDraftEndDate('');
+        setSearchTerm('');
     };
 
-    const renderChildren = () => {
-        const items = React.Children.toArray(children);
+    const handleApply = () => {
+        onApply?.({
+            project: isProject ? (draftProject.length === 1 ? draftProject[0] : draftProject) : '',
+            department: !isProject ? (draftDepartment.length === 1 ? draftDepartment[0] : draftDepartment) : '',
+            start_date: draftStartDate,
+            end_date: draftEndDate,
+        });
 
-        return items.map((child, index) => (
-            <div
-                key={child?.key || index}
-                className="relative min-w-0 z-[1] focus-within:z-[300]"
-            >
-                {child}
-            </div>
-        ));
+        setIsOpen(false);
     };
 
-    if (mode === 'inline') {
-        return (
-            <div className={`w-full ${className}`}>
-                <div className="flex flex-wrap items-center gap-2.5">
-                    {renderChildren()}
+    const categoryTitle = activeCategory === 'project' ? 'Project' : activeCategory === 'department' ? 'Departemen' : 'Periode';
 
-                    {showActions && (
-                        <>
-                            <button
-                                type="button"
-                                onClick={handleReset}
-                                disabled={isProcessing}
-                                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                            >
-                                <span className="inline-flex items-center gap-1.5">
-                                    <RotateCcw className="w-3.5 h-3.5" />
-                                    {resetLabel}
-                                </span>
-                            </button>
+    const filterModal = (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[3px]" onClick={handleClose} />
 
-                            <button
-                                type="button"
-                                onClick={handleApply}
-                                disabled={isProcessing}
-                                className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-semibold shadow-sm shadow-rose-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                            >
-                                {applyLabel}
-                            </button>
-                        </>
-                    )}
+            <div className="relative z-[10000] w-full max-w-[920px] h-[590px] max-h-[calc(100vh-80px)] flex flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-white shadow-2xl">
+                <div className="h-[64px] shrink-0 flex items-center justify-center px-5 border-b border-slate-700 bg-slate-900">
+                    <h2 className="text-base font-black tracking-tight">Filter Data</h2>
                 </div>
-            </div>
-        );
-    }
 
-    const alignmentClass = triggerPosition === 'right'
-        ? 'justify-end'
-        : 'justify-start';
-
-    return (
-        <div className={`relative w-full ${className}`}>
-            <div className={`flex items-center ${alignmentClass}`}>
-                <button
-                    type="button"
-                    onClick={handleToggle}
-                    disabled={isProcessing}
-                    className={`inline-flex items-center gap-2 h-9 px-3.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${buttonClassName}`}
-                >
-                    <Filter className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-
-                    <span>{title}</span>
-
-                    {Number(activeCount) > 0 && (
-                        <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center">
-                            {activeCount}
-                        </span>
-                    )}
-
-                    {isOpen ? (
-                        <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                    ) : (
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                    )}
-                </button>
-            </div>
-
-            {isOpen && (
-                <div
-                    className="absolute right-3 sm:right-4 top-[calc(100%+18px)] z-[100] overflow-visible rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl shadow-slate-900/10 dark:shadow-black/30"
-                    style={{
-                        width: `min(${panelWidth}, calc(100vw - 2rem))`,
-                    }}
-                >
-                    {showHeader && (
-            <div className="relative overflow-hidden rounded-t-2xl border-b border-blue-400/30 bg-blue-700 dark:bg-blue-800">
-                <svg
-                    className="absolute right-0 top-0 w-[70%] h-full pointer-events-none"
-                    viewBox="0 0 760 90"
-                    preserveAspectRatio="none"
-                    fill="none"
-                >
-                    <path
-                        d="M120 88C205 68 220 22 318 27C407 32 430 70 510 56C590 42 610 8 760 14"
-                        stroke="rgba(191,219,254,0.32)"
-                        strokeWidth="1.3"
-                    />
-
-                    <path
-                        d="M150 90C235 72 255 36 340 40C420 44 455 73 528 63C600 53 630 24 760 25"
-                        stroke="rgba(147,197,253,0.28)"
-                        strokeWidth="1.1"
-                    />
-
-                    <path
-                        d="M185 92C267 77 290 49 362 51C432 53 462 80 535 71C612 61 645 37 760 38"
-                        stroke="rgba(125,211,252,0.22)"
-                        strokeWidth="1"
-                    />
-
-                    <path
-                        d="M215 90C292 82 319 61 382 61C447 61 480 82 548 77C620 72 655 51 760 52"
-                        stroke="rgba(191,219,254,0.18)"
-                        strokeWidth="0.9"
-                    />
-
-                    <path
-                        d="M255 90C325 84 350 71 406 70C467 69 500 88 562 83C632 78 680 66 760 66"
-                        stroke="rgba(96,165,250,0.16)"
-                        strokeWidth="0.8"
-                    />
-                </svg>
-
-                <div className="absolute inset-y-0 right-0 w-[65%] bg-gradient-to-l from-blue-300/5 via-transparent to-transparent pointer-events-none" />
-
-                <div className="relative flex items-center justify-between px-5 py-3.5">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-white">
-                        {title}
-                    </h3>
-
-                    {Number(activeCount) > 0 && (
-                        <span className="ml-auto rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
-                            {activeCount} filter aktif
-                        </span>
-                    )}
-                </div>
-            </div>
-        )}
-
-                    <div className={`grid ${columnClass} gap-3 p-4 overflow-visible bg-white dark:bg-slate-900`}>
-                        {renderChildren()}
-                    </div>
-
-                    {showActions && (
-                        <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30 rounded-b-2xl flex items-center justify-end gap-2">
+                <div className="flex flex-1 min-h-0">
+                    <div className="w-[190px] shrink-0 border-r border-slate-700 bg-slate-950 p-3">
+                        <div className="space-y-1">
                             <button
                                 type="button"
-                                onClick={handleReset}
-                                disabled={isProcessing}
-                                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                onClick={() => {
+                                    setActiveCategory(isProject ? 'project' : 'department');
+                                    setSearchTerm('');
+                                }}
+                                className={`w-full h-10 flex items-center justify-between px-3.5 rounded-lg text-sm font-bold text-left transition-all ${activeCategory === (isProject ? 'project' : 'department') ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-300 hover:bg-slate-900 hover:text-white'}`}
                             >
-                                <span className="inline-flex items-center gap-1.5">
-                                    <RotateCcw className="w-3.5 h-3.5" />
-                                    {resetLabel}
-                                </span>
+                                <span>{isProject ? 'Project' : 'Departemen'}</span>
+
+                                {(isProject ? draftProject.length : draftDepartment.length) > 0 && (
+                                    <span className="min-w-5 h-5 px-1.5 flex items-center justify-center rounded-full bg-white/15 text-[10px]">
+                                        {isProject ? draftProject.length : draftDepartment.length}
+                                    </span>
+                                )}
                             </button>
 
                             <button
                                 type="button"
-                                onClick={handleApply}
-                                disabled={isProcessing}
-                                className="h-8 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-semibold shadow-sm shadow-rose-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                onClick={() => {
+                                    setActiveCategory('periode');
+                                    setSearchTerm('');
+                                }}
+                                className={`w-full h-10 px-3.5 rounded-lg text-sm font-bold text-left transition-all ${activeCategory === 'periode' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-300 hover:bg-slate-900 hover:text-white'}`}
                             >
-                                {applyLabel}
+                                Periode
                             </button>
                         </div>
-                    )}
+                    </div>
+
+                    <div className="flex-1 min-w-0 min-h-0 p-4 bg-slate-900">
+                        {activeCategory === 'periode' ? (
+                            <div className="h-full flex flex-col">
+                                <div className="mb-3">
+                                    <h3 className="text-sm font-black text-white">Periode</h3>
+                                    <p className="mt-1 text-[11px] text-slate-400">Tentukan rentang tanggal transaksi.</p>
+                                </div>
+
+                                <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
+                                    <DateRangeFilter
+                                        startDate={draftStartDate}
+                                        endDate={draftEndDate}
+                                        onApply={(start, end) => {
+                                            setDraftStartDate(start);
+                                            setDraftEndDate(end);
+                                        }}
+                                        onReset={() => {
+                                            setDraftStartDate('');
+                                            setDraftEndDate('');
+                                        }}
+                                        isProcessing={isProcessing}
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col min-h-0">
+                                <div className="shrink-0 mb-3">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="min-w-0">
+                                            <h3 className="text-sm font-black text-white">{categoryTitle}</h3>
+                                            <p className="mt-1 text-[11px] text-slate-400">Pilih satu atau beberapa {categoryTitle.toLowerCase()}.</p>
+                                        </div>
+
+                                        <Search
+                                            value={searchTerm}
+                                            onChange={setSearchTerm}
+                                            onSearch={setSearchTerm}
+                                            placeholder={`Cari ${categoryTitle.toLowerCase()}...`}
+                                            disabled={isProcessing}
+                                            className="w-[260px] shrink-0"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 min-h-0">
+                                    <OptionPicker
+                                        options={activeOptions}
+                                        selected={activeSelected}
+                                        onChange={setActiveSelected}
+                                        searchTerm={searchTerm}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            )}
+
+                <div className="h-[76px] shrink-0 flex items-center justify-between px-5 border-t border-slate-700 bg-slate-950">
+                    <Card
+                        variant="oval-3d"
+                        size="none"
+                        radius="full"
+                        width="fit"
+                        clickable={!isProcessing}
+                        hover={!isProcessing}
+                        onClick={handleReset}
+                        className={`h-10 px-5 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                        <span className="text-sm font-bold">{resetLabel}</span>
+                    </Card>
+
+                    <div className="flex items-center gap-2">
+                        <Card
+                            variant="oval-3d"
+                            size="none"
+                            radius="full"
+                            width="fit"
+                            clickable={!isProcessing}
+                            hover={!isProcessing}
+                            onClick={handleClose}
+                            className={`h-10 px-5 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                        >
+                            <span className="text-sm font-bold">Batal</span>
+                        </Card>
+
+                        <Card
+                            variant="oval-3d"
+                            size="none"
+                            radius="full"
+                            width="fit"
+                            clickable={!isProcessing}
+                            hover={!isProcessing}
+                            onClick={handleApply}
+                            className={`h-10 px-6 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                        >
+                            <span className="text-sm font-bold">{isProcessing ? 'Memproses...' : applyLabel}</span>
+                        </Card>
+                    </div>
+                </div>
+            </div>
         </div>
+    );
+
+    return (
+        <>
+            <Card
+                variant="oval-3d"
+                size="none"
+                radius="full"
+                width="fit"
+                clickable={!isProcessing}
+                hover={!isProcessing}
+                onClick={handleOpen}
+                className={`h-9 px-3.5 gap-2 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+                <Filter className="w-4 h-4 shrink-0" />
+                <span className="text-sm font-bold whitespace-nowrap">{title}</span>
+
+                {activeCount > 0 && (
+                    <span className="min-w-6 h-6 px-1.5 flex items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                        {activeCount}
+                    </span>
+                )}
+            </Card>
+
+            {isOpen && typeof document !== 'undefined' && createPortal(filterModal, document.body)}
+        </>
     );
 }
