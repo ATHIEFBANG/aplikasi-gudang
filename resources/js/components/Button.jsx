@@ -8,9 +8,8 @@ const VARIANTS = {
     outlined: `${BASE} border bg-transparent`,
     filled: `${BASE} border`,
     flat: `${BASE} border-transparent`,
-    glass: `${BASE} border backdrop-blur-xl`,
+    glass: `${BASE} relative border backdrop-blur-xl`,
     '3d': `${BASE} relative border`,
-    neon: `${BASE} relative border`,
     duotone: `${BASE} relative border overflow-hidden`,
     gradient: `${BASE} border-transparent`,
     game: `${BASE} border text-white`,
@@ -142,20 +141,6 @@ const GLASS = {
     slate: 'bg-slate-500/10 border-slate-300/30 text-slate-700 dark:text-slate-200',
 };
 
-const NEON = {
-    default: 'bg-slate-950 border-slate-400 text-white shadow-[0_0_12px_rgba(148,163,184,0.45),inset_0_0_10px_rgba(148,163,184,0.08)]',
-    blue: 'bg-blue-950/80 border-blue-400 text-blue-100 shadow-[0_0_12px_rgba(59,130,246,0.65),inset_0_0_10px_rgba(59,130,246,0.12)]',
-    red: 'bg-red-950/80 border-red-400 text-red-100 shadow-[0_0_12px_rgba(239,68,68,0.65),inset_0_0_10px_rgba(239,68,68,0.12)]',
-    green: 'bg-emerald-950/80 border-emerald-400 text-emerald-100 shadow-[0_0_12px_rgba(16,185,129,0.65),inset_0_0_10px_rgba(16,185,129,0.12)]',
-    amber: 'bg-amber-950/80 border-amber-400 text-amber-100 shadow-[0_0_12px_rgba(245,158,11,0.65),inset_0_0_10px_rgba(245,158,11,0.12)]',
-    purple: 'bg-purple-950/80 border-purple-400 text-purple-100 shadow-[0_0_12px_rgba(168,85,247,0.65),inset_0_0_10px_rgba(168,85,247,0.12)]',
-    orange: 'bg-orange-950/80 border-orange-400 text-orange-100 shadow-[0_0_12px_rgba(249,115,22,0.65),inset_0_0_10px_rgba(249,115,22,0.12)]',
-    cyan: 'bg-cyan-950/80 border-cyan-400 text-cyan-100 shadow-[0_0_12px_rgba(6,182,212,0.65),inset_0_0_10px_rgba(6,182,212,0.12)]',
-    pink: 'bg-pink-950/80 border-pink-400 text-pink-100 shadow-[0_0_12px_rgba(236,72,153,0.65),inset_0_0_10px_rgba(236,72,153,0.12)]',
-    indigo: 'bg-indigo-950/80 border-indigo-400 text-indigo-100 shadow-[0_0_12px_rgba(99,102,241,0.65),inset_0_0_10px_rgba(99,102,241,0.12)]',
-    slate: 'bg-slate-950 border-slate-400 text-slate-100 shadow-[0_0_12px_rgba(100,116,139,0.55)]',
-};
-
 const DUOTONE = {
     default: 'from-slate-700 via-slate-500 to-slate-900',
     blue: 'from-blue-400 via-indigo-500 to-blue-800',
@@ -187,6 +172,73 @@ const HOLOGRAPHIC = {
     slate: 'from-slate-300 via-blue-300 to-purple-300',
 };
 
+const EFFECTS = {
+    none: '',
+    neon: 'relative isolate before:content-[""] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border-2 before:z-10',
+    glow: 'relative isolate before:content-[""] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:z-10',
+    shine: 'relative isolate before:content-[""] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-white/60 before:shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] before:z-10',
+    'glass-edge': 'relative isolate before:content-[""] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-white/50 before:shadow-[0_0_0_1px_rgba(255,255,255,0.12)] before:z-10',
+};
+
+const EFFECT_COLORS = {
+    default: {
+        neon: 'before:border-slate-400 before:shadow-[0_0_12px_rgba(148,163,184,0.65)]',
+        glow: 'before:border-slate-400/70 before:shadow-[0_0_16px_rgba(148,163,184,0.55)]',
+    },
+    blue: {
+        neon: 'before:border-blue-400 before:shadow-[0_0_12px_rgba(59,130,246,0.75)]',
+        glow: 'before:border-blue-400/70 before:shadow-[0_0_16px_rgba(59,130,246,0.6)]',
+    },
+    red: {
+        neon: 'before:border-red-400 before:shadow-[0_0_12px_rgba(239,68,68,0.75)]',
+        glow: 'before:border-red-400/70 before:shadow-[0_0_16px_rgba(239,68,68,0.6)]',
+    },
+    green: {
+        neon: 'before:border-emerald-400 before:shadow-[0_0_12px_rgba(16,185,129,0.75)]',
+        glow: 'before:border-emerald-400/70 before:shadow-[0_0_16px_rgba(16,185,129,0.6)]',
+    },
+    amber: {
+        neon: 'before:border-amber-400 before:shadow-[0_0_12px_rgba(245,158,11,0.75)]',
+        glow: 'before:border-amber-400/70 before:shadow-[0_0_16px_rgba(245,158,11,0.6)]',
+    },
+    purple: {
+        neon: 'before:border-purple-400 before:shadow-[0_0_12px_rgba(168,85,247,0.75)]',
+        glow: 'before:border-purple-400/70 before:shadow-[0_0_16px_rgba(168,85,247,0.6)]',
+    },
+    orange: {
+        neon: 'before:border-orange-400 before:shadow-[0_0_12px_rgba(249,115,22,0.75)]',
+        glow: 'before:border-orange-400/70 before:shadow-[0_0_16px_rgba(249,115,22,0.6)]',
+    },
+    cyan: {
+        neon: 'before:border-cyan-400 before:shadow-[0_0_12px_rgba(6,182,212,0.75)]',
+        glow: 'before:border-cyan-400/70 before:shadow-[0_0_16px_rgba(6,182,212,0.6)]',
+    },
+    pink: {
+        neon: 'before:border-pink-400 before:shadow-[0_0_12px_rgba(236,72,153,0.75)]',
+        glow: 'before:border-pink-400/70 before:shadow-[0_0_16px_rgba(236,72,153,0.6)]',
+    },
+    indigo: {
+        neon: 'before:border-indigo-400 before:shadow-[0_0_12px_rgba(99,102,241,0.75)]',
+        glow: 'before:border-indigo-400/70 before:shadow-[0_0_16px_rgba(99,102,241,0.6)]',
+    },
+    slate: {
+        neon: 'before:border-slate-400 before:shadow-[0_0_12px_rgba(100,116,139,0.65)]',
+        glow: 'before:border-slate-400/70 before:shadow-[0_0_16px_rgba(100,116,139,0.55)]',
+    },
+    gray: {
+        neon: 'before:border-gray-400 before:shadow-[0_0_12px_rgba(156,163,175,0.65)]',
+        glow: 'before:border-gray-400/70 before:shadow-[0_0_16px_rgba(156,163,175,0.55)]',
+    },
+    white: {
+        neon: 'before:border-white before:shadow-[0_0_12px_rgba(255,255,255,0.75)]',
+        glow: 'before:border-white/70 before:shadow-[0_0_16px_rgba(255,255,255,0.55)]',
+    },
+    black: {
+        neon: 'before:border-slate-700 before:shadow-[0_0_12px_rgba(15,23,42,0.65)]',
+        glow: 'before:border-slate-700/70 before:shadow-[0_0_16px_rgba(15,23,42,0.55)]',
+    },
+};
+
 const SIZES = {
     none: 'p-0',
     xs: 'p-2',
@@ -194,16 +246,6 @@ const SIZES = {
     md: 'p-4',
     lg: 'p-5',
     xl: 'p-6',
-};
-
-const RADIUS = {
-    none: 'rounded-none',
-    sm: 'rounded-md',
-    md: 'rounded-lg',
-    lg: 'rounded-xl',
-    xl: 'rounded-2xl',
-    '2xl': 'rounded-3xl',
-    full: 'rounded-full',
 };
 
 const WIDTHS = {
@@ -249,14 +291,91 @@ const LAYER_STYLES = {
     front: 'z-50',
 };
 
+const SHAPES = {
+    default: { borderRadius: '1rem' },
+    kapsul: { borderRadius: '9999px' },
+    'bawah-membulat': { borderRadius: '0 0 9999px 9999px' },
+    'kiri-bawah-kanan-kapsul': { borderRadius: '0 9999px 9999px 9999px' },
+    'kiri-atas-kanan-bawah': { borderRadius: '9999px 0 9999px 0' },
+    'kiri-atas-kanan-kapsul': { borderRadius: '9999px 9999px 9999px 0' },
+    'takik-kiri': { clipPath: 'polygon(0 0, 88% 0, 100% 50%, 88% 100%, 0 100%, 7% 50%)' },
+    'pita-cekung': { clipPath: 'polygon(0 0, 90% 0, 100% 50%, 90% 100%, 0 100%, 7% 50%)' },
+    'persegi-membulat': { borderRadius: '8px' },
+    'kiri-siku-kanan-kapsul': { borderRadius: '0 9999px 9999px 0' },
+    'jajar-genjang': { clipPath: 'polygon(6% 0, 100% 0, 94% 100%, 0 100%)' },
+};
+
+function flipBorderRadius(value, flipHorizontal, flipVertical) {
+    const corners = value.split(/\s+/);
+    const normalized = corners.length === 1
+        ? [corners[0], corners[0], corners[0], corners[0]]
+        : corners.length === 2
+            ? [corners[0], corners[1], corners[0], corners[1]]
+            : corners.length === 3
+                ? [corners[0], corners[1], corners[2], corners[1]]
+                : corners;
+
+    let [topLeft, topRight, bottomRight, bottomLeft] = normalized;
+
+    if (flipHorizontal) {
+        [topLeft, topRight] = [topRight, topLeft];
+        [bottomLeft, bottomRight] = [bottomRight, bottomLeft];
+    }
+
+    if (flipVertical) {
+        [topLeft, bottomLeft] = [bottomLeft, topLeft];
+        [topRight, bottomRight] = [bottomRight, topRight];
+    }
+
+    return `${topLeft} ${topRight} ${bottomRight} ${bottomLeft}`;
+}
+
+function flipClipPath(value, flipHorizontal, flipVertical) {
+    if (!value?.startsWith('polygon(') || (!flipHorizontal && !flipVertical)) return value;
+
+    const points = value.match(/-?\d*\.?\d+%?\s+-?\d*\.?\d+%?/g);
+    if (!points) return value;
+
+    const flippedPoints = points.map((point) => {
+        let [x, y] = point.trim().split(/\s+/);
+        const xValue = parseFloat(x);
+        const yValue = parseFloat(y);
+
+        if (flipHorizontal) x = `${100 - xValue}%`;
+        if (flipVertical) y = `${100 - yValue}%`;
+
+        return `${x} ${y}`;
+    });
+
+    return `polygon(${flippedPoints.join(', ')})`;
+}
+
+function getShapeStyle(shape, flipHorizontal, flipVertical) {
+    const shapeStyle = SHAPES[shape] || SHAPES.default;
+    const style = { ...shapeStyle };
+
+    if (style.borderRadius && (flipHorizontal || flipVertical)) {
+        style.borderRadius = flipBorderRadius(style.borderRadius, flipHorizontal, flipVertical);
+    }
+
+    if (style.clipPath) {
+        style.clipPath = flipClipPath(style.clipPath, flipHorizontal, flipVertical);
+    }
+
+    return style;
+}
+
 export default function Button({
     children,
     variant = 'default',
+    effect = 'none',
     color = 'default',
     gradient = false,
     gradientDirection = 'b',
     size = 'md',
-    radius = 'xl',
+    shape = 'default',
+    flipHorizontal = false,
+    flipVertical = false,
     width = 'full',
     edge = 'none',
     edgeOffset = 0,
@@ -276,16 +395,17 @@ export default function Button({
     const gradientColor = GRADIENTS[color] || GRADIENTS.default;
     const threeDColor = THREE_D[color] || THREE_D.default;
     const glassColor = GLASS[color] || GLASS.default;
-    const neonColor = NEON[color] || NEON.default;
     const duotoneColor = DUOTONE[color] || DUOTONE.default;
     const holographicColor = HOLOGRAPHIC[color] || HOLOGRAPHIC.default;
+    const effectClass = EFFECTS[effect] || '';
+    const effectColorClass = EFFECT_COLORS[color]?.[effect] || EFFECT_COLORS.default[effect] || '';
     const gradientDirectionClass = GRADIENT_DIRECTIONS[gradientDirection] || GRADIENT_DIRECTIONS.b;
     const sizeClass = SIZES[size] || SIZES.md;
-    const radiusClass = RADIUS[radius] || RADIUS.xl;
     const widthClass = WIDTHS[width] || WIDTHS.full;
     const attachedClass = ATTACHED_STYLES[attached] || '';
     const layerClass = LAYER_STYLES[layer] || LAYER_STYLES.normal;
     const edgeClass = edge !== 'none' ? EDGE_STYLES[edge] || '' : '';
+    const shapeStyle = getShapeStyle(shape, flipHorizontal, flipVertical);
 
     const interactiveClass = hover || onClick
         ? 'transition-all duration-200 hover:brightness-110 active:translate-y-[1px]'
@@ -299,9 +419,7 @@ export default function Button({
         ? 'opacity-50 pointer-events-none'
         : '';
 
-    const cursorClass = disabled
-        ? ''
-        : 'cursor-pointer';
+    const cursorClass = disabled ? '' : 'cursor-pointer';
 
     let colorClass = '';
     let contentClass = '';
@@ -310,8 +428,6 @@ export default function Button({
         colorClass = `bg-gradient-to-b ${threeDColor} shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-2px_4px_rgba(0,0,0,0.25),0_3px_5px_rgba(0,0,0,0.35)]`;
     } else if (variant === 'glass') {
         colorClass = `${glassColor} shadow-[0_8px_24px_rgba(0,0,0,0.12)]`;
-    } else if (variant === 'neon') {
-        colorClass = neonColor;
     } else if (variant === 'duotone') {
         colorClass = `bg-gradient-to-br ${duotoneColor} border-white/20 text-white shadow-md`;
     } else if (variant === 'gradient' || gradient) {
@@ -356,8 +472,8 @@ export default function Button({
             onClick={onClick}
             disabled={Component === 'button' ? disabled : undefined}
             aria-disabled={disabled || undefined}
-            style={edgeStyle}
-            className={`${widthClass} ${variantClass} ${colorClass} ${sizeClass} ${radiusClass} ${attachedClass} ${layerClass} ${edgeClass} ${interactiveClass} ${selectedClass} ${disabledClass} ${cursorClass} ${contentClass} ${className}`}
+            style={{ ...shapeStyle, ...edgeStyle }}
+            className={`${widthClass} ${variantClass} ${effectClass} ${colorClass} ${effectColorClass} ${sizeClass} ${attachedClass} ${layerClass} ${edgeClass} ${interactiveClass} ${selectedClass} ${disabledClass} ${cursorClass} ${contentClass} ${className}`}
             {...props}
         >
             {children}

@@ -435,7 +435,7 @@ export default function FilterPanel({
 
                         <Button
                             variant="3d"
-                            color="blue"
+                            color="default"
                             size="none"
                             radius="full"
                             width="fit"
@@ -475,18 +475,21 @@ export default function FilterPanel({
         <>
             <Button
                 id={FILTER_BUTTON_ID}
-                variant="neon"
+                shape="kiri-atas-kanan-bawah"
+                flipHorizontal={false}
+                flipVertical={false}
+                variant="ghost"
+                effect="neon"
                 color="blue"
                 size="none"
-                radius="sm"
                 width="fit"
                 edge="top-right"
-                edgeOffset={14}
+                edgeOffset={18}
                 layer="behind"
                 onClick={handleOpen}
                 disabled={isProcessing}
-                className={`h-9 px-3.5 gap-2 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
-            >
+                className={`!w-[170px] h-12 px-6 gap-2 translate-x-9 translate-y-1 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+        >
                 <Filter className="w-4 h-4 shrink-0" />
 
                 <span className="text-sm font-bold whitespace-nowrap">
