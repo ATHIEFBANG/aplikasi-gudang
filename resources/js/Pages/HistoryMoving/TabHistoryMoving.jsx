@@ -1,6 +1,6 @@
 import React from 'react';
-import Toolbar from '@/components/Toolbar';
-import Tabel from '@/components/Tabel';
+import Toolbar from '@/components/gabungan/Toolbar';
+import Tabel from '@/components/gabungan/Tabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 

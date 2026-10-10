@@ -3,8 +3,8 @@ import { Head, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from "@/components/ui/input";
-import HybridDropdown from '@/components/HybridDropdown';
-import Toolbar from '@/components/Toolbar';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import Toolbar from '@/components/gabungan/Toolbar';
 import TabelRekonsiliasi from './TabelRekonsiliasi';
 import { 
     FileSpreadsheet,

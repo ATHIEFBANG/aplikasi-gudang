@@ -1,8 +1,8 @@
-import React from 'react';
+// ButtonLogic.jsx
 
 const BASE = 'inline-flex items-center justify-center whitespace-nowrap select-none';
 
-const VARIANTS = {
+export const VARIANTS = {
     default: `${BASE} border shadow-sm`,
     soft: `${BASE} border shadow-sm`,
     outlined: `${BASE} border bg-transparent`,
@@ -10,90 +10,104 @@ const VARIANTS = {
     flat: `${BASE} border-transparent`,
     glass: `${BASE} relative border backdrop-blur-xl`,
     '3d': `${BASE} relative border`,
-    duotone: `${BASE} relative border overflow-hidden`,
+    duotone: `${BASE} relative border`,
     gradient: `${BASE} border-transparent`,
     game: `${BASE} border text-white`,
     pill: `${BASE} border shadow-sm`,
     filter: `${BASE} border shadow-sm`,
     ghost: `${BASE} border-transparent bg-transparent`,
     inset: `${BASE} border shadow-inner`,
-    holographic: `${BASE} relative border overflow-hidden`,
+    holographic: `${BASE} relative border`,
 };
 
-const COLORS = {
+export const COLORS = {
     default: {
         base: 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200',
         hover: 'hover:bg-slate-50 dark:hover:bg-slate-800',
         active: 'active:bg-slate-100 dark:active:bg-slate-700',
+        hex: '#94A3B8',
     },
     blue: {
         base: 'bg-blue-500 border-blue-500 text-white',
         hover: 'hover:bg-blue-600 hover:border-blue-600',
         active: 'active:bg-blue-700 active:border-blue-700',
+        hex: '#3B82F6',
     },
     red: {
         base: 'bg-red-500 border-red-500 text-white',
         hover: 'hover:bg-red-600 hover:border-red-600',
         active: 'active:bg-red-700 active:border-red-700',
+        hex: '#EF4444',
     },
     green: {
         base: 'bg-emerald-500 border-emerald-500 text-white',
         hover: 'hover:bg-emerald-600 hover:border-emerald-600',
         active: 'active:bg-emerald-700 active:border-emerald-700',
+        hex: '#10B981',
     },
     amber: {
         base: 'bg-amber-500 border-amber-500 text-white',
         hover: 'hover:bg-amber-600 hover:border-amber-600',
         active: 'active:bg-amber-700 active:border-amber-700',
+        hex: '#F59E0B',
     },
     purple: {
         base: 'bg-purple-500 border-purple-500 text-white',
         hover: 'hover:bg-purple-600 hover:border-purple-600',
         active: 'active:bg-purple-700 active:border-purple-700',
+        hex: '#A855F7',
     },
     orange: {
         base: 'bg-orange-500 border-orange-500 text-white',
         hover: 'hover:bg-orange-600 hover:border-orange-600',
         active: 'active:bg-orange-700 active:border-orange-700',
+        hex: '#F97316',
     },
     cyan: {
         base: 'bg-cyan-500 border-cyan-500 text-white',
         hover: 'hover:bg-cyan-600 hover:border-cyan-600',
         active: 'active:bg-cyan-700 active:border-cyan-700',
+        hex: '#06B6D4',
     },
     pink: {
         base: 'bg-pink-500 border-pink-500 text-white',
         hover: 'hover:bg-pink-600 hover:border-pink-600',
         active: 'active:bg-pink-700 active:border-pink-700',
+        hex: '#EC4899',
     },
     indigo: {
         base: 'bg-indigo-500 border-indigo-500 text-white',
         hover: 'hover:bg-indigo-600 hover:border-indigo-600',
         active: 'active:bg-indigo-700 active:border-indigo-700',
+        hex: '#6366F1',
     },
     slate: {
         base: 'bg-slate-600 border-slate-600 text-white',
         hover: 'hover:bg-slate-700 hover:border-slate-700',
         active: 'active:bg-slate-800 active:border-slate-800',
+        hex: '#64748B',
     },
     gray: {
         base: 'bg-gray-500 border-gray-500 text-white',
         hover: 'hover:bg-gray-600 hover:border-gray-600',
         active: 'active:bg-gray-700 active:border-gray-700',
+        hex: '#6B7280',
     },
     white: {
         base: 'bg-white border-slate-200 text-slate-700',
         hover: 'hover:bg-slate-50',
         active: 'active:bg-slate-100',
+        hex: '#FFFFFF',
     },
     black: {
         base: 'bg-black border-black text-white',
         hover: 'hover:bg-slate-900',
         active: 'active:bg-slate-800',
+        hex: '#000000',
     },
 };
 
-const GRADIENTS = {
+export const GRADIENTS = {
     default: 'from-slate-500 to-slate-800',
     blue: 'from-blue-400 to-blue-700',
     red: 'from-red-400 to-red-700',
@@ -110,7 +124,7 @@ const GRADIENTS = {
     black: 'from-slate-700 to-black',
 };
 
-const THREE_D = {
+export const THREE_D = {
     default: 'from-slate-700 via-slate-800 to-slate-950 border-slate-500/80',
     blue: 'from-blue-500 via-blue-600 to-blue-800 border-blue-300/60',
     red: 'from-red-500 via-red-600 to-red-800 border-red-300/60',
@@ -127,7 +141,7 @@ const THREE_D = {
     black: 'from-slate-700 via-slate-800 to-black border-slate-600',
 };
 
-const GLASS = {
+export const GLASS = {
     default: 'bg-white/70 dark:bg-slate-900/70 border-white/30 dark:border-white/10 text-slate-700 dark:text-slate-100',
     blue: 'bg-blue-500/10 border-blue-300/30 text-blue-700 dark:text-blue-200',
     red: 'bg-red-500/10 border-red-300/30 text-red-700 dark:text-red-200',
@@ -141,7 +155,7 @@ const GLASS = {
     slate: 'bg-slate-500/10 border-slate-300/30 text-slate-700 dark:text-slate-200',
 };
 
-const DUOTONE = {
+export const DUOTONE = {
     default: 'from-slate-700 via-slate-500 to-slate-900',
     blue: 'from-blue-400 via-indigo-500 to-blue-800',
     red: 'from-red-400 via-orange-500 to-red-800',
@@ -158,7 +172,7 @@ const DUOTONE = {
     black: 'from-slate-700 via-slate-900 to-black',
 };
 
-const HOLOGRAPHIC = {
+export const HOLOGRAPHIC = {
     default: 'from-slate-300 via-white to-slate-400',
     blue: 'from-cyan-300 via-blue-500 to-purple-500',
     red: 'from-orange-300 via-red-500 to-pink-500',
@@ -172,7 +186,7 @@ const HOLOGRAPHIC = {
     slate: 'from-slate-300 via-blue-300 to-purple-300',
 };
 
-const EFFECTS = {
+export const EFFECTS = {
     none: '',
     neon: 'relative isolate before:content-[""] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border-2 before:z-10',
     glow: 'relative isolate before:content-[""] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:z-10',
@@ -180,7 +194,7 @@ const EFFECTS = {
     'glass-edge': 'relative isolate before:content-[""] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-white/50 before:shadow-[0_0_0_1px_rgba(255,255,255,0.12)] before:z-10',
 };
 
-const EFFECT_COLORS = {
+export const EFFECT_COLORS = {
     default: {
         neon: 'before:border-slate-400 before:shadow-[0_0_12px_rgba(148,163,184,0.65)]',
         glow: 'before:border-slate-400/70 before:shadow-[0_0_16px_rgba(148,163,184,0.55)]',
@@ -239,7 +253,17 @@ const EFFECT_COLORS = {
     },
 };
 
-const SIZES = {
+export const DECORATIONS = {
+    none: '',
+    geometric: 'geometric',
+    stripes: 'stripes',
+    highlight: 'highlight',
+    corner: 'corner',
+    diagonal: 'diagonal',
+    glossy: 'glossy',
+};
+
+export const SIZES = {
     none: 'p-0',
     xs: 'p-2',
     sm: 'p-3',
@@ -248,13 +272,13 @@ const SIZES = {
     xl: 'p-6',
 };
 
-const WIDTHS = {
+export const WIDTHS = {
     auto: 'w-auto',
     full: 'w-full',
     fit: 'w-fit',
 };
 
-const GRADIENT_DIRECTIONS = {
+export const GRADIENT_DIRECTIONS = {
     r: 'bg-gradient-to-r',
     l: 'bg-gradient-to-l',
     t: 'bg-gradient-to-t',
@@ -265,7 +289,7 @@ const GRADIENT_DIRECTIONS = {
     bl: 'bg-gradient-to-bl',
 };
 
-const EDGE_STYLES = {
+export const EDGE_STYLES = {
     top: 'absolute top-0 left-1/2 -translate-x-1/2',
     right: 'absolute top-1/2 right-0 -translate-y-1/2',
     bottom: 'absolute bottom-0 left-1/2 -translate-x-1/2',
@@ -276,14 +300,14 @@ const EDGE_STYLES = {
     'bottom-left': 'absolute bottom-0 left-0',
 };
 
-const ATTACHED_STYLES = {
+export const ATTACHED_STYLES = {
     none: '',
     left: 'relative rounded-r-none z-10',
     middle: 'relative -ml-px rounded-none z-10',
     right: 'relative -ml-px rounded-l-none z-10',
 };
 
-const LAYER_STYLES = {
+export const LAYER_STYLES = {
     behind: 'z-[-10]',
     below: 'z-0',
     normal: 'z-10',
@@ -331,7 +355,9 @@ function flipBorderRadius(value, flipHorizontal, flipVertical) {
 }
 
 function flipClipPath(value, flipHorizontal, flipVertical) {
-    if (!value?.startsWith('polygon(') || (!flipHorizontal && !flipVertical)) return value;
+    if (!value?.startsWith('polygon(') || (!flipHorizontal && !flipVertical)) {
+        return value;
+    }
 
     const points = value.match(/-?\d*\.?\d+%?\s+-?\d*\.?\d+%?/g);
     if (!points) return value;
@@ -350,25 +376,70 @@ function flipClipPath(value, flipHorizontal, flipVertical) {
     return `polygon(${flippedPoints.join(', ')})`;
 }
 
-function getShapeStyle(shape, flipHorizontal, flipVertical) {
-    const shapeStyle = SHAPES[shape] || SHAPES.default;
-    const style = { ...shapeStyle };
+export function getShapeStyle(shape, flipHorizontal, flipVertical) {
+    const style = { ...(SHAPES[shape] || SHAPES.default) };
 
     if (style.borderRadius && (flipHorizontal || flipVertical)) {
-        style.borderRadius = flipBorderRadius(style.borderRadius, flipHorizontal, flipVertical);
+        style.borderRadius = flipBorderRadius(
+            style.borderRadius,
+            flipHorizontal,
+            flipVertical
+        );
     }
 
     if (style.clipPath) {
-        style.clipPath = flipClipPath(style.clipPath, flipHorizontal, flipVertical);
+        style.clipPath = flipClipPath(
+            style.clipPath,
+            flipHorizontal,
+            flipVertical
+        );
     }
 
     return style;
 }
 
-export default function Button({
-    children,
+export function hexToRgba(hex, alpha = 1) {
+    if (typeof hex !== 'string') {
+        return `rgba(148, 163, 184, ${alpha})`;
+    }
+
+    let value = hex.replace('#', '').trim();
+
+    if (/^[0-9a-fA-F]{3}$/.test(value)) {
+        value = value.split('').map((char) => char + char).join('');
+    }
+
+    if (!/^[0-9a-fA-F]{6}$/.test(value)) {
+        return `rgba(148, 163, 184, ${alpha})`;
+    }
+
+    const number = parseInt(value, 16);
+    const red = (number >> 16) & 255;
+    const green = (number >> 8) & 255;
+    const blue = number & 255;
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+export function getDecorationStyle(decoration, color) {
+    const gradients = {
+        geometric: `linear-gradient(135deg, transparent 44%, ${color} 45%, ${color} 48%, transparent 49%), linear-gradient(135deg, transparent 68%, ${color} 69%, ${color} 72%, transparent 73%)`,
+        stripes: `repeating-linear-gradient(125deg, transparent 0px, transparent 9px, ${color} 10px, ${color} 12px)`,
+        highlight: `linear-gradient(115deg, ${color}, transparent 42%, transparent)`,
+        corner: `linear-gradient(225deg, ${color} 0px, ${color} 14px, transparent 15px)`,
+        diagonal: `linear-gradient(125deg, transparent 0%, transparent 74%, ${color} 74.3%, ${color} 74.7%, transparent 75%)`,
+        glossy: `linear-gradient(180deg, ${hexToRgba(color, 0.35)} 0%, transparent 48%, ${hexToRgba(color, 0.12)} 100%)`,
+    };
+
+    return gradients[decoration] || '';
+}
+
+export function getButtonLogic({
     variant = 'default',
     effect = 'none',
+    effectColor,
+    decoration = 'none',
+    decorationColor = '#FFFFFF',
     color = 'default',
     gradient = false,
     gradientDirection = 'b',
@@ -384,11 +455,7 @@ export default function Button({
     hover = false,
     selected = false,
     disabled = false,
-    className = '',
     onClick,
-    type = 'button',
-    as: Component = 'button',
-    ...props
 }) {
     const variantClass = VARIANTS[variant] || VARIANTS.default;
     const colorConfig = COLORS[color] || COLORS.default;
@@ -397,15 +464,29 @@ export default function Button({
     const glassColor = GLASS[color] || GLASS.default;
     const duotoneColor = DUOTONE[color] || DUOTONE.default;
     const holographicColor = HOLOGRAPHIC[color] || HOLOGRAPHIC.default;
+
     const effectClass = EFFECTS[effect] || '';
-    const effectColorClass = EFFECT_COLORS[color]?.[effect] || EFFECT_COLORS.default[effect] || '';
-    const gradientDirectionClass = GRADIENT_DIRECTIONS[gradientDirection] || GRADIENT_DIRECTIONS.b;
+    const effectColorClass = effectColor
+        ? ''
+        : EFFECT_COLORS[color]?.[effect] ||
+          EFFECT_COLORS.default[effect] ||
+          '';
+
+    const gradientDirectionClass =
+        GRADIENT_DIRECTIONS[gradientDirection] ||
+        GRADIENT_DIRECTIONS.b;
+
     const sizeClass = SIZES[size] || SIZES.md;
     const widthClass = WIDTHS[width] || WIDTHS.full;
     const attachedClass = ATTACHED_STYLES[attached] || '';
     const layerClass = LAYER_STYLES[layer] || LAYER_STYLES.normal;
     const edgeClass = edge !== 'none' ? EDGE_STYLES[edge] || '' : '';
-    const shapeStyle = getShapeStyle(shape, flipHorizontal, flipVertical);
+
+    const shapeStyle = getShapeStyle(
+        shape,
+        flipHorizontal,
+        flipVertical
+    );
 
     const interactiveClass = hover || onClick
         ? 'transition-all duration-200 hover:brightness-110 active:translate-y-[1px]'
@@ -466,17 +547,51 @@ export default function Button({
         }
         : undefined;
 
-    return (
-        <Component
-            type={Component === 'button' ? type : undefined}
-            onClick={onClick}
-            disabled={Component === 'button' ? disabled : undefined}
-            aria-disabled={disabled || undefined}
-            style={{ ...shapeStyle, ...edgeStyle }}
-            className={`${widthClass} ${variantClass} ${effectClass} ${colorClass} ${effectColorClass} ${sizeClass} ${attachedClass} ${layerClass} ${edgeClass} ${interactiveClass} ${selectedClass} ${disabledClass} ${cursorClass} ${contentClass} ${className}`}
-            {...props}
-        >
-            {children}
-        </Component>
+    const decorationStyle = getDecorationStyle(
+        decoration,
+        decorationColor
     );
+
+    const hasDecoration = Boolean(
+        DECORATIONS[decoration] && decorationStyle
+    );
+
+    const customEffectStyle = effectColor
+        ? {
+            '--button-effect-color': effectColor,
+            '--button-effect-glow': hexToRgba(effectColor, 0.75),
+            '--button-effect-soft-glow': hexToRgba(effectColor, 0.55),
+        }
+        : {};
+
+    const customEffectClass = effectColor &&
+        ['neon', 'glow'].includes(effect)
+        ? 'before:border-[var(--button-effect-color)] before:shadow-[0_0_12px_var(--button-effect-glow)]'
+        : effectColor &&
+          ['shine', 'glass-edge'].includes(effect)
+            ? 'before:border-[var(--button-effect-color)] before:shadow-[0_0_0_1px_var(--button-effect-soft-glow)]'
+            : '';
+
+    return {
+        widthClass,
+        variantClass,
+        effectClass,
+        colorClass,
+        effectColorClass,
+        customEffectClass,
+        sizeClass,
+        attachedClass,
+        layerClass,
+        edgeClass,
+        interactiveClass,
+        selectedClass,
+        disabledClass,
+        cursorClass,
+        contentClass,
+        shapeStyle,
+        edgeStyle,
+        customEffectStyle,
+        decorationStyle,
+        hasDecoration,
+    };
 }

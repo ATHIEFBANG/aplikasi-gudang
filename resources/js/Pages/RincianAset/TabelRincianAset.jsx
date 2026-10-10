@@ -1,7 +1,8 @@
+
 import React, { useMemo, useRef } from 'react';
-import TabelPivot from '@/components/TabelPivot';
-import FilterPanel from '@/components/FilterPanel';
-import Search from '@/components/Search';
+import TabelPivot from '@/components/gabungan/TabelPivot';
+import FilterPanel from '@/components/gabungan/FilterPanel';
+import Search from '@/components/gabungan/Search';
 import { Card, CardContent } from '@/components/ui/card';
 import { BriefcaseBusiness, Building2 } from 'lucide-react';
 
@@ -27,23 +28,16 @@ const normalizeSerials = value => {
     if (!value) return [];
 
     const raw = String(value).trim();
-
     if (!raw) return [];
 
     try {
         const parsed = JSON.parse(raw);
-
-        if (Array.isArray(parsed)) {
-            return normalizeSerials(parsed);
-        }
+        if (Array.isArray(parsed)) return normalizeSerials(parsed);
     } catch {
         //
     }
 
-    return raw
-        .split(/\r?\n|,|;/)
-        .map(item => item.trim())
-        .filter(Boolean);
+    return raw.split(/\r?\n|,|;/).map(item => item.trim()).filter(Boolean);
 };
 
 const buildPivotRows = dataList => {
@@ -51,25 +45,11 @@ const buildPivotRows = dataList => {
 
     return rows.flatMap((item, index) => {
         const serials = normalizeSerials(
-            item?.serials ??
-            item?.serial_numbers ??
-            item?.serial_number ??
-            item?.sn
+            item?.serials ?? item?.serial_numbers ?? item?.serial_number ?? item?.sn
         );
 
-        const qty = Number(
-            item?.qty ??
-            item?.jumlah ??
-            item?.quantity ??
-            0
-        );
-
-        const harga = Number(
-            item?.harga ??
-            item?.harga_satuan ??
-            item?.unit_price ??
-            0
-        );
+        const qty = Number(item?.qty ?? item?.jumlah ?? item?.quantity ?? 0);
+        const harga = Number(item?.harga ?? item?.harga_satuan ?? item?.unit_price ?? 0);
 
         const baseData = {
             ...item,
@@ -131,12 +111,24 @@ export default function TabelRincianAset({
     zoomLevel = 100,
 }) {
     const pivotRef = useRef(null);
-
     const pivotRows = useMemo(() => buildPivotRows(dataList), [dataList]);
-
     const isProject = activeTab === 'PROYEK';
 
     const pivotLevels = useMemo(() => {
+        const barangLevel = {
+            key: 'barang',
+            getValue: row => `${row?.nama_barang_display || '-'}|||${row?.kode_ppl || '-'}`,
+            format: value => value.split('|||')[0],
+            subLabel: node => `Kode PPL: ${node.value.split('|||')[1] || '-'}`,
+            showValues: true,
+        };
+
+        const serialNumberLevel = {
+            key: 'serial_number',
+            getValue: row => row?.serial_number || '-',
+            showValues: true,
+        };
+
         if (isProject) {
             return [
                 {
@@ -145,21 +137,8 @@ export default function TabelRincianAset({
                     emptyLabel: 'Tanpa Project',
                     showValues: true,
                 },
-                {
-                    key: 'barang',
-                    getValue: row => row?.nama_barang_display || '-',
-                    showValues: true,
-                },
-                {
-                    key: 'kode_ppl',
-                    getValue: row => row?.kode_ppl || '-',
-                    showValues: false,
-                },
-                {
-                    key: 'serial_number',
-                    getValue: row => row?.serial_number || '-',
-                    showValues: true,
-                },
+                barangLevel,
+                serialNumberLevel,
             ];
         }
 
@@ -170,21 +149,8 @@ export default function TabelRincianAset({
                 emptyLabel: 'Tanpa Departemen',
                 showValues: true,
             },
-            {
-                key: 'barang',
-                getValue: row => row?.nama_barang_display || '-',
-                showValues: true,
-            },
-            {
-                key: 'kode_ppl',
-                getValue: row => row?.kode_ppl || '-',
-                showValues: false,
-            },
-            {
-                key: 'serial_number',
-                getValue: row => row?.serial_number || '-',
-                showValues: true,
-            },
+            barangLevel,
+            serialNumberLevel,
         ];
     }, [isProject]);
 
@@ -254,13 +220,6 @@ export default function TabelRincianAset({
     return (
         <div className="w-full">
             <div className="flex items-start justify-between gap-4 mb-3">
-                <div className="pt-2 text-[10px] font-bold tracking-wider text-slate-500 dark:text-slate-400 uppercase">
-                    {contextLabel}
-                    <span className="mx-1.5 text-slate-300 dark:text-slate-600">•</span>
-                    <span className="text-slate-800 dark:text-slate-200 normal-case tracking-normal">
-                        {contextValue}
-                    </span>
-                </div>
 
                 <div className="shrink-0">
                     <FilterPanel
@@ -347,8 +306,8 @@ export default function TabelRincianAset({
 
                                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                     {isProject
-                                        ? 'Proyek → Barang → Kode PPL → Serial Number'
-                                        : 'Non Proyek → Barang → Kode PPL → Serial Number'}
+                                        ? 'Proyek → Nama Barang → Serial Number'
+                                        : 'Non Proyek → Nama Barang → Serial Number'}
                                 </p>
                             </div>
 

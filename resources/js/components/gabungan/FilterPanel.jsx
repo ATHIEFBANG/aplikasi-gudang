@@ -1,14 +1,16 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Filter, RotateCcw, X } from 'lucide-react';
-import Search from '@/components/Search';
-import DateRangeFilter from '@/components/DateRangeFilter';
-import Button from '@/components/Button';
+import { Check, Filter, RotateCcw, X, ChevronDown, ChevronRight } from 'lucide-react';
+import Search from '@/components/gabungan/Search';
+import DateRangeFilter from '@/components/gabungan/DateRangeFilter';
+import Button from '@/components/gabungan/Button';
+import FilterPanelMenu from '@/components/gabungan/FilterPanelMenu';
 
 const FILTER_BUTTON_ID = 'filter-panel-trigger';
 
-const normalizeOptions = options => {
-    return (options || [])
+const normalizeOptions = options =>
+    (options || [])
         .map(item => {
             if (typeof item === 'string') return { value: item, label: item };
 
@@ -18,7 +20,6 @@ const normalizeOptions = options => {
             };
         })
         .filter(item => item.value !== '' && item.label !== '');
-};
 
 const normalizeSelected = value => {
     if (Array.isArray(value)) return value.map(String);
@@ -26,83 +27,87 @@ const normalizeSelected = value => {
     return [String(value)];
 };
 
-const groupByAlphabet = options => {
-    return options.reduce((groups, item) => {
+const groupByAlphabet = options =>
+    options.reduce((groups, item) => {
         const letter = String(item.label).trim().charAt(0).toUpperCase() || '#';
-
         if (!groups[letter]) groups[letter] = [];
-
         groups[letter].push(item);
-
         return groups;
     }, {});
-};
 
 const Checkbox = ({ checked, indeterminate = false }) => (
-    <span className={`flex items-center justify-center w-4 h-4 shrink-0 rounded-[4px] border transition-colors ${checked || indeterminate ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 dark:border-slate-600 bg-transparent'}`}>
-        {checked && <Check className="w-3 h-3" strokeWidth={3} />}
-        {indeterminate && !checked && <span className="w-2 h-0.5 rounded-full bg-white" />}
+    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${checked || indeterminate ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-transparent dark:border-slate-600'}`}>
+        {checked && <Check className="h-3 w-3" strokeWidth={3} />}
+        {indeterminate && !checked && <span className="h-0.5 w-2 rounded-full bg-white" />}
     </span>
 );
 
 function AlphabetSection({ letter, options, selected, onChange }) {
+    const [isExpanded, setIsExpanded] = useState(true);
     const values = options.map(item => String(item.value));
     const selectedValues = values.filter(value => selected.includes(value));
     const allSelected = values.length > 0 && selectedValues.length === values.length;
-    const partiallySelected = selectedValues.length > 0 && selectedValues.length < values.length;
+    const partiallySelected = selectedValues.length > 0 && !allSelected;
 
     const toggleAll = () => {
-        if (allSelected) {
-            onChange(selected.filter(value => !values.includes(value)));
-        } else {
-            onChange([...new Set([...selected, ...values])]);
-        }
+        onChange(allSelected
+            ? selected.filter(value => !values.includes(value))
+            : [...new Set([...selected, ...values])]
+        );
     };
 
     const toggleOption = value => {
         const stringValue = String(value);
-
-        if (selected.includes(stringValue)) {
-            onChange(selected.filter(item => item !== stringValue));
-        } else {
-            onChange([...selected, stringValue]);
-        }
+        onChange(selected.includes(stringValue)
+            ? selected.filter(item => item !== stringValue)
+            : [...selected, stringValue]
+        );
     };
 
     return (
-        <div className="rounded-xl border border-slate-700 overflow-hidden bg-slate-900/40">
-            <div className="h-9 flex items-center justify-between px-3 bg-slate-800/80 border-b border-slate-700">
-                <span className="text-xs font-black text-blue-400">{letter}</span>
+        <div className="min-w-0">
+            <button
+                type="button"
+                onClick={() => setIsExpanded(prev => !prev)}
+                aria-expanded={isExpanded}
+                className="relative flex h-10 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 transition-colors hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-700"
+            >
+                <span className="text-xs font-black text-blue-600 dark:text-blue-400">{letter}</span>
+                <span className="absolute right-3 text-slate-500 dark:text-slate-400">
+                    {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                </span>
+            </button>
 
-                <button
-                    type="button"
-                    onClick={toggleAll}
-                    className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-slate-700 transition-colors cursor-pointer"
-                >
-                    <Checkbox checked={allSelected} indeterminate={partiallySelected} />
-                    <span className="text-[11px] font-semibold text-slate-300">Semua</span>
-                </button>
-            </div>
+            {isExpanded && (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-2 py-2">
+                    <button
+                        type="button"
+                        onClick={toggleAll}
+                        className="flex h-9 min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left transition-colors hover:bg-blue-500/10"
+                    >
+                        <Checkbox checked={allSelected} indeterminate={partiallySelected} />
+                        <span className="truncate text-xs font-semibold text-slate-700 dark:text-slate-300">Semua</span>
+                    </button>
 
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 p-2.5">
-                {options.map(item => {
-                    const checked = selected.includes(String(item.value));
+                    {options.map(item => {
+                        const checked = selected.includes(String(item.value));
 
-                    return (
-                        <button
-                            key={item.value}
-                            type="button"
-                            onClick={() => toggleOption(item.value)}
-                            className="min-w-0 h-9 flex items-center gap-2.5 px-2.5 rounded-lg text-left hover:bg-blue-500/10 transition-colors cursor-pointer"
-                        >
-                            <Checkbox checked={checked} />
-                            <span className={`truncate text-xs ${checked ? 'font-semibold text-white' : 'text-slate-300'}`}>
-                                {item.label}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
+                        return (
+                            <button
+                                key={item.value}
+                                type="button"
+                                onClick={() => toggleOption(item.value)}
+                                className="flex h-9 min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left transition-colors hover:bg-blue-500/10"
+                            >
+                                <Checkbox checked={checked} />
+                                <span className={`truncate text-xs ${checked ? 'font-semibold text-slate-950 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
+                                    {item.label}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
@@ -110,10 +115,7 @@ function AlphabetSection({ letter, options, selected, onChange }) {
 function OptionPicker({ options, selected, onChange, searchTerm }) {
     const filteredOptions = useMemo(() => {
         const keyword = searchTerm.trim().toLowerCase();
-
-        if (!keyword) return options;
-
-        return options.filter(item => item.label.toLowerCase().includes(keyword));
+        return options.filter(item => String(item.label).toLowerCase().includes(keyword));
     }, [options, searchTerm]);
 
     const groupedOptions = useMemo(() => groupByAlphabet(filteredOptions), [filteredOptions]);
@@ -123,33 +125,33 @@ function OptionPicker({ options, selected, onChange, searchTerm }) {
     const partiallyVisibleSelected = allVisibleValues.some(value => selected.includes(value)) && !allVisibleSelected;
 
     const toggleAllVisible = () => {
-        if (allVisibleSelected) {
-            onChange(selected.filter(value => !allVisibleValues.includes(value)));
-        } else {
-            onChange([...new Set([...selected, ...allVisibleValues])]);
-        }
+        onChange(allVisibleSelected
+            ? selected.filter(value => !allVisibleValues.includes(value))
+            : [...new Set([...selected, ...allVisibleValues])]
+        );
     };
 
     return (
-        <div className="flex-1 min-h-0 flex flex-col">
-            <div className="flex items-center justify-between h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 mb-3">
+        <div className="flex h-full min-h-0 flex-col">
+            <div className="mb-3 flex h-10 shrink-0 items-center justify-end gap-4">
                 <button
                     type="button"
                     onClick={toggleAllVisible}
-                    className="flex items-center gap-2.5 cursor-pointer"
+                    disabled={filteredOptions.length === 0}
+                    className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-800"
                 >
                     <Checkbox checked={allVisibleSelected} indeterminate={partiallyVisibleSelected} />
-                    <span className="text-xs font-bold text-slate-200">Semua</span>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Semua</span>
                 </button>
 
-                <span className="text-[10px] font-semibold text-slate-500">
+                <span className="whitespace-nowrap text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                     {selected.length} dipilih
                 </span>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                 {letters.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                    <div className="flex h-full items-center justify-center text-xs text-slate-500 dark:text-slate-400">
                         Tidak ada data ditemukan.
                     </div>
                 ) : (
@@ -195,10 +197,10 @@ export default function FilterPanel({
 
     const isProject = activeTab === 'PROYEK';
 
-    const activeOptions = useMemo(() => {
-        const options = isProject ? projectOptions : departmentOptions;
-        return normalizeOptions(options);
-    }, [isProject, projectOptions, departmentOptions]);
+    const activeOptions = useMemo(
+        () => normalizeOptions(isProject ? projectOptions : departmentOptions),
+        [isProject, projectOptions, departmentOptions]
+    );
 
     useEffect(() => {
         if (!isOpen) return;
@@ -230,23 +232,15 @@ export default function FilterPanel({
             }
 
             const rect = trigger.getBoundingClientRect();
-
-            setTriggerRect({
-                top: rect.top,
-                left: rect.left,
-                width: rect.width,
-                height: rect.height,
-            });
+            setTriggerRect({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
         };
 
         updateTriggerPosition();
-
         window.addEventListener('resize', updateTriggerPosition);
         window.addEventListener('scroll', updateTriggerPosition, true);
 
         const observer = new ResizeObserver(updateTriggerPosition);
         const trigger = document.getElementById(FILTER_BUTTON_ID);
-
         if (trigger) observer.observe(trigger);
 
         return () => {
@@ -275,6 +269,7 @@ export default function FilterPanel({
         setDraftStartDate('');
         setDraftEndDate('');
         setSearchTerm('');
+        onReset?.();
     };
 
     const handleApply = () => {
@@ -296,60 +291,46 @@ export default function FilterPanel({
 
     const filterModal = (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <div
-                className="absolute inset-0 bg-slate-950/65 backdrop-blur-[3px]"
-                onClick={handleClose}
-            />
+            <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[3px] dark:bg-slate-950/65" onClick={handleClose} />
 
-            <div className="relative z-[10000] w-full max-w-[920px] h-[590px] max-h-[calc(100vh-80px)] flex flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-white shadow-2xl">
-                <div className="h-[64px] shrink-0 flex items-center justify-center px-5 border-b border-slate-700 bg-slate-900">
+            <div className="relative z-[10000] flex h-[590px] max-h-[calc(100vh-80px)] w-full max-w-[920px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                <div className="flex h-[64px] shrink-0 items-center justify-center border-b border-slate-200 bg-slate-100 px-5 dark:border-slate-700 dark:bg-slate-900">
                     <h2 className="text-base font-black tracking-tight">Filter Data</h2>
                 </div>
 
-                <div className="flex flex-1 min-h-0">
-                    <div className="w-[190px] shrink-0 border-r border-slate-700 bg-slate-950 p-3">
-                        <div className="space-y-1">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setActiveCategory(isProject ? 'project' : 'department');
-                                    setSearchTerm('');
-                                }}
-                                className={`w-full h-10 flex items-center justify-between px-3.5 rounded-lg text-sm font-bold text-left transition-all ${activeCategory === (isProject ? 'project' : 'department') ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-300 hover:bg-slate-900 hover:text-white'}`}
-                            >
-                                <span>{isProject ? 'Project' : 'Departemen'}</span>
+                <div className="flex min-h-0 flex-1">
+                    <aside className="w-[190px] shrink-0 border-r border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
+                        
+                <FilterPanelMenu
+                    items={[
+                        {
+                            value: isProject ? 'project' : 'department',
+                            label: isProject ? 'Project' : 'Departemen',
+                            count: isProject ? draftProject.length : draftDepartment.length,
+                        },
+                        { value: 'periode', label: 'Periode' },
+                    ]}
+                    activeItem={activeCategory}
+                    onChange={value => {
+                        setActiveCategory(value);
+                        setSearchTerm('');
+                    }}
+                    positionX={0}
+                    positionY={0}
+                    positionClassName=""
+                />
 
-                                {(isProject ? draftProject.length : draftDepartment.length) > 0 && (
-                                    <span className="min-w-5 h-5 px-1.5 flex items-center justify-center rounded-full bg-white/15 text-[10px]">
-                                        {isProject ? draftProject.length : draftDepartment.length}
-                                    </span>
-                                )}
-                            </button>
+                    </aside>
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setActiveCategory('periode');
-                                    setSearchTerm('');
-                                }}
-                                className={`w-full h-10 px-3.5 rounded-lg text-sm font-bold text-left transition-all ${activeCategory === 'periode' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-300 hover:bg-slate-900 hover:text-white'}`}
-                            >
-                                Periode
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 min-w-0 min-h-0 p-4 bg-slate-900">
+                    <div className="min-h-0 min-w-0 flex-1 bg-white p-4 dark:bg-slate-900">
                         {activeCategory === 'periode' ? (
-                            <div className="h-full flex flex-col">
+                            <div className="flex h-full flex-col">
                                 <div className="mb-3">
-                                    <h3 className="text-sm font-black text-white">Periode</h3>
-                                    <p className="mt-1 text-[11px] text-slate-400">
-                                        Tentukan rentang tanggal transaksi.
-                                    </p>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white">Periode</h3>
+                                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Tentukan rentang tanggal transaksi.</p>
                                 </div>
 
-                                <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
                                     <DateRangeFilter
                                         startDate={draftStartDate}
                                         endDate={draftEndDate}
@@ -366,15 +347,12 @@ export default function FilterPanel({
                                 </div>
                             </div>
                         ) : (
-                            <div className="h-full flex flex-col min-h-0">
-                                <div className="shrink-0 mb-3">
+                            <div className="flex h-full min-h-0 flex-col">
+                                <div className="mb-3 shrink-0">
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="min-w-0">
-                                            <h3 className="text-sm font-black text-white">
-                                                {categoryTitle}
-                                            </h3>
-
-                                            <p className="mt-1 text-[11px] text-slate-400">
+                                            <h3 className="text-sm font-black text-slate-900 dark:text-white">{categoryTitle}</h3>
+                                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                                                 Pilih satu atau beberapa {categoryTitle.toLowerCase()}.
                                             </p>
                                         </div>
@@ -390,7 +368,7 @@ export default function FilterPanel({
                                     </div>
                                 </div>
 
-                                <div className="flex-1 min-h-0">
+                                <div className="min-h-0 flex-1">
                                     <OptionPicker
                                         options={activeOptions}
                                         selected={activeSelected}
@@ -403,19 +381,18 @@ export default function FilterPanel({
                     </div>
                 </div>
 
-                <div className="h-[64px] shrink-0 flex items-center justify-between px-5 border-t border-slate-700 bg-slate-950">
+                <div className="flex h-[64px] shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50 px-5 dark:border-slate-700 dark:bg-slate-950">
                     <Button
                         variant="3d"
                         color="slate"
                         size="none"
-                        radius="full"
                         width="fit"
                         onClick={handleReset}
                         disabled={isProcessing}
-                        className="h-9 px-5 gap-2"
+                        className="h-9 gap-2 px-5"
                     >
-                        <RotateCcw className="w-4 h-4 shrink-0" strokeWidth={2.5} />
-                        <span className="text-sm font-bold">{resetLabel}</span>
+                        <RotateCcw className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                        <span className="text-sm font-bold text-white">{resetLabel}</span>
                     </Button>
 
                     <div className="flex items-center gap-2">
@@ -423,28 +400,26 @@ export default function FilterPanel({
                             variant="3d"
                             color="red"
                             size="none"
-                            radius="full"
                             width="fit"
                             onClick={handleClose}
                             disabled={isProcessing}
-                            className="h-9 px-5 gap-2"
+                            className="h-9 gap-2 px-5"
                         >
-                            <X className="w-4 h-4 shrink-0" strokeWidth={2.5} />
-                            <span className="text-sm font-bold">Batal</span>
+                            <X className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                            <span className="text-sm font-bold text-white">Batal</span>
                         </Button>
 
                         <Button
                             variant="3d"
                             color="default"
                             size="none"
-                            radius="full"
                             width="fit"
                             onClick={handleApply}
                             disabled={isProcessing}
-                            className="h-9 px-6 gap-2"
+                            className="h-9 gap-2 px-6"
                         >
-                            <Check className="w-4 h-4 shrink-0" strokeWidth={2.5} />
-                            <span className="text-sm font-bold">
+                            <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                            <span className="text-sm font-bold text-white">
                                 {isProcessing ? 'Memproses...' : applyLabel}
                             </span>
                         </Button>
@@ -467,7 +442,7 @@ export default function FilterPanel({
                 height: triggerRect.height,
                 zIndex: 9998,
             }}
-            className="opacity-0 cursor-pointer"
+            className="cursor-pointer opacity-0"
         />
     ) : null;
 
@@ -478,8 +453,11 @@ export default function FilterPanel({
                 shape="kiri-atas-kanan-bawah"
                 flipHorizontal={false}
                 flipVertical={false}
-                variant="ghost"
+                variant="3d"
                 effect="neon"
+                effectColor="#22D3EE"
+                decoration="none"
+                decorationColor="#FFF000"
                 color="blue"
                 size="none"
                 width="fit"
@@ -488,23 +466,19 @@ export default function FilterPanel({
                 layer="behind"
                 onClick={handleOpen}
                 disabled={isProcessing}
-                className={`!w-[170px] h-12 px-6 gap-2 translate-x-9 translate-y-1 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
-        >
-                <Filter className="w-4 h-4 shrink-0" />
-
-                <span className="text-sm font-bold whitespace-nowrap">
-                    {title}
-                </span>
+                className={`!w-[170px] h-12 translate-x-267 translate-y-1 gap-2 px-6 ${isProcessing ? 'pointer-events-none opacity-50' : ''}`}
+            >
+                <Filter className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap text-sm font-bold">{title}</span>
 
                 {activeCount > 0 && (
-                    <span className="min-w-6 h-6 px-1.5 flex items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                    <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[10px] font-bold text-white">
                         {activeCount}
                     </span>
                 )}
             </Button>
 
             {typeof document !== 'undefined' && triggerHitbox && createPortal(triggerHitbox, document.body)}
-
             {isOpen && typeof document !== 'undefined' && createPortal(filterModal, document.body)}
         </>
     );

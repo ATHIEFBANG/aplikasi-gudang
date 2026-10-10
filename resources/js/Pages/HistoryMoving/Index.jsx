@@ -1,8 +1,8 @@
 import React from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
-import HybridDropdown from '@/components/HybridDropdown';
-import DateRangeFilter from '@/components/DateRangeFilter';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import DateRangeFilter from '@/components/gabungan/DateRangeFilter';
 import TabHistoryMoving from './TabHistoryMoving';
 import { useHistoryMovingControl, KONDISI_OPTIONS } from './HistoryMovingControl';
 import { 

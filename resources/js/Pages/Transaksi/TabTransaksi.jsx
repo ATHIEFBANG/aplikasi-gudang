@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import Toolbar from '@/components/Toolbar';
+import Toolbar from '@/components/gabungan/Toolbar';
 import CrudTable from './CrudTable';
 import ModalBarangMasuk from './ModalBarangMasuk';
 import ModalBarangKeluar from './ModalBarangKeluar';
 import ModalTransferGudang from './ModalTransferGudang';
-import HybridDropdown from '@/components/HybridDropdown';
-import DateRangeFilter from '@/components/DateRangeFilter';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import DateRangeFilter from '@/components/gabungan/DateRangeFilter';
 import { Toast } from '@/components/ui/Notifikasi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

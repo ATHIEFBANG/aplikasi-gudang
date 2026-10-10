@@ -21,7 +21,7 @@ import {
     CheckSquare 
 } from 'lucide-react';
 import { router } from '@inertiajs/react';
-import HybridDropdown from '@/components/HybridDropdown';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
 
 const MAX_ROWS_LIMIT = 50;
 

@@ -14,7 +14,7 @@ import {
     Hash, 
     Check 
 } from 'lucide-react';
-import HybridDropdown from '@/components/HybridDropdown';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
 
 import { 
     useModalBarangControl, 

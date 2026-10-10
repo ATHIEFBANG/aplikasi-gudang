@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import Toolbar from '@/components/Toolbar';
+import Toolbar from '@/components/gabungan/Toolbar';
 import CrudTable from './CrudTable';
 import ModalBarang from './ModalBarang';
 import { Button } from '@/components/ui/button';
