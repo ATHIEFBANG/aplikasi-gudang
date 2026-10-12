@@ -1,5 +1,6 @@
-// Style.jsx
-// Shared visual tokens and helpers for Button, Card, Modal, and other components.
+
+ // Style.jsx
+ // Shared visual tokens and helpers for Button, Card, Modal, and other components.
 
 export const COLORS = {
     default: { base: 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200', hover: 'hover:bg-slate-50 dark:hover:bg-slate-800', active: 'active:bg-slate-100 dark:active:bg-slate-700', hex: '#94A3B8' },
@@ -31,7 +32,7 @@ export const MODAL_COLOR_STYLES = {
     pink: { border: 'border-pink-500/30', ring: 'ring-pink-500/15', shadow: 'shadow-pink-500/10', text: 'text-pink-600 dark:text-pink-400', tint: 'bg-pink-500/5' },
     indigo: { border: 'border-indigo-500/30', ring: 'ring-indigo-500/15', shadow: 'shadow-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', tint: 'bg-indigo-500/5' },
     slate: { border: 'border-slate-500/30', ring: 'ring-slate-500/15', shadow: 'shadow-slate-500/10', text: 'text-slate-600 dark:text-slate-300', tint: 'bg-slate-500/5' },
-    gray: { border: 'border-gray-500/30', ring: 'ring-gray-500/15', shadow: 'shadow-gray-500/10', text: 'text-gray-600 dark:text-gray-300', tint: 'bg-gray-500/5' },
+    gray: { border: 'border-gray-500/30', ring: 'ring-gray-500/10', shadow: 'shadow-gray-500/10', text: 'text-gray-600 dark:text-gray-300', tint: 'bg-gray-500/5' },
     white: { border: 'border-white/50', ring: 'ring-white/15', shadow: 'shadow-white/10', text: 'text-white', tint: 'bg-white/5' },
     black: { border: 'border-black/20 dark:border-white/15', ring: 'ring-black/10 dark:ring-white/10', shadow: 'shadow-black/10', text: 'text-black dark:text-white', tint: 'bg-black/5 dark:bg-white/5' },
 };
@@ -196,25 +197,55 @@ export const GRADIENT_DIRECTIONS = {
     bl: 'bg-gradient-to-bl',
 };
 
-export const LAYER_STYLES = { behind: 'z-[-10]', below: 'z-0', normal: 'z-10', above: 'z-30', front: 'z-50' };
+export const LAYER_STYLES = {
+    behind: 'z-[-10]',
+    below: 'z-0',
+    normal: 'z-10',
+    above: 'z-30',
+    front: 'z-50',
+};
+
+// Shared shadow effect presets for Button, Card, and Modal.
+export const SHADOW_EFFECTS = {
+    shadow: {
+        offsetX: 0,
+        offsetY: 8,
+        blur: 24,
+        spread: 0,
+        opacity: 0.24,
+    },
+};
+// Shared shape tokens for Button, Card, and Modal.
+
 
 export const SHAPES = {
     default: { borderRadius: '1rem' },
+    soft: { borderRadius: '0.75rem' },
+    rounded: { borderRadius: '1.5rem' },
+    square: { borderRadius: '0.375rem' },
+    pill: { borderRadius: '2rem' },
     kapsul: { borderRadius: '9999px' },
-    'bawah-membulat': { borderRadius: '0 0 9999px 9999px' },
-    'kiri-bawah-kanan-kapsul': { borderRadius: '0 9999px 9999px 9999px' },
-    'kiri-atas-kanan-bawah': { borderRadius: '9999px 0 9999px 0' },
-    'kiri-atas-kanan-kapsul': { borderRadius: '9999px 9999px 9999px 0' },
-    'takik-kiri': { clipPath: 'polygon(0 0, 88% 0, 100% 50%, 88% 100%, 0 100%, 7% 50%)' },
-    'pita-cekung': { clipPath: 'polygon(0 0, 90% 0, 100% 50%, 90% 100%, 0 100%, 7% 50%)' },
+    'bawah-membulat': { borderRadius: '0 0 56px 56px' },
+    'kiri-bawah-kanan-kapsul': { borderRadius: '0 56px 56px 56px' },
+    'kiri-atas-kanan-bawah': { borderRadius: '56px 0 56px 0' },
+    'pita-cekung': {
+        clipPath: 'polygon(0 0, 90% 0, 100% 50%, 90% 100%, 0 100%, 0 0)',
+    },
     'persegi-membulat': { borderRadius: '8px' },
-    'kiri-siku-kanan-kapsul': { borderRadius: '0 9999px 9999px 0' },
-    'jajar-genjang': { clipPath: 'polygon(6% 0, 100% 0, 94% 100%, 0 100%)' },
+    'kiri-siku-kanan-kapsul': { borderRadius: '0 56px 56px 0' },
 };
+
+
 
 function flipBorderRadius(value, flipHorizontal, flipVertical) {
     const corners = value.split(/\s+/);
-    const normalized = corners.length === 1 ? Array(4).fill(corners[0]) : corners.length === 2 ? [corners[0], corners[1], corners[0], corners[1]] : corners.length === 3 ? [corners[0], corners[1], corners[2], corners[1]] : corners;
+    const normalized = corners.length === 1
+        ? Array(4).fill(corners[0])
+        : corners.length === 2
+            ? [corners[0], corners[1], corners[0], corners[1]]
+            : corners.length === 3
+                ? [corners[0], corners[1], corners[2], corners[1]]
+                : corners;
 
     let [topLeft, topRight, bottomRight, bottomLeft] = normalized;
 
@@ -247,14 +278,16 @@ function flipClipPath(value, flipHorizontal, flipVertical) {
     return `polygon(${flippedPoints.join(', ')})`;
 }
 
-export function getShapeStyle(shape, flipHorizontal, flipVertical) {
+export function getShapeStyle(shape, flipHorizontal = false, flipVertical = false) {
     const style = { ...(SHAPES[shape] || SHAPES.default) };
 
     if (style.borderRadius && (flipHorizontal || flipVertical)) {
         style.borderRadius = flipBorderRadius(style.borderRadius, flipHorizontal, flipVertical);
     }
 
-    if (style.clipPath) style.clipPath = flipClipPath(style.clipPath, flipHorizontal, flipVertical);
+    if (style.clipPath) {
+        style.clipPath = flipClipPath(style.clipPath, flipHorizontal, flipVertical);
+    }
 
     return style;
 }
@@ -282,6 +315,36 @@ export function getColorHex(color = 'default') {
 
 export function getColorRgba(color = 'default', alpha = 1) {
     return hexToRgba(getColorHex(color), alpha);
+}
+
+// Returns a reusable box-shadow style for supported shadow effects.
+export function getShadowEffectStyle({
+    effect = 'none',
+    effectColor = '#000000',
+    effectOpacity,
+    effectOffsetX,
+    effectOffsetY,
+    effectBlur,
+    effectSpread,
+} = {}) {
+    const preset = SHADOW_EFFECTS[effect];
+    if (!preset) return {};
+
+    const getValue = (value, fallback) => {
+        const number = Number(value);
+        return value !== undefined && Number.isFinite(number) ? number : fallback;
+    };
+
+    const offsetX = getValue(effectOffsetX, preset.offsetX);
+    const offsetY = getValue(effectOffsetY, preset.offsetY);
+    const blur = Math.max(0, getValue(effectBlur, preset.blur));
+    const spread = getValue(effectSpread, preset.spread);
+    const opacity = Math.max(0, Math.min(1, getValue(effectOpacity, preset.opacity)));
+    const color = hexToRgba(getColorHex(effectColor), opacity);
+
+    return {
+        boxShadow: `${offsetX}px ${offsetY}px ${blur}px ${spread}px ${color}`,
+    };
 }
 
 export function getDecorationStyle(decoration, color) {

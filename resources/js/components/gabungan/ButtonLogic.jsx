@@ -103,17 +103,6 @@ export const EFFECT_COLORS = {
     },
 };
 
-export const EDGE_STYLES = {
-    top: 'absolute top-0 left-1/2 -translate-x-1/2',
-    right: 'absolute top-1/2 right-0 -translate-y-1/2',
-    bottom: 'absolute bottom-0 left-1/2 -translate-x-1/2',
-    left: 'absolute top-1/2 left-0 -translate-y-1/2',
-    'top-right': 'absolute top-0 right-0',
-    'top-left': 'absolute top-0 left-0',
-    'bottom-right': 'absolute bottom-0 right-0',
-    'bottom-left': 'absolute bottom-0 left-0',
-};
-
 export const ATTACHED_STYLES = {
     none: '',
     left: 'relative rounded-r-none z-10',
@@ -135,8 +124,6 @@ export function getButtonLogic({
     flipHorizontal = false,
     flipVertical = false,
     width = 'full',
-    edge = 'none',
-    edgeOffset = 0,
     layer = 'normal',
     attached = 'none',
     hover = false,
@@ -167,7 +154,6 @@ export function getButtonLogic({
     const widthClass = WIDTHS[width] || WIDTHS.full;
     const attachedClass = ATTACHED_STYLES[attached] || '';
     const layerClass = LAYER_STYLES[layer] || LAYER_STYLES.normal;
-    const edgeClass = edge !== 'none' ? EDGE_STYLES[edge] || '' : '';
 
     const shapeStyle = getShapeStyle(
         shape,
@@ -219,20 +205,6 @@ export function getButtonLogic({
         colorClass = `${colorConfig.base} ${colorConfig.hover} ${colorConfig.active}`;
     }
 
-    const edgeStyle = edge !== 'none'
-        ? {
-            top: edge.includes('top') ? edgeOffset : undefined,
-            bottom: edge.includes('bottom') ? edgeOffset : undefined,
-            left: edge.includes('left')
-                ? edgeOffset
-                : edge.includes('right')
-                    ? undefined
-                    : edge === 'top' || edge === 'bottom'
-                        ? '50%'
-                        : undefined,
-            right: edge.includes('right') ? edgeOffset : undefined,
-        }
-        : undefined;
 
     const decorationStyle = getDecorationStyle(
         decoration,
@@ -269,14 +241,12 @@ export function getButtonLogic({
         sizeClass,
         attachedClass,
         layerClass,
-        edgeClass,
         interactiveClass,
         selectedClass,
         disabledClass,
         cursorClass,
         contentClass,
         shapeStyle,
-        edgeStyle,
         customEffectStyle,
         decorationStyle,
         hasDecoration,

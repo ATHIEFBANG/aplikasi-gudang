@@ -6,13 +6,11 @@ import Button from '@/components/gabungan/Button';
 import Card from '@/components/gabungan/CustomCard';
 
 const DEFAULT_BUTTON_PROPS = {
-    shape: 'kiri-atas-kanan-kapsul',
+    shape: 'kiri-bawah-kanan-kapsul',
     flipHorizontal: false,
     flipVertical: true,
     size: 'none',
     width: 'full',
-    edge: 'none',
-    edgeOffset: 0,
     layer: 'normal',
     decoration: 'none',
     decorationColor: '#FFFFFF',

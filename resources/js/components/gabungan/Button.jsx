@@ -1,13 +1,18 @@
-// Button.jsx
 
 import React from 'react';
 import { getButtonLogic } from './ButtonLogic';
+import { getShadowEffectStyle } from './Style';
 
 export default function Button({
     children,
     variant = 'default',
     effect = 'none',
     effectColor,
+    effectOpacity,
+    effectOffsetX,
+    effectOffsetY,
+    effectBlur,
+    effectSpread,
     decoration = 'none',
     decorationColor = '#FFFFFF',
     color = 'default',
@@ -18,8 +23,6 @@ export default function Button({
     flipHorizontal = false,
     flipVertical = false,
     width = 'full',
-    edge = 'none',
-    edgeOffset = 0,
     layer = 'normal',
     attached = 'none',
     hover = false,
@@ -45,8 +48,6 @@ export default function Button({
         flipHorizontal,
         flipVertical,
         width,
-        edge,
-        edgeOffset,
         layer,
         attached,
         hover,
@@ -55,6 +56,16 @@ export default function Button({
         onClick,
     });
 
+    const shadowEffectStyle = getShadowEffectStyle({
+        effect,
+        effectColor,
+        effectOpacity,
+        effectOffsetX,
+        effectOffsetY,
+        effectBlur,
+        effectSpread,
+    });
+    
     const {
         widthClass,
         variantClass,
@@ -65,14 +76,12 @@ export default function Button({
         sizeClass,
         attachedClass,
         layerClass,
-        edgeClass,
         interactiveClass,
         selectedClass,
         disabledClass,
         cursorClass,
         contentClass,
         shapeStyle,
-        edgeStyle,
         customEffectStyle,
         decorationStyle,
         hasDecoration,
@@ -88,7 +97,6 @@ export default function Button({
         sizeClass,
         attachedClass,
         layerClass,
-        edgeClass,
         interactiveClass,
         selectedClass,
         disabledClass,
@@ -105,8 +113,8 @@ export default function Button({
             aria-disabled={disabled || undefined}
             style={{
                 ...shapeStyle,
-                ...edgeStyle,
                 ...customEffectStyle,
+                ...shadowEffectStyle,
             }}
             className={buttonClassName}
             {...props}

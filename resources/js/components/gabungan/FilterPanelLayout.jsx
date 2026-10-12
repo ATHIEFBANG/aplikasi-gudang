@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Check, Filter, RotateCcw, X } from 'lucide-react';
 
@@ -21,16 +22,34 @@ import {
 import { DialogTitle } from '@/components/ui/dialog';
 
 // =========================================================
-// 1. VARIANT DAN WARNA FILTER PANEL
+// 1. STYLE FILTER PANEL
 // =========================================================
 
 const FILTER_PANEL_STYLE = {
     content: {
-        variant: '3d',
+        variant: 'clean',
         color: 'blue',
         borderColor: '#FFFFFF',
         borderWidth: 3,
-        shape: 'rounded',
+        shape: 'kiri-atas-kanan-bawah',
+        flipHorizontal: false,
+        flipVertical: false,
+
+        // Shadow Effect
+        effect: 'shadow',
+        effectColor: '#000000',
+        effectOpacity: 0.25,
+        effectOffsetX: 0,
+        effectOffsetY: 23,
+        effectBlur: 1,
+        effectSpread: 0,
+
+        // Stack Effect
+        stack: true,
+        stackOffset: 20,
+        stackColor: '#FFFFFF',
+        stackBorderColor: '#64748B',
+        stackBorderWidth: 2,
     },
 
     header: {
@@ -71,22 +90,26 @@ const FILTER_PANEL_STYLE = {
 // 2. CARD JUDUL FILTER DATA
 // =========================================================
 
-// Atur desain, ukuran, dan posisi Card di sini.
 const FILTER_TITLE_CARD = {
     variant: 'duotone',
     color: 'amber',
-    shape: 'kiri-atas-kanan-kapsul',
+    shape: 'kiri-bawah-kanan-kapsul',
     flipHorizontal: true,
     flipVertical: false,
-    effect: 'glow',
-    effectColor: "#22D3EE",
+
+        effect: 'shadow',
+        effectColor: '#000000',
+        effectOpacity: 0.25,
+        effectOffsetX: 0,
+        effectOffsetY: 23,
+        effectBlur: 1,
+        effectSpread: 0,
+
     decoration: 'none',
     size: 'none',
     width: 'fit',
-    edge: 'none',
-    edgeOffset: 0,
     layer: 'front',
-    className: '!h-10 !w-fit !max-w-full  translate-x-2 -translate-y-7 !px-7 !py-0',
+    className: '!h-10 !w-fit !max-w-full translate-x-2 -translate-y-7 !px-7 !py-0',
     contentClassName: '!h-full !w-fit !flex-row !items-center !justify-center !gap-2 !p-0',
 };
 
@@ -136,15 +159,12 @@ export default function FilterPanelLayout({
 
     return (
         <Modal open={open} onOpenChange={handleOpenChange}>
-            {/* CONTENT */}
             <ModalContent
                 {...contentStyle}
                 size="4xl"
                 placement="center"
                 density="compact"
                 overlay="blur"
-                showCloseButton={!isProcessing}
-                closeButtonLabel="Tutup filter"
                 className={FILTER_PANEL_LAYOUT.content}
             >
                 {/* HEADER */}
@@ -161,7 +181,10 @@ export default function FilterPanelLayout({
                                 className: '!size-7',
                             })}
                         >
-                            <Filter className="size-4" strokeWidth={2.5} />
+                            <Filter
+                                className="size-4"
+                                strokeWidth={2.5}
+                            />
                         </span>
 
                         <DialogTitle className="m-0 shrink-0 whitespace-nowrap text-sm font-black tracking-tight !text-white sm:text-base">
@@ -235,7 +258,10 @@ export default function FilterPanelLayout({
                             disabled={isProcessing}
                             className="h-9 gap-2 px-3 sm:px-5"
                         >
-                            <RotateCcw className="size-4 shrink-0" strokeWidth={2.5} />
+                            <RotateCcw
+                                className="size-4 shrink-0"
+                                strokeWidth={2.5}
+                            />
                             <span className="text-sm font-bold text-white">
                                 {resetLabel}
                             </span>
@@ -253,7 +279,10 @@ export default function FilterPanelLayout({
                                 disabled={isProcessing}
                                 className="h-9 gap-2 px-3 sm:px-5"
                             >
-                                <X className="size-4 shrink-0" strokeWidth={2.5} />
+                                <X
+                                    className="size-4 shrink-0"
+                                    strokeWidth={2.5}
+                                />
                                 <span className="text-sm font-bold text-white">
                                     Batal
                                 </span>
@@ -262,17 +291,29 @@ export default function FilterPanelLayout({
                             {/* TERAPKAN */}
                             <Button
                                 type="button"
-                                variant="3d"
-                                color="default"
+                                variant="clean"
+                                color="black"
                                 size="none"
+                                effect="shadow"
+                                effectColor="#FFF000"
+                                effectOpacity={0.25}
+                                effectOffsetX={8}
+                                effectOffsetY={9}
+                                effectBlur={1}
+                                effectSpread={0}
                                 width="fit"
                                 onClick={onApply}
                                 disabled={isProcessing}
                                 className="h-9 gap-2 px-4 sm:px-6"
                             >
-                                <Check className="size-4 shrink-0" strokeWidth={2.5} />
+                                <Check
+                                    className="size-4 shrink-0"
+                                    strokeWidth={2.5}
+                                />
                                 <span className="text-sm font-bold text-white">
-                                    {isProcessing ? 'Memproses...' : applyLabel}
+                                    {isProcessing
+                                        ? 'Memproses...'
+                                        : applyLabel}
                                 </span>
                             </Button>
                         </div>

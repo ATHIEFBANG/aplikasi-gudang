@@ -2,12 +2,18 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { CARD_WIDTHS, getCardLogic } from './CardLogic';
+import { getShadowEffectStyle } from './Style';
 
 export default function CustomCard({
     children,
     variant = 'default',
     effect = 'none',
     effectColor,
+    effectOpacity,
+    effectOffsetX,
+    effectOffsetY,
+    effectBlur,
+    effectSpread,
     decoration = 'none',
     decorationColor = '#FFFFFF',
     color = 'default',
@@ -55,7 +61,15 @@ export default function CustomCard({
     const widthClass = CARD_WIDTHS[width] || CARD_WIDTHS.full;
     const depth = stack ? Math.min(5, Math.max(1, Math.floor(Number(stackDepth) || 1))) : 0;
     const offset = Math.max(0, Number(stackOffset) || 0);
-
+    const shadowEffectStyle = getShadowEffectStyle({
+        effect,
+        effectColor,
+        effectOpacity,
+        effectOffsetX,
+        effectOffsetY,
+        effectBlur,
+        effectSpread,
+    });
     return (
         <Component
             {...props}
@@ -122,15 +136,16 @@ export default function CustomCard({
             </div>
 
             {effect !== 'none' && (
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 z-20"
-                    style={{
-                        ...shapeStyle,
-                        ...effectStyle,
-                    }}
-                />
-            )}
+            <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-20"
+                style={{
+                    ...shapeStyle,
+                    ...effectStyle,
+                    ...shadowEffectStyle,
+                }}
+            />
+        )}
         </Component>
     );
 }

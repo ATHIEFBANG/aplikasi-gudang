@@ -1,3 +1,4 @@
+
 // ModalLogic.jsx
 // Styling logic for Modal components using shared tokens from Style.jsx.
 
@@ -38,7 +39,7 @@ export const MODAL_VARIANTS = {
     bordered: 'border-2 border-border bg-background text-foreground shadow-lg shadow-black/5',
     danger: 'border border-red-500/25 bg-background text-foreground shadow-2xl shadow-red-950/10 ring-1 ring-red-500/10',
     flat: 'border border-border/70 bg-background text-foreground shadow-lg shadow-black/5',
-   '3d': 'border border-white/30 text-white shadow-[0_8px_0_color-mix(in_srgb,var(--modal-accent-color)_22%,transparent),0_18px_40px_rgba(0,0,0,0.18)] dark:border-white/10 dark:shadow-[0_8px_0_color-mix(in_srgb,var(--modal-accent-color)_18%,transparent),0_18px_40px_rgba(0,0,0,0.4)]',
+    '3d': 'border border-white/30 text-white shadow-[0_8px_0_color-mix(in_srgb,var(--modal-accent-color)_22%,transparent),0_18px_40px_rgba(0,0,0,0.18)] dark:border-white/10 dark:shadow-[0_8px_0_color-mix(in_srgb,var(--modal-accent-color)_18%,transparent),0_18px_40px_rgba(0,0,0,0.4)]',
     ghost: 'border border-transparent bg-transparent text-foreground shadow-none ring-0',
     none: 'border-transparent bg-transparent text-foreground shadow-none ring-0',
     soft: 'border border-transparent text-foreground shadow-sm',
@@ -47,14 +48,6 @@ export const MODAL_VARIANTS = {
     gradient: 'border-transparent text-white shadow-md',
     duotone: 'relative border border-white/20 text-white shadow-md',
     holographic: 'relative border border-white/30 text-white shadow-lg',
-};
-
-export const MODAL_SHAPES = {
-    default: 'rounded-2xl',
-    soft: 'rounded-xl',
-    rounded: 'rounded-3xl',
-    square: 'rounded-md',
-    pill: 'rounded-[2rem]',
 };
 
 export const MODAL_PLACEMENTS = {
@@ -71,9 +64,27 @@ export const MODAL_OVERLAYS = {
 };
 
 export const MODAL_DENSITIES = {
-    compact: { header: 'px-4 py-3 sm:px-5 sm:py-4', body: 'p-4 sm:p-5', footer: 'px-4 py-3 sm:px-5 sm:py-3', gap: 'gap-3', section: 'space-y-3' },
-    comfortable: { header: 'px-5 py-4 sm:px-6 sm:py-5', body: 'p-5 sm:p-6', footer: 'px-5 py-4 sm:px-6', gap: 'gap-4', section: 'space-y-4' },
-    spacious: { header: 'px-6 py-5 sm:px-8 sm:py-6', body: 'p-6 sm:p-8', footer: 'px-6 py-4 sm:px-8 sm:py-5', gap: 'gap-5', section: 'space-y-5' },
+    compact: {
+        header: 'px-4 py-3 sm:px-5 sm:py-4',
+        body: 'p-4 sm:p-5',
+        footer: 'px-4 py-3 sm:px-5 sm:py-3',
+        gap: 'gap-3',
+        section: 'space-y-3',
+    },
+    comfortable: {
+        header: 'px-5 py-4 sm:px-6 sm:py-5',
+        body: 'p-5 sm:p-6',
+        footer: 'px-5 py-4 sm:px-6',
+        gap: 'gap-4',
+        section: 'space-y-4',
+    },
+    spacious: {
+        header: 'px-6 py-5 sm:px-8 sm:py-6',
+        body: 'p-6 sm:p-8',
+        footer: 'px-6 py-4 sm:px-8 sm:py-5',
+        gap: 'gap-5',
+        section: 'space-y-5',
+    },
 };
 
 export const MODAL_HEADER_STYLES = {
@@ -189,7 +200,10 @@ const fallback = (map, key, defaultKey) => map[key] ?? map[defaultKey] ?? '';
 const isPaletteColor = color => Boolean(COLORS[color]);
 const isKnownColor = color => isPaletteColor(color) || typeof color === 'string';
 
-export function getModalVariantColorClass({ variant = 'clean', color = 'default' } = {}) {
+export function getModalVariantColorClass({
+    variant = 'clean',
+    color = 'default',
+} = {}) {
     const safeColor = isPaletteColor(color) ? color : 'default';
     const accent = MODAL_COLOR_STYLES[safeColor] ?? MODAL_COLOR_STYLES.default;
 
@@ -203,23 +217,51 @@ export function getModalVariantColorClass({ variant = 'clean', color = 'default'
 
     if (variant === 'glass') return GLASS[safeColor] ?? GLASS.default;
 
-    if (variant === 'gradient') return cn('bg-gradient-to-br', GRADIENTS[safeColor] ?? GRADIENTS.default, 'border-transparent text-white');
+    if (variant === 'gradient') {
+        return cn(
+            'bg-gradient-to-br',
+            GRADIENTS[safeColor] ?? GRADIENTS.default,
+            'border-transparent text-white'
+        );
+    }
 
-    if (variant === 'duotone') return cn('bg-gradient-to-br', DUOTONE[safeColor] ?? DUOTONE.default, 'border-white/20 text-white');
+    if (variant === 'duotone') {
+        return cn(
+            'bg-gradient-to-br',
+            DUOTONE[safeColor] ?? DUOTONE.default,
+            'border-white/20 text-white'
+        );
+    }
 
-    if (variant === 'holographic') return cn('bg-gradient-to-r', HOLOGRAPHIC[safeColor] ?? HOLOGRAPHIC.default, 'border-white/30 text-white');
+    if (variant === 'holographic') {
+        return cn(
+            'bg-gradient-to-r',
+            HOLOGRAPHIC[safeColor] ?? HOLOGRAPHIC.default,
+            'border-white/30 text-white'
+        );
+    }
 
     if (variant === 'filled') return COLORS[safeColor].base;
 
     if (variant === 'outlined') return cn('bg-transparent border-current', accent.text);
 
-    if (variant === 'ghost' || variant === 'none') return cn('bg-transparent shadow-none', safeColor === 'default' ? 'text-foreground' : accent.text);
-
-    if (variant === 'soft') {
-        return cn('bg-[color-mix(in_srgb,var(--modal-accent-color)_14%,var(--background))]', safeColor === 'default' ? 'text-foreground' : accent.text);
+    if (variant === 'ghost' || variant === 'none') {
+        return cn(
+            'bg-transparent shadow-none',
+            safeColor === 'default' ? 'text-foreground' : accent.text
+        );
     }
 
-    if (variant === 'danger' && safeColor === 'default') return 'bg-red-500/[0.06] dark:bg-red-500/[0.10]';
+    if (variant === 'soft') {
+        return cn(
+            'bg-[color-mix(in_srgb,var(--modal-accent-color)_14%,var(--background))]',
+            safeColor === 'default' ? 'text-foreground' : accent.text
+        );
+    }
+
+    if (variant === 'danger' && safeColor === 'default') {
+        return 'bg-red-500/[0.06] dark:bg-red-500/[0.10]';
+    }
 
     if (safeColor === 'default') return variant === 'accent' ? 'bg-primary/[0.04]' : '';
 
@@ -229,7 +271,11 @@ export function getModalVariantColorClass({ variant = 'clean', color = 'default'
 }
 
 // Resolves color accents such as ring, border, text, and tint.
-export function getModalColorClass({ color = 'default', parts = ['ring'], className = '' } = {}) {
+export function getModalColorClass({
+    color = 'default',
+    parts = ['ring'],
+    className = '',
+} = {}) {
     const styles = MODAL_COLOR_STYLES[color] ?? MODAL_COLOR_STYLES.default;
     const activeParts = parts.filter(part => styles[part]).map(part => styles[part]);
     const ringClass = color !== 'default' && parts.includes('ring') ? 'ring-1' : '';
@@ -245,36 +291,59 @@ export function getModalSurfaceStyle({
     borderAlpha = 0.35,
     ringAlpha = 0.18,
 } = {}) {
-    const resolvedBorderColor = borderColor ?? (color !== 'default' ? getColorRgba(color, borderAlpha) : undefined);
-    const style = getBorderStyle({ borderColor: resolvedBorderColor, borderWidth, fallbackColor: color });
+    const resolvedBorderColor =
+        borderColor ?? (color !== 'default' ? getColorRgba(color, borderAlpha) : undefined);
+
+    const style = getBorderStyle({
+        borderColor: resolvedBorderColor,
+        borderWidth,
+        fallbackColor: color,
+    });
 
     style['--modal-accent-color'] = getStyleColorValue(color);
-    if (color !== 'default') style['--tw-ring-color'] = getColorRgba(color, ringAlpha);
+
+    if (color !== 'default') {
+        style['--tw-ring-color'] = getColorRgba(color, ringAlpha);
+    }
 
     return style;
 }
 
-export function getModalContentClass({
-    size = 'lg',
+// Visual surface styling is separate from the popup layout.
+export function getModalContentSurfaceClass({
     variant = 'clean',
     color = 'default',
-    shape = 'default',
+} = {}) {
+    return cn(
+        fallback(MODAL_VARIANTS, variant, 'clean'),
+        getModalVariantColorClass({ variant, color }),
+        getModalColorClass({ color, parts: ['ring'] }),
+    );
+}
+
+// Popup layout only. Shape, background, border, and shadows are applied
+// to the visual surface rendered inside ModalContent.
+
+export function getModalContentClass({
+    size = 'lg',
     placement = 'center',
     className = '',
 } = {}) {
+    const positionClass = {
+        center: '!left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2',
+        top: '!left-1/2 !top-[max(1rem,env(safe-area-inset-top))] !-translate-x-1/2 !translate-y-0',
+        bottom: '!left-1/2 !top-auto !bottom-[max(1rem,env(safe-area-inset-bottom))] !-translate-x-1/2 !translate-y-0',
+    };
+
     return cn(
-        'flex min-h-0 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden p-0 text-sm outline-none sm:max-h-[calc(100dvh-2rem)] sm:w-full',
+        '!fixed !z-50 !isolate !flex min-h-0 max-h-[calc(100dvh-2rem)] w-[calc(100%-1rem)] !flex-col !gap-0 !overflow-visible !rounded-none !border-0 !bg-transparent !p-0 !text-sm !shadow-none !ring-0 !outline-none sm:max-h-[calc(100dvh-3rem)] sm:w-full',
         fallback(MODAL_SIZES, size, 'lg'),
-        fallback(MODAL_VARIANTS, variant, 'clean'),
-        getModalVariantColorClass({ variant, color }),
-        fallback(MODAL_SHAPES, shape, 'default'),
-        fallback(MODAL_PLACEMENTS, placement, 'center'),
-        placement === 'bottom' ? 'origin-bottom' : placement === 'top' ? 'origin-top' : 'origin-center',
-        size === 'fullscreen' ? 'h-[100dvh] max-h-none w-screen max-w-none rounded-none sm:w-screen' : '',
-        getModalColorClass({ color, parts: ['ring'] }),
-        className
+        fallback(positionClass, placement, 'center'),
+        size === 'fullscreen' ? '!left-0 !top-0 !h-[100dvh] !w-screen !max-w-none !translate-x-0 !translate-y-0 !rounded-none !max-h-none' : '',
+        className,
     );
 }
+
 
 export function getModalOverlayClass(overlay = 'default', className = '') {
     return cn(fallback(MODAL_OVERLAYS, overlay, 'default'), className);
@@ -348,11 +417,22 @@ export function getModalFooterClass({
     );
 }
 
-export function getModalSectionClass({ columns = 1, className = '' } = {}) {
-    return cn('grid gap-x-4 gap-y-4', fallback(MODAL_SECTION_COLUMNS, columns, 1), className);
+export function getModalSectionClass({
+    columns = 1,
+    className = '',
+} = {}) {
+    return cn(
+        'grid gap-x-4 gap-y-4',
+        fallback(MODAL_SECTION_COLUMNS, columns, 1),
+        className
+    );
 }
 
-export function getModalIconClass({ color = 'default', size = 'md', className = '' } = {}) {
+export function getModalIconClass({
+    color = 'default',
+    size = 'md',
+    className = '',
+} = {}) {
     const sizes = {
         sm: 'size-9 rounded-xl [&>svg]:size-4',
         md: 'size-11 rounded-2xl [&>svg]:size-5',
@@ -367,7 +447,11 @@ export function getModalIconClass({ color = 'default', size = 'md', className = 
     );
 }
 
-export function getModalPanelClass({ variant = 'default', color = 'default', className = '' } = {}) {
+export function getModalPanelClass({
+    variant = 'default',
+    color = 'default',
+    className = '',
+} = {}) {
     return cn(
         fallback(MODAL_PANEL_VARIANTS, variant, 'default'),
         getModalVariantColorClass({ variant, color }),

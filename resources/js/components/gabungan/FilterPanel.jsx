@@ -186,12 +186,11 @@ export default function FilterPanel({
                 color="blue"
                 size="none"
                 width="fit"
-                edge="top-right"
-                edgeOffset={18}
+                edge="none"
                 layer="behind"
                 onClick={handleOpen}
                 disabled={isProcessing}
-                className={`!w-[170px] h-12 translate-x-267 translate-y-1 gap-2 px-6 ${isProcessing ? 'pointer-events-none opacity-50' : ''}`}
+                className={`!w-[170px] h-12 translate-x-267 translate-y-4 gap-2 px-6 ${isProcessing ? 'pointer-events-none opacity-50' : ''}`}
             >
                 <Filter className="h-4 w-4 shrink-0" />
                 <span className="whitespace-nowrap text-sm font-bold">{title}</span>
