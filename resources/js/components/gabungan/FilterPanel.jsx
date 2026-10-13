@@ -269,13 +269,16 @@ export default function FilterPanel({
                                 </div>
 
                                 <Search
-                                    value={searchTerm}
-                                    onChange={setSearchTerm}
-                                    onSearch={setSearchTerm}
-                                    placeholder={`Cari ${categoryTitle.toLowerCase()}...`}
-                                    disabled={isProcessing}
-                                    className="w-full shrink-0 sm:w-[260px]"
-                                />
+                                value={searchTerm}
+                                onChange={setSearchTerm}
+                                onSearch={setSearchTerm}
+                                placeholder={`Cari ${categoryTitle.toLowerCase()}...`}
+                                disabled={isProcessing}
+                                variant="classic"
+                                color="#FF8A00"
+                                size="sm"
+                                className="w-full shrink-0 sm:w-[260px]"
+                            />
                             </div>
                         </div>
 

@@ -317,7 +317,10 @@ export default function TabelRincianAset({
                                 onSearch={onSearch}
                                 placeholder="Cari barang / kode PPL / SN..."
                                 disabled={isProcessing}
-                                className="w-72 hidden lg:block"
+                                variant="pill"
+                                color="#FF8A00"
+                                size="sm"
+                                className="w-full shrink-0 sm:w-[260px]"
                             />
                         </div>
                     </div>

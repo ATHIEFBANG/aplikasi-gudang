@@ -24,20 +24,23 @@ import {
     getModalIconClass,
     getModalPanelClass,
     getModalSurfaceStyle,
+    getModalLayoutDividerClass,
 } from './ModalLogic';
 
 const ModalStyleContext = React.createContext({
     variant: 'clean',
     color: 'default',
     density: 'comfortable',
+    layoutDivider: 'visible',
 });
 
+// Memperbesar radius sudut sesuai pembesaran Card.
 function expandBorderRadius(borderRadius, offset) {
     if (!borderRadius || offset <= 0) return borderRadius;
 
     const values = borderRadius.trim().split(/\s+/);
     const corners = values.length === 1
-        ? Array(4).fill(values[0])
+        ? [values[0], values[0], values[0], values[0]]
         : values.length === 2
             ? [values[0], values[1], values[0], values[1]]
             : values.length === 3
@@ -83,10 +86,23 @@ function ModalContent({
     flipVertical = false,
     placement = 'center',
     density = 'comfortable',
+    layoutDivider = 'visible',
     overlay = 'default',
     overlayClassName = '',
     className = '',
     style,
+    stack = false,
+    stackShape = shape,
+    stackDepth = 1,
+    stackOffset = 5,
+    stackRotate = 0,
+    stackTranslateX = 0,
+    stackTranslateY = 0,
+    stackColor = '#111827',
+    stackBorderColor = '#64748B',
+    stackBorderWidth = 2,
+    stackFlipHorizontal,
+    stackFlipVertical,
     effect = 'none',
     effectColor,
     effectOpacity,
@@ -94,11 +110,6 @@ function ModalContent({
     effectOffsetY,
     effectBlur,
     effectSpread,
-    stack = false,
-    stackOffset = 5,
-    stackColor = '#111827',
-    stackBorderColor = '#64748B',
-    stackBorderWidth = 2,
     ...props
 }) {
     const safeDensity = MODAL_DENSITIES[density] ? density : 'comfortable';
@@ -107,16 +118,29 @@ function ModalContent({
     const surfaceStyle = getModalSurfaceStyle({ color, borderColor, borderWidth, borderAlpha, ringAlpha });
     const shapeStyle = getShapeStyle(shape, flipHorizontal, flipVertical);
     const contentShapeStyle = shapeStyle.borderRadius ? { borderRadius: shapeStyle.borderRadius } : {};
-    const shadowEffectStyle = getShadowEffectStyle({ effect, effectColor, effectOpacity, effectOffsetX, effectOffsetY, effectBlur, effectSpread });
     const offset = Math.max(0, Number(stackOffset) || 0);
+    const depth = stack ? Math.min(5, Math.max(1, Math.floor(Number(stackDepth) || 1))) : 0;
     const safeBorderWidth = Math.max(0, Number(stackBorderWidth) || 0);
+    const getNumericValue = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+    const safeStackRotate = getNumericValue(stackRotate);
+    const safeStackTranslateX = getNumericValue(stackTranslateX);
+    const safeStackTranslateY = getNumericValue(stackTranslateY);
+    const stackTransform = safeStackRotate !== 0 || safeStackTranslateX !== 0 || safeStackTranslateY !== 0
+        ? `translate(${safeStackTranslateX}px, ${safeStackTranslateY}px) rotate(${safeStackRotate}deg)`
+        : undefined;
+    const stackBaseShapeStyle = getShapeStyle(
+        stackShape,
+        stackFlipHorizontal ?? flipHorizontal,
+        stackFlipVertical ?? flipVertical
+    );
+    const shadowEffectStyle = getShadowEffectStyle({ effect, effectColor, effectOpacity, effectOffsetX, effectOffsetY, effectBlur, effectSpread });
 
-    const stackShapeStyle = {
-        ...shapeStyle,
-        ...(shapeStyle.borderRadius ? {
-            borderRadius: expandBorderRadius(shapeStyle.borderRadius, offset),
+    const getStackShapeStyle = distance => ({
+        ...stackBaseShapeStyle,
+        ...(stackBaseShapeStyle.borderRadius ? {
+            borderRadius: expandBorderRadius(stackBaseShapeStyle.borderRadius, distance),
         } : {}),
-    };
+    });
 
     return (
         <DialogContent
@@ -126,37 +150,41 @@ function ModalContent({
             {...props}
             showCloseButton={false}
         >
-            <ModalStyleContext.Provider value={{ variant, color, density: safeDensity }}>
-                {stack && (
-                    <div
-                        data-slot="modal-stack"
-                        aria-hidden="true"
-                        className="pointer-events-none absolute border"
-                        style={{
-                            ...stackShapeStyle,
-                            top: -offset,
-                            right: -offset,
-                            bottom: -offset,
-                            left: -offset,
-                            backgroundColor: stackColor,
-                            borderColor: stackBorderColor,
-                            borderWidth: `${safeBorderWidth}px`,
-                            borderStyle: safeBorderWidth > 0 ? 'solid' : 'none',
-                            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)',
-                            zIndex: 1,
-                        }}
-                    />
-                )}
+            <ModalStyleContext.Provider value={{ variant, color, density: safeDensity, layoutDivider }}>
+                {depth > 0 && Array.from({ length: depth }, (_, index) => {
+                    const distance = (depth - index) * offset;
+
+                    return (
+                        <div
+                            key={`modal-stack-${index}`}
+                            data-slot="modal-stack"
+                            aria-hidden="true"
+                            className="pointer-events-none absolute border"
+                            style={{
+                                ...getStackShapeStyle(distance),
+                                top: -distance,
+                                right: -distance,
+                                bottom: -distance,
+                                left: -distance,
+                                transform: stackTransform,
+                                transformOrigin: stackTransform ? 'center' : undefined,
+                                backgroundColor: stackColor,
+                                borderColor: stackBorderColor,
+                                borderWidth: `${safeBorderWidth}px`,
+                                borderStyle: safeBorderWidth > 0 ? 'solid' : 'none',
+                                boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)',
+                                zIndex: 1,
+                            }}
+                        />
+                    );
+                })}
 
                 {Object.keys(shadowEffectStyle).length > 0 && (
                     <div
                         data-slot="modal-shadow-effect"
                         aria-hidden="true"
                         className="pointer-events-none absolute inset-0 z-[4] bg-transparent"
-                        style={{
-                            ...shapeStyle,
-                            ...shadowEffectStyle,
-                        }}
+                        style={{ ...shapeStyle, ...shadowEffectStyle }}
                     />
                 )}
 
@@ -206,12 +234,24 @@ function ModalHeader({
         context.variant === 'danger' ? 'danger' : context.variant === 'accent' ? 'accent' : 'default'
     );
     const surfaceStyle = getModalSurfaceStyle({ color: effectiveColor, borderColor, borderWidth, borderAlpha, ringAlpha });
+    const effectiveDivider = divider && context.layoutDivider !== 'hidden';
+    // Only control the Header's own separator. Do not alter Body, Sidebar,
+    // Main, or Footer styling when layoutDivider is hidden.
+    const dividerStyle = context.layoutDivider === 'hidden'
+        ? { borderBottomWidth: 0, borderBottomStyle: 'none', boxShadow: 'none' }
+        : context.layoutDivider === 'subtle'
+            ? { borderBottomColor: 'rgb(148 163 184 / 0.25)' }
+            : {};
+    const headerClassName = cn(
+        getModalHeaderClass({ variant: effectiveVariant, color: effectiveColor, density: effectiveDensity, divider: effectiveDivider, layoutDivider: context.layoutDivider, className }),
+        context.layoutDivider === 'hidden' && '!border-b-0 !shadow-none !ring-0'
+    );
 
     return (
         <header
             data-slot="modal-header"
-            className={getModalHeaderClass({ variant: effectiveVariant, color: effectiveColor, density: effectiveDensity, divider, className })}
-            style={{ ...surfaceStyle, ...style }}
+            className={headerClassName}
+            style={{ ...surfaceStyle, ...dividerStyle, ...style, ...(context.layoutDivider === 'hidden' ? { borderBottomWidth: 0, borderBottomStyle: 'none', boxShadow: 'none' } : {}) }}
             {...props}
         >
             {(eyebrow || icon || title || description || badge || actions) && (
@@ -287,7 +327,7 @@ function ModalBody({
         <div
             data-slot="modal-body"
             data-variant={variant}
-            className={getModalBodyClass({ density: effectiveDensity, layout, variant, color: effectiveColor, scrollable, className })}
+            className={getModalBodyClass({ density: effectiveDensity, layout, variant, color: effectiveColor, scrollable, layoutDivider: context.layoutDivider, className })}
             style={{ ...surfaceStyle, ...style }}
             {...props}
         >
@@ -316,12 +356,18 @@ function ModalFooter({
     const effectiveDensity = MODAL_DENSITIES[density] ? density : context.density;
     const effectiveColor = color ?? context.color;
     const surfaceStyle = getModalSurfaceStyle({ color: effectiveColor, borderColor, borderWidth, borderAlpha, ringAlpha });
+    const effectiveDivider = divider && context.layoutDivider !== 'hidden';
+    const dividerStyle = context.layoutDivider === 'hidden'
+        ? { borderTopWidth: 0 }
+        : context.layoutDivider === 'subtle'
+            ? { borderTopColor: 'rgb(148 163 184 / 0.25)' }
+            : {};
 
     return (
         <footer
             data-slot="modal-footer"
-            className={getModalFooterClass({ density: effectiveDensity, align, sticky, divider, variant, color: effectiveColor, className })}
-            style={{ ...surfaceStyle, ...style }}
+            className={getModalFooterClass({ density: effectiveDensity, align, sticky, divider: effectiveDivider, variant, color: effectiveColor, layoutDivider: context.layoutDivider, className })}
+            style={{ ...surfaceStyle, ...dividerStyle, ...style }}
             {...props}
         >
             {children}
@@ -389,7 +435,7 @@ function ModalPanel({
     return (
         <div
             data-slot="modal-panel"
-            className={cn('min-w-0 p-4 sm:p-5', getModalPanelClass({ variant, color: effectiveColor, className }))}
+            className={cn('min-w-0 p-4 sm:p-5', getModalPanelClass({ variant, color: effectiveColor, layoutDivider: context.layoutDivider, className }))}
             style={{ ...surfaceStyle, ...style }}
             {...props}
         >
@@ -398,8 +444,23 @@ function ModalPanel({
     );
 }
 
-function ModalDivider({ className = '', ...props }) {
-    return <div data-slot="modal-divider" role="separator" className={cn('h-px w-full bg-border/70', className)} {...props} />;
+function ModalDivider({ className = '', variant, orientation = 'horizontal', ...props }) {
+    const context = React.useContext(ModalStyleContext);
+    const effectiveVariant = variant ?? context.layoutDivider ?? 'visible';
+
+    if (effectiveVariant === 'hidden') return null;
+
+    return (
+        <div
+            data-slot="modal-divider"
+            data-variant={effectiveVariant}
+            data-orientation={orientation}
+            role="separator"
+            aria-orientation={orientation}
+            className={getModalLayoutDividerClass({ variant: effectiveVariant, orientation, className })}
+            {...props}
+        />
+    );
 }
 
 export {
@@ -413,6 +474,7 @@ export {
     ModalSection,
     ModalPanel,
     ModalDivider,
+    ModalDivider as ModalLayoutDivider,
 };
 
 export default Modal;

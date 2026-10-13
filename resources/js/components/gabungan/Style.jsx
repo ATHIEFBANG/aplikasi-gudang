@@ -67,6 +67,107 @@ export function getStyleColorValue(color, fallback = 'default') {
     return fallbackValue;
 }
 
+// Builds reusable inline styles for variants that need a custom HEX color.
+// Named palette colors keep using the existing Tailwind classes unchanged.
+export function getVariantColorStyle({
+    variant = 'default',
+    color = 'default',
+    gradientDirection = 'br',
+} = {}) {
+    if (typeof color !== 'string' || !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color.trim())) {
+        return {};
+    }
+
+    const hex = color.trim();
+    const directions = {
+        r: 'to right',
+        l: 'to left',
+        t: 'to top',
+        b: 'to bottom',
+        tr: 'to top right',
+        tl: 'to top left',
+        br: 'to bottom right',
+        bl: 'to bottom left',
+    };
+    const direction = directions[gradientDirection] || directions.br;
+    const light = `color-mix(in srgb, ${hex} 42%, white)`;
+    const lighter = `color-mix(in srgb, ${hex} 24%, white)`;
+    const dark = `color-mix(in srgb, ${hex} 68%, black)`;
+    const darker = `color-mix(in srgb, ${hex} 78%, black)`;
+
+    if (variant === 'gradient') {
+        return {
+            backgroundColor: hex,
+            backgroundImage: `linear-gradient(${direction}, ${lighter}, ${hex} 52%, ${dark})`,
+            borderColor: 'transparent',
+            color: '#FFFFFF',
+        };
+    }
+
+    if (variant === '3d') {
+        return {
+            backgroundColor: hex,
+            backgroundImage: `linear-gradient(to bottom, ${light}, ${hex} 48%, ${darker})`,
+            borderColor: light,
+            color: '#FFFFFF',
+        };
+    }
+
+    if (variant === 'duotone') {
+        return {
+            backgroundColor: hex,
+            backgroundImage: `linear-gradient(135deg, ${lighter}, ${hex} 48%, ${dark})`,
+            borderColor: 'rgb(255 255 255 / 20%)',
+            color: '#FFFFFF',
+        };
+    }
+
+    if (variant === 'holographic') {
+        return {
+            backgroundColor: hex,
+            backgroundImage: `linear-gradient(120deg, ${light}, ${hex} 42%, color-mix(in srgb, ${hex} 52%, #A855F7) 72%, color-mix(in srgb, ${hex} 55%, #06B6D4))`,
+            borderColor: 'rgb(255 255 255 / 30%)',
+            color: '#FFFFFF',
+        };
+    }
+
+    if (variant === 'glass') {
+        return {
+            backgroundColor: `color-mix(in srgb, ${hex} 12%, transparent)`,
+            backgroundImage: 'none',
+            borderColor: `color-mix(in srgb, ${hex} 32%, transparent)`,
+            color: `color-mix(in srgb, ${hex} 78%, black)`,
+        };
+    }
+
+    if (variant === 'filled' || variant === 'flat') {
+        return {
+            backgroundColor: hex,
+            borderColor: hex,
+            color: '#FFFFFF',
+        };
+    }
+
+    if (variant === 'soft') {
+        return {
+            backgroundColor: `color-mix(in srgb, ${hex} 10%, transparent)`,
+            borderColor: `color-mix(in srgb, ${hex} 24%, transparent)`,
+            color: hex,
+        };
+    }
+
+    if (variant === 'outlined') {
+        return {
+            backgroundColor: 'transparent',
+            backgroundImage: 'none',
+            borderColor: hex,
+            color: hex,
+        };
+    }
+
+    return {};
+}
+
 // Creates inline styles for a custom border color and width.
 export function getBorderStyle({ borderColor, borderWidth, fallbackColor = 'default' } = {}) {
     const style = {};

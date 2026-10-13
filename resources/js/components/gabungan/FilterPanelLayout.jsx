@@ -30,7 +30,7 @@ const FILTER_PANEL_STYLE = {
         variant: 'clean',
         color: 'blue',
         borderColor: '#FFFFFF',
-        borderWidth: 3,
+        borderWidth: 0,
         shape: 'kiri-atas-kanan-bawah',
         flipHorizontal: false,
         flipVertical: false,
@@ -46,39 +46,48 @@ const FILTER_PANEL_STYLE = {
 
         // Stack Effect
         stack: true,
-        stackOffset: 20,
-        stackColor: '#FFFFFF',
-        stackBorderColor: '#64748B',
-        stackBorderWidth: 2,
+    stackShape: 'persegi-membulat',
+    stackDepth: 1,
+    stackOffset: 20,
+    stackRotate: -3,
+    stackTranslateX: 8,
+    stackTranslateY: 12,
+    stackColor: '#FFF000',
+    stackBorderColor: '#64748B',
+    stackBorderWidth: 20,
     },
 
     header: {
-        variant: '3d',
-        color: 'blue',
-        borderColor: '#60A5FA',
-        borderWidth: 2,
+        variant: 'clean',
+        color: 'slate',
+        borderColor: '#64748B',
+        borderWidth: 0
     },
 
     body: {
-        variant: '3d',
-        color: 'red',
+        variant: 'clean',
+        color: 'none',
+        borderWidth: 0,
     },
 
     sidebar: {
         variant: 'muted',
         color: 'slate',
         borderColor: '#64748B',
+        borderWidth: 0,
     },
 
     main: {
         variant: 'clean',
         color: 'blue',
+        borderWidth: 0,
     },
 
     footer: {
         variant: 'clean',
         color: 'slate',
         borderColor: '#64748B',
+       
     },
 
     icon: {
@@ -91,8 +100,8 @@ const FILTER_PANEL_STYLE = {
 // =========================================================
 
 const FILTER_TITLE_CARD = {
-    variant: 'duotone',
-    color: 'amber',
+    variant: 'soft',
+    color: '#154BC9',
     shape: 'kiri-bawah-kanan-kapsul',
     flipHorizontal: true,
     flipVertical: false,
@@ -104,6 +113,18 @@ const FILTER_TITLE_CARD = {
         effectOffsetY: 23,
         effectBlur: 1,
         effectSpread: 0,
+
+    stack: true,
+    stackShape: 'persegi-membulat',
+    stackDepth: 1,
+    stackOffset: 8,
+    stackRotate: -3,
+    stackTranslateX: 8,
+    stackTranslateY: 12,
+    stackColor: '#FFF000',
+    stackBorderColor: '#64748B',
+    stackBorderWidth: 2,
+    
 
     decoration: 'none',
     size: 'none',
@@ -144,6 +165,7 @@ export default function FilterPanelLayout({
     onCancel,
     onApply,
     children,
+    layoutDivider = 'hidden',
 }) {
     const handleOpenChange = nextOpen => {
         if (!nextOpen && isProcessing) return;
@@ -165,6 +187,7 @@ export default function FilterPanelLayout({
                 placement="center"
                 density="compact"
                 overlay="blur"
+                layoutDivider={layoutDivider}
                 className={FILTER_PANEL_LAYOUT.content}
             >
                 {/* HEADER */}
@@ -172,6 +195,7 @@ export default function FilterPanelLayout({
                     {...headerStyle}
                     density="compact"
                     className={FILTER_PANEL_LAYOUT.header}
+                    style={layoutDivider === 'hidden' ? { borderBottomWidth: 0 } : layoutDivider === 'subtle' ? { borderBottomColor: 'rgb(148 163 184 / 0.25)' } : undefined}
                 >
                     <Card {...FILTER_TITLE_CARD}>
                         <span
@@ -199,7 +223,7 @@ export default function FilterPanelLayout({
                     layout="flush"
                     scrollable={false}
                     density="compact"
-                    className={FILTER_PANEL_LAYOUT.body}
+                    className={[FILTER_PANEL_LAYOUT.body, layoutDivider === 'hidden' && '!ring-0'].filter(Boolean).join(' ')}
                 >
                     <div className="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
                         {/* SIDEBAR */}
@@ -207,9 +231,18 @@ export default function FilterPanelLayout({
                             className={getModalPanelClass({
                                 variant: sidebarStyle.variant,
                                 color: sidebarStyle.color,
-                                className: FILTER_PANEL_LAYOUT.sidebar,
+                                layoutDivider,
+                                className: [
+                                    FILTER_PANEL_LAYOUT.sidebar,
+                                    layoutDivider === 'hidden' && '!border-b-0 sm:!border-r-0',
+                                    layoutDivider === 'subtle' && '!border-b-border/40 sm:!border-r-border/40',
+                                ].filter(Boolean).join(' '),
                             })}
-                            style={getModalSurfaceStyle(sidebarStyle)}
+                            style={{
+                                ...getModalSurfaceStyle(sidebarStyle),
+                                ...(layoutDivider === 'hidden' ? { borderRightWidth: 0, borderBottomWidth: 0 } : {}),
+                                ...(layoutDivider === 'subtle' ? { borderRightColor: 'rgb(148 163 184 / 0.25)', borderBottomColor: 'rgb(148 163 184 / 0.25)' } : {}),
+                            }}
                         >
                             <FilterPanelMenu
                                 items={menuItems}
@@ -228,9 +261,10 @@ export default function FilterPanelLayout({
                             className={getModalPanelClass({
                                 variant: mainStyle.variant,
                                 color: mainStyle.color,
-                                className: FILTER_PANEL_LAYOUT.main,
+                                layoutDivider,
+                                className: [FILTER_PANEL_LAYOUT.main, layoutDivider === 'hidden' && '!ring-0'].filter(Boolean).join(' '),
                             })}
-                            style={getModalSurfaceStyle(mainStyle)}
+                            style={{ ...getModalSurfaceStyle(mainStyle), ...(layoutDivider === 'hidden' ? { borderRightWidth: 0, borderBottomWidth: 0, boxShadow: 'none' } : {}), ...(layoutDivider === 'subtle' ? { borderRightColor: 'rgb(148 163 184 / 0.25)', borderBottomColor: 'rgb(148 163 184 / 0.25)' } : {}) }}
                         >
                             {children}
                         </main>
@@ -242,9 +276,13 @@ export default function FilterPanelLayout({
                     {...footerStyle}
                     density="compact"
                     sticky
-                    divider
+                    divider={layoutDivider !== 'hidden'}
                     align="between"
-                    className={FILTER_PANEL_LAYOUT.footer}
+                    className={[
+                        FILTER_PANEL_LAYOUT.footer,
+                        layoutDivider === 'subtle' && '!border-t-border/40',
+                    ].filter(Boolean).join(' ')}
+                    style={layoutDivider === 'hidden' ? { borderTopWidth: 0 } : layoutDivider === 'subtle' ? { borderTopColor: 'rgb(148 163 184 / 0.25)' } : undefined}
                 >
                     <div className="flex w-full items-center justify-between gap-3">
                         {/* RESET */}

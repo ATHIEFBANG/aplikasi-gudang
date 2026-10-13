@@ -2,7 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { CARD_WIDTHS, getCardLogic } from './CardLogic';
-import { getShadowEffectStyle } from './Style';
+import { getShadowEffectStyle, getShapeStyle } from './Style';
 
 export default function CustomCard({
     children,
@@ -21,11 +21,20 @@ export default function CustomCard({
     shape = 'default',
     flipHorizontal = false,
     flipVertical = false,
+    stackShape = shape,
+    stackFlipHorizontal,
+    stackFlipVertical,
+    stackColor,
+    stackBorderColor,
+    stackBorderWidth,
     width = 'full',
     layer = 'normal',
     stack = false,
     stackDepth = 3,
     stackOffset = 8,
+    stackRotate = 0,
+    stackTranslateX = 0,
+    stackTranslateY = 0,
     stackOpacity = 0.75,
     padding = 'p-5',
     gap = 'gap-3',
@@ -40,6 +49,8 @@ export default function CustomCard({
     const {
         surfaceClassName,
         contentColorClassName,
+        surfaceStyle,
+        contentStyle,
         shapeStyle,
         decorationStyle,
         effectStyle,
@@ -58,9 +69,17 @@ export default function CustomCard({
         layer,
     });
 
+    const stackShapeStyle = getShapeStyle(
+        stackShape,
+        stackFlipHorizontal ?? flipHorizontal,
+        stackFlipVertical ?? flipVertical
+    );
     const widthClass = CARD_WIDTHS[width] || CARD_WIDTHS.full;
     const depth = stack ? Math.min(5, Math.max(1, Math.floor(Number(stackDepth) || 1))) : 0;
     const offset = Math.max(0, Number(stackOffset) || 0);
+    const rotate = Number.isFinite(Number(stackRotate)) ? Number(stackRotate) : 0;
+    const translateX = Number.isFinite(Number(stackTranslateX)) ? Number(stackTranslateX) : 0;
+    const translateY = Number.isFinite(Number(stackTranslateY)) ? Number(stackTranslateY) : 0;
     const shadowEffectStyle = getShadowEffectStyle({
         effect,
         effectColor,
@@ -101,8 +120,16 @@ export default function CustomCard({
                             stackClassName
                         )}
                         style={{
-                            ...shapeStyle,
-                            transform: `translate(${distance}px, ${distance}px)`,
+                            ...stackShapeStyle,
+                            ...surfaceStyle,
+                            ...(stackColor !== undefined ? { backgroundColor: stackColor, backgroundImage: 'none' } : {}),
+                            ...(stackBorderColor !== undefined ? { borderColor: stackBorderColor } : {}),
+                            ...(stackBorderWidth !== undefined ? {
+                                borderWidth: `${Math.max(0, Number(stackBorderWidth) || 0)}px`,
+                                borderStyle: Number(stackBorderWidth) > 0 ? 'solid' : 'none',
+                            } : {}),
+                            transform: `translate(${distance + translateX}px, ${distance + translateY}px) rotate(${rotate}deg)`,
+                            transformOrigin: 'center center',
                             opacity,
                         }}
                     />
@@ -116,7 +143,7 @@ export default function CustomCard({
                     surfaceClassName,
                     surfaceClassNameOverride
                 )}
-                style={shapeStyle}
+                style={{ ...shapeStyle, ...surfaceStyle }}
             />
 
             {decoration !== 'none' && decorationStyle && (
@@ -131,7 +158,10 @@ export default function CustomCard({
                 />
             )}
 
-            <div className={cn('relative z-10 flex min-w-0 flex-col', gap, contentClassName)}>
+            <div
+                className={cn('relative z-10 flex min-w-0 flex-col', gap, contentClassName)}
+                style={contentStyle}
+            >
                 {children}
             </div>
 

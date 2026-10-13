@@ -12,6 +12,8 @@ import {
     getShapeStyle,
     getDecorationStyle,
     hexToRgba,
+    getColorHex,
+    getVariantColorStyle,
 } from './Style';
 
 export const CARD_VARIANTS = [
@@ -72,6 +74,37 @@ const OUTLINE_COLORS = {
     black: 'border-slate-700 dark:border-slate-300',
 };
 
+const isHexColor = color => typeof color === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color.trim());
+
+const getReadableTextColor = color => {
+    if (!isHexColor(color)) return '#FFFFFF';
+
+    let hex = color.trim().slice(1);
+    if (hex.length === 3) hex = hex.split('').map(char => char + char).join('');
+
+    const channels = [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+    const linear = channels.map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+
+    return luminance > 0.48 ? '#0F172A' : '#FFFFFF';
+};
+
+const getCardVariantColorStyle = (variant, color, gradientDirection) => {
+    if (!isHexColor(color)) return {};
+
+    if (variant === 'inset') {
+        const textColor = getReadableTextColor(color);
+        return {
+            backgroundColor: color.trim(),
+            backgroundImage: `linear-gradient(to bottom, color-mix(in srgb, ${color.trim()} 42%, white), ${color.trim()} 48%, color-mix(in srgb, ${color.trim()} 78%, black))`,
+            borderColor: `color-mix(in srgb, ${color.trim()} 42%, white)`,
+            color: textColor,
+        };
+    }
+
+    return getVariantColorStyle({ variant, color, gradientDirection });
+};
+
 const getEffectStyle = (effect, effectColor) => {
     if (effect === 'none') return {};
 
@@ -126,6 +159,12 @@ export function getCardLogic({
     const duotoneColor = DUOTONE[color] || DUOTONE.default;
     const holographicColor = HOLOGRAPHIC[color] || HOLOGRAPHIC.default;
     const gradientDirectionClass = GRADIENT_DIRECTIONS[gradientDirection] || GRADIENT_DIRECTIONS.b;
+    const hasCustomHexColor = isHexColor(color);
+    const variantColorStyle = getCardVariantColorStyle(safeVariant, color, gradientDirection);
+    const hasVariantColorStyle = Object.keys(variantColorStyle).length > 0;
+    const contentStyle = hasVariantColorStyle
+        ? { color: ['soft', 'glass', 'outlined'].includes(safeVariant) ? variantColorStyle.color : getReadableTextColor(color) }
+        : {};
 
     let surfaceClassName = '';
     let contentColorClassName = colorText;
@@ -177,9 +216,11 @@ export function getCardLogic({
     return {
         surfaceClassName,
         contentColorClassName,
+        surfaceStyle: variantColorStyle,
+        contentStyle,
         shapeStyle: getShapeStyle(shape, flipHorizontal, flipVertical),
         decorationStyle: getDecorationStyle(decoration, decorationColor),
-        effectStyle: getEffectStyle(effect, effectColor || colorConfig.hex),
+        effectStyle: getEffectStyle(effect, effectColor || (hasCustomHexColor ? getColorHex(color) : colorConfig.hex)),
         layerClassName: LAYER_STYLES[layer] || LAYER_STYLES.normal,
     };
 }

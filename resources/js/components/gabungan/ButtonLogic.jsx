@@ -14,6 +14,7 @@ import {
     getShapeStyle,
     hexToRgba,
     getDecorationStyle,
+    getVariantColorStyle,
 } from './Style';
 
 const BASE = 'inline-flex items-center justify-center whitespace-nowrap select-none';
@@ -132,6 +133,7 @@ export function getButtonLogic({
     onClick,
 }) {
     const variantClass = VARIANTS[variant] || VARIANTS.default;
+    const isHexColor = typeof color === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color.trim());
     const colorConfig = COLORS[color] || COLORS.default;
     const gradientColor = GRADIENTS[color] || GRADIENTS.default;
     const threeDColor = THREE_D[color] || THREE_D.default;
@@ -206,6 +208,17 @@ export function getButtonLogic({
     }
 
 
+    let variantColorStyle = getVariantColorStyle({ variant: variant === 'default' || variant === 'pill' || variant === 'filter' || variant === 'game' || variant === 'inset' || variant === 'ghost' ? variant : (gradient ? 'gradient' : variant), color, gradientDirection });
+
+    if (isHexColor && Object.keys(variantColorStyle).length === 0) {
+        const hex = color.trim();
+        variantColorStyle = variant === 'ghost'
+            ? { backgroundColor: 'transparent', borderColor: 'transparent', color: hex }
+            : variant === 'default' || variant === 'pill' || variant === 'filter' || variant === 'game' || variant === 'inset'
+                ? { backgroundColor: hex, borderColor: hex, color: '#FFFFFF' }
+                : {};
+    }
+
     const decorationStyle = getDecorationStyle(
         decoration,
         decorationColor
@@ -248,6 +261,7 @@ export function getButtonLogic({
         contentClass,
         shapeStyle,
         customEffectStyle,
+        variantColorStyle,
         decorationStyle,
         hasDecoration,
     };

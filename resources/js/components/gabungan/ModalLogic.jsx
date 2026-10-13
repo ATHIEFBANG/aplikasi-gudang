@@ -194,6 +194,40 @@ export const MODAL_FOOTER_STYLES = {
     holographic: 'bg-background text-foreground',
 };
 
+
+// Layout dividers are structural separators between layout regions.
+// They are independent from borderWidth/borderColor on ModalHeader, ModalBody,
+// ModalFooter, and ModalPanel.
+export const MODAL_LAYOUT_DIVIDERS = {
+    visible: {
+        vertical: 'w-px self-stretch bg-border',
+        horizontal: 'h-px w-full bg-border',
+    },
+    subtle: {
+        vertical: 'w-px self-stretch bg-border/40',
+        horizontal: 'h-px w-full bg-border/40',
+    },
+    hidden: {
+        vertical: 'hidden',
+        horizontal: 'hidden',
+    },
+};
+
+export function getModalLayoutDividerClass({
+    variant = 'visible',
+    orientation = 'vertical',
+    className = '',
+} = {}) {
+    const safeVariant = MODAL_LAYOUT_DIVIDERS[variant] ? variant : 'visible';
+    const safeOrientation = orientation === 'horizontal' ? 'horizontal' : 'vertical';
+
+    return cn(
+        'shrink-0',
+        MODAL_LAYOUT_DIVIDERS[safeVariant][safeOrientation],
+        className,
+    );
+}
+
 // Standardized surface class resolver.
 const fallback = (map, key, defaultKey) => map[key] ?? map[defaultKey] ?? '';
 
@@ -354,6 +388,7 @@ export function getModalHeaderClass({
     color = 'default',
     density = 'comfortable',
     divider = true,
+    layoutDivider = 'visible',
     className = '',
 } = {}) {
     return cn(
@@ -361,8 +396,10 @@ export function getModalHeaderClass({
         fallback(MODAL_HEADER_STYLES, variant, 'default'),
         fallback(MODAL_DENSITIES, density, 'comfortable').header,
         getModalVariantColorClass({ variant, color }),
-        getModalColorClass({ color, parts: ['ring'] }),
+        layoutDivider === 'hidden' ? '' : getModalColorClass({ color, parts: ['ring'] }),
         divider ? '' : 'border-b-0',
+        layoutDivider === 'hidden' ? '!border-b-0 !shadow-none !ring-0' : '',
+        layoutDivider === 'subtle' ? 'border-b-border/40' : '',
         className
     );
 }
@@ -373,6 +410,7 @@ export function getModalBodyClass({
     variant = 'default',
     color = 'default',
     scrollable = true,
+    layoutDivider = 'visible',
     className = '',
 } = {}) {
     return cn(
@@ -382,7 +420,7 @@ export function getModalBodyClass({
         scrollable ? 'overflow-y-auto overscroll-contain' : 'overflow-visible',
         fallback(MODAL_BODY_LAYOUTS, layout, 'default'),
         layout === 'flush' ? '' : fallback(MODAL_DENSITIES, density, 'comfortable').body,
-        getModalColorClass({ color, parts: ['ring'] }),
+        layoutDivider === 'hidden' ? '' : getModalColorClass({ color, parts: ['ring'] }),
         className
     );
 }
@@ -394,6 +432,7 @@ export function getModalFooterClass({
     divider = true,
     variant = 'default',
     color = 'default',
+    layoutDivider = 'visible',
     className = '',
 } = {}) {
     const alignments = {
@@ -409,8 +448,9 @@ export function getModalFooterClass({
         fallback(MODAL_DENSITIES, density, 'comfortable').footer,
         fallback(MODAL_FOOTER_STYLES, variant, 'default'),
         getModalVariantColorClass({ variant, color }),
-        getModalColorClass({ color, parts: ['ring'] }),
+        layoutDivider === 'hidden' ? '' : getModalColorClass({ color, parts: ['ring'] }),
         divider ? 'border-t border-border/70' : 'border-t-0',
+        layoutDivider === 'subtle' ? 'border-t-border/40' : '',
         sticky ? 'relative' : '',
         '[&>button]:w-full sm:[&>button]:w-auto',
         className
@@ -450,12 +490,13 @@ export function getModalIconClass({
 export function getModalPanelClass({
     variant = 'default',
     color = 'default',
+    layoutDivider = 'visible',
     className = '',
 } = {}) {
     return cn(
         fallback(MODAL_PANEL_VARIANTS, variant, 'default'),
         getModalVariantColorClass({ variant, color }),
-        getModalColorClass({ color, parts: ['ring'] }),
+        layoutDivider === 'hidden' ? '' : getModalColorClass({ color, parts: ['ring'] }),
         className
     );
 }

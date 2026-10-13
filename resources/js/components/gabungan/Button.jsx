@@ -85,9 +85,12 @@ export default function Button({
         customEffectStyle,
         decorationStyle,
         hasDecoration,
+        variantColorStyle,
     } = logic;
 
+    const hasShadowEffect = Boolean(shadowEffectStyle.boxShadow);
     const buttonClassName = [
+        hasShadowEffect && 'relative isolate',
         widthClass,
         variantClass,
         effectClass,
@@ -114,11 +117,19 @@ export default function Button({
             style={{
                 ...shapeStyle,
                 ...customEffectStyle,
-                ...shadowEffectStyle,
+                ...variantColorStyle,
             }}
             className={buttonClassName}
             {...props}
         >
+            {hasShadowEffect && (
+                <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 z-10 bg-transparent"
+                    style={{ ...shapeStyle, ...shadowEffectStyle }}
+                />
+            )}
+
             {hasDecoration && (
                 <span
                     aria-hidden="true"
