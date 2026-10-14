@@ -233,6 +233,7 @@ class RincianAsetController extends Controller
                 'transaksis.nama_customer',
                 'transaksis.pihak_asal',
                 'transaksis.gudang_asal_id',
+                'transaksis.sub_jenis as transaction_sub_jenis',
                 'transaksis.tanggal',
                 'transaksis.no_transaksi',
             ])
@@ -256,7 +257,11 @@ class RincianAsetController extends Controller
 
         return $rows->map(function ($row) use ($priceMap, $serialMap) {
             $barangId = (int) $row->barang_id;
+            $isProjectReturn = $row->transaction_sub_jenis === 'PENGEMBALIAN_PROYEK';
             $qty = (int) $row->qty;
+            if ($isProjectReturn) {
+                $qty = -abs($qty);
+            }
             $harga = (float) ($priceMap[$barangId] ?? 0);
             $serials = $serialMap[(int) $row->detail_id] ?? [];
 
@@ -278,6 +283,8 @@ class RincianAsetController extends Controller
                     : null,
                 'tanggal' => $row->tanggal,
                 'no_transaksi' => $row->no_transaksi,
+                'sub_jenis' => $row->transaction_sub_jenis,
+                'is_pengembalian_proyek' => $isProjectReturn,
                 'qty' => $qty,
                 'jumlah' => $qty,
                 'harga' => $harga,

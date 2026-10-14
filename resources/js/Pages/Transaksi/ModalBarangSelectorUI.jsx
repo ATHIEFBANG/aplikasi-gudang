@@ -23,6 +23,8 @@ export default function ModalBarangSelectorUI({
     stockInOrigin = 0,
     allowRusak = false
 }) {
+    const isProjectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG';
+    const sourceSelected = isProjectReturn ? Boolean(row?.kode_projek) : Boolean(row?.gudang_asal_id);
     const selector = useModalBarangSelectorLogic({
         row,
         rowIdx,
@@ -80,7 +82,7 @@ export default function ModalBarangSelectorUI({
                         <QrCode className="w-3.5 h-3.5 text-amber-500" />
 
                         <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                            Pilih Barang dari Gudang (SN)
+                            {isProjectReturn ? 'Pilih Barang dari Proyek (SN)' : 'Pilih Barang dari Gudang (SN)'}
                         </span>
                     </div>
 
@@ -101,13 +103,13 @@ export default function ModalBarangSelectorUI({
                     </div>
                 </div>
 
-                {!row?.gudang_asal_id ? (
+                {!sourceSelected ? (
                     <div className="py-2 text-[11px] text-amber-700 dark:text-amber-400 font-medium">
-                        Pilih <strong>Gudang Asal</strong> terlebih dahulu untuk memuat daftar Serial Number yang tersedia.
+                        Pilih <strong>{isProjectReturn ? 'Proyek Asal' : 'Gudang Asal'}</strong> terlebih dahulu untuk memuat daftar Serial Number yang tersedia.
                     </div>
                 ) : availableSnCount === 0 ? (
                     <div className="py-2 text-[11px] text-rose-600 dark:text-rose-400 font-medium">
-                        Tidak ada Serial Number aktif yang dapat dipindahkan dari gudang asal terpilih.
+                        Tidak ada Serial Number aktif yang dapat dipindahkan dari {isProjectReturn ? 'proyek asal' : 'gudang asal'} terpilih.
                     </div>
                 ) : (
                     <div className="space-y-2 pt-1">
@@ -272,7 +274,7 @@ export default function ModalBarangSelectorUI({
                     <PackageCheck className="w-3.5 h-3.5 text-amber-500" />
 
                     <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                        Pilih Barang dari Gudang (Non-SN)
+                        {isProjectReturn ? 'Pilih Barang dari Proyek (Non-SN)' : 'Pilih Barang dari Gudang (Non-SN)'}
                     </span>
                 </div>
 

@@ -49,6 +49,8 @@ const buildPivotRows = dataList => {
         );
 
         const qty = Number(item?.qty ?? item?.jumlah ?? item?.quantity ?? 0);
+        const sign = item?.is_pengembalian_proyek || item?.sub_jenis === 'PENGEMBALIAN_PROYEK' ? -1 : 1;
+        const signedQty = Math.abs(qty) * sign;
         const harga = Number(item?.harga ?? item?.harga_satuan ?? item?.unit_price ?? 0);
 
         const baseData = {
@@ -62,24 +64,24 @@ const buildPivotRows = dataList => {
             return [{
                 ...baseData,
                 serial_number: '-',
-                pivot_qty: qty,
-                pivot_nilai: qty * harga,
+                pivot_qty: signedQty,
+                pivot_nilai: signedQty * harga,
             }];
         }
 
         const serialRows = serials.map(serial => ({
             ...baseData,
             serial_number: serial,
-            pivot_qty: 1,
-            pivot_nilai: harga,
+            pivot_qty: sign,
+            pivot_nilai: harga * sign,
         }));
 
         if (qty > serials.length) {
             serialRows.push({
                 ...baseData,
                 serial_number: '-',
-                pivot_qty: qty - serials.length,
-                pivot_nilai: (qty - serials.length) * harga,
+                pivot_qty: (Math.abs(qty) - serials.length) * sign,
+                pivot_nilai: (Math.abs(qty) - serials.length) * harga * sign,
             });
         }
 
@@ -317,10 +319,7 @@ export default function TabelRincianAset({
                                 onSearch={onSearch}
                                 placeholder="Cari barang / kode PPL / SN..."
                                 disabled={isProcessing}
-                                variant="pill"
-                                color="#FF8A00"
-                                size="sm"
-                                className="w-full shrink-0 sm:w-[260px]"
+                                className="w-72 hidden lg:block"
                             />
                         </div>
                     </div>

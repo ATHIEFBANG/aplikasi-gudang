@@ -93,9 +93,11 @@ export function useModalBarangSelectorLogic({
      * GUDANG
      * ========================================================= */
 
+    const isProjectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG';
+    const targetProjectCode = String(row?.kode_projek || '');
     const targetGudangId = useMemo(
-        () => resolveGudangId(gudangs, row?.gudang_asal_id),
-        [gudangs, row?.gudang_asal_id]
+        () => isProjectReturn ? null : resolveGudangId(gudangs, row?.gudang_asal_id),
+        [gudangs, row?.gudang_asal_id, isProjectReturn]
     );
 
     /* =========================================================
@@ -106,33 +108,27 @@ export function useModalBarangSelectorLogic({
         if (
             !isWajibSn ||
             !targetBarang ||
-            !targetGudangId ||
-            !Array.isArray(targetBarang.serials)
+            (!targetGudangId && !isProjectReturn) ||
+            (isProjectReturn && !targetProjectCode)
         ) {
             return [];
         }
+        const sourceSerials = isProjectReturn
+            ? (targetBarang.project_serials?.[targetProjectCode] || [])
+            : (Array.isArray(targetBarang.serials) ? targetBarang.serials : []);
 
-        return targetBarang.serials.filter(serial => {
+        return sourceSerials.filter(serial => {
             if (!serial || typeof serial !== 'object') return false;
 
             const snValue = getSnValue(serial);
             if (!snValue) return false;
 
-            const serialGudangId =
-                serial.gudang_id !== null &&
-                serial.gudang_id !== undefined &&
-                String(serial.gudang_id).trim() !== ''
-                    ? String(serial.gudang_id)
-                    : null;
-
-            if (!serialGudangId || serialGudangId !== targetGudangId) {
-                return false;
-            }
-
+            const serialGudangId = serial.gudang_id !== null && serial.gudang_id !== undefined && String(serial.gudang_id).trim() !== '' ? String(serial.gudang_id) : null;
             const status = String(serial.status || '').toUpperCase().trim();
-
-            if (!AVAILABLE_SERIAL_STATUSES.includes(status)) {
-                return false;
+            if (isProjectReturn) {
+                if (serialGudangId || status !== 'IN_USE') return false;
+            } else {
+                if (!serialGudangId || serialGudangId !== targetGudangId || !AVAILABLE_SERIAL_STATUSES.includes(status)) return false;
             }
 
             if (!allowRusak && isRusakCondition(serial.kondisi)) {
@@ -141,7 +137,7 @@ export function useModalBarangSelectorLogic({
 
             return true;
         });
-    }, [isWajibSn, targetBarang, targetGudangId, allowRusak]);
+    }, [isWajibSn, targetBarang, targetGudangId, targetProjectCode, isProjectReturn, allowRusak]);
 
     const getAvailableSerialsForOutbound = useCallback(
         () => availableEligibleSns,
@@ -283,8 +279,13 @@ export function useModalBarangSelectorLogic({
      * ========================================================= */
 
     const groupedNonSnBatches = useMemo(() => {
-        if (isWajibSn || !targetBarang || !targetGudangId) {
-            return [];
+        if (isWajibSn || !targetBarang || (!targetGudangId && !isProjectReturn)) return [];
+
+        if (isProjectReturn) {
+            return (targetBarang.project_batches?.[targetProjectCode] || [])
+                .filter(batch => Number(batch.max_stock || 0) > 0)
+                .filter(batch => allowRusak || !isRusakCondition(batch.kondisi))
+                .map(batch => ({ ...batch, badgeClass: getKondisiBadgeClass(normalizeKondisi(batch.kondisi)) }));
         }
 
         const kondisiStok = targetBarang.kondisi_stok?.[targetGudangId];
@@ -373,7 +374,7 @@ export function useModalBarangSelectorLogic({
         }
 
         return result;
-    }, [isWajibSn, targetBarang, targetGudangId, allowRusak]);
+    }, [isWajibSn, targetBarang, targetGudangId, targetProjectCode, isProjectReturn, allowRusak]);
 
     const filteredBatches = useMemo(() => {
         const search = String(nonSnSearch || '').toLowerCase().trim();
@@ -404,9 +405,13 @@ export function useModalBarangSelectorLogic({
     );
 
     const availableNonSnStock = useMemo(() => {
-        if (!targetBarang || !targetGudangId) {
+        if (!targetBarang) return Number(stockInOrigin || 0);
+        if (isProjectReturn) {
+            const projectStock = targetBarang.project_stocks?.[targetProjectCode];
+            if (projectStock) return Number(projectStock.aktif ?? (Number(projectStock.baru || 0) + Number(projectStock.bekas || 0) + (allowRusak ? Number(projectStock.rusak || 0) : 0)));
             return Number(stockInOrigin || 0);
         }
+        if (!targetGudangId) return Number(stockInOrigin || 0);
 
         const kondisiStok = targetBarang.kondisi_stok?.[targetGudangId];
 
@@ -419,7 +424,7 @@ export function useModalBarangSelectorLogic({
         }
 
         return Number(stockInOrigin || 0);
-    }, [targetBarang, targetGudangId, stockInOrigin, allowRusak]);
+    }, [targetBarang, targetGudangId, targetProjectCode, isProjectReturn, stockInOrigin, allowRusak]);
 
     /* =========================================================
      * NON-SN SEARCH

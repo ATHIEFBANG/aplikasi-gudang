@@ -328,6 +328,136 @@ class TransaksiController extends Controller
         return [$kondisiByGudang, $stokNetMap, $kondisiByBarangGudang];
     }
 
+    private function calculateProjectInventorySnapshot(): array
+    {
+        $inventory = ['stocks' => [], 'batches' => [], 'serials' => []];
+        $serialOwners = [];
+
+        $transaksis = Transaksi::with(['details.serials'])
+            ->where(function ($query) {
+                $query->whereIn('status', ['COMPLETED', 'completed'])->orWhereNull('status');
+            })
+            ->where(function ($movement) {
+                $movement->where(function ($outbound) {
+                    $outbound->where('jenis_transaksi', 'KELUAR')
+                        ->where('sub_jenis', 'BARANG_KE_SITE');
+                })->orWhere(function ($transferToProject) {
+                    $transferToProject->where('jenis_transaksi', 'TRANSFER')
+                        ->where('sub_jenis', '!=', 'PENGEMBALIAN_PROYEK')
+                        ->whereNotNull('gudang_asal_id')
+                        ->whereNull('gudang_tujuan_id')
+                        ->whereNotNull('kode_projek')
+                        ->where('kode_projek', '!=', '');
+                })->orWhere('sub_jenis', 'PENGEMBALIAN_PROYEK');
+            })
+            ->orderBy('tanggal')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($transaksis as $transaksi) {
+            $projectCode = trim((string) ($transaksi->kode_projek ?? ''));
+            $isReturn = $transaksi->sub_jenis === 'PENGEMBALIAN_PROYEK';
+            $isTransfer = $transaksi->jenis_transaksi === 'TRANSFER' || $transaksi->sub_jenis === 'TRANSFER_GUDANG';
+            $isProjectInbound = $projectCode !== '' &&
+                !empty($transaksi->gudang_asal_id) &&
+                empty($transaksi->gudang_tujuan_id) &&
+                !$isReturn &&
+                (($transaksi->jenis_transaksi === 'KELUAR' && $transaksi->sub_jenis === 'BARANG_KE_SITE') || $isTransfer);
+
+            foreach ($transaksi->details as $detail) {
+                $barangId = (int) $detail->barang_id;
+                $qty = (int) $detail->qty;
+                $conditionRaw = strtoupper(trim((string) ($detail->kondisi ?: $transaksi->kondisi ?: 'BARU')));
+                if (str_contains($conditionRaw, 'RUSAK') || str_contains($conditionRaw, 'DAMAGED')) {
+                    $condition = 'Rusak';
+                } elseif (str_contains($conditionRaw, 'BEKAS') || str_contains($conditionRaw, 'SECOND') || str_contains($conditionRaw, 'USED')) {
+                    $condition = 'Bekas';
+                } else {
+                    $condition = 'Baru';
+                }
+
+                if ($isProjectInbound) {
+                    $inventory['stocks'][$barangId][$projectCode][$condition] =
+                        (int) ($inventory['stocks'][$barangId][$projectCode][$condition] ?? 0) + $qty;
+
+                    $imc = trim((string) ($transaksi->nomor_imc ?: $transaksi->no_transaksi ?: 'Stok Proyek'));
+                    $batchKey = $condition . '|' . $imc;
+                    $inventory['batches'][$barangId][$projectCode][$batchKey] ??= [
+                        'key' => $batchKey,
+                        'kondisi' => $condition,
+                        'nomor_imc' => $imc,
+                        'max_stock' => 0,
+                    ];
+                    $inventory['batches'][$barangId][$projectCode][$batchKey]['max_stock'] += $qty;
+
+                    foreach ($detail->serials as $serial) {
+                        $serialOwners[(int) $serial->id] = [
+                            'barang_id' => $barangId,
+                            'kode_projek' => $projectCode,
+                            'id' => (int) $serial->id,
+                            'serial_number' => trim((string) $serial->serial_number),
+                            'kondisi' => $serial->kondisi ?: $condition,
+                            'nomor_imc' => $serial->nomer_imc,
+                        ];
+                    }
+                    continue;
+                }
+
+                if ($isReturn && $projectCode !== '' && !empty($transaksi->gudang_tujuan_id)) {
+                    $current = (int) ($inventory['stocks'][$barangId][$projectCode][$condition] ?? 0);
+                    $inventory['stocks'][$barangId][$projectCode][$condition] = max(0, $current - $qty);
+
+                    $remainingToRemove = $qty;
+                    foreach (($inventory['batches'][$barangId][$projectCode] ?? []) as $batchKey => $batch) {
+                        if ($remainingToRemove <= 0) break;
+                        if (($batch['kondisi'] ?? '') !== $condition) continue;
+                        $available = (int) ($batch['max_stock'] ?? 0);
+                        if ($available <= 0) continue;
+                        $take = min($available, $remainingToRemove);
+                        $inventory['batches'][$barangId][$projectCode][$batchKey]['max_stock'] = $available - $take;
+                        $remainingToRemove -= $take;
+                    }
+
+                    foreach ($detail->serials as $serial) {
+                        $serialId = (int) $serial->id;
+                        if (($serialOwners[$serialId]['kode_projek'] ?? null) === $projectCode) {
+                            unset($serialOwners[$serialId]);
+                        }
+                    }
+                    continue;
+                }
+
+                foreach ($detail->serials as $serial) {
+                    unset($serialOwners[(int) $serial->id]);
+                }
+            }
+        }
+
+        foreach ($serialOwners as $owner) {
+            $barangId = (int) $owner['barang_id'];
+            $projectCode = (string) $owner['kode_projek'];
+            $inventory['serials'][$barangId][$projectCode][strtolower((string) $owner['serial_number'])] = [
+                'id' => (int) $owner['id'],
+                'serial_number' => $owner['serial_number'],
+                'kondisi' => $owner['kondisi'],
+                'nomor_imc' => $owner['nomor_imc'],
+                'gudang_id' => null,
+                'status' => 'IN_USE',
+            ];
+        }
+
+        foreach ($inventory['batches'] as $barangId => $projects) {
+            foreach ($projects as $projectCode => $batches) {
+                $inventory['batches'][$barangId][$projectCode] = array_values(array_filter(
+                    $batches,
+                    fn ($batch) => (int) ($batch['max_stock'] ?? 0) > 0
+                ));
+            }
+        }
+
+        return $inventory;
+    }
+
     public function index(Request $request): Response
     {
         $jenis = $request->input('jenis_transaksi', 'MASUK');
@@ -430,10 +560,19 @@ class TransaksiController extends Controller
             });
 
         $projectOptions = Transaksi::query()
-            ->where('jenis_transaksi', 'KELUAR')
-            ->where('sub_jenis', 'BARANG_KE_SITE')
             ->whereNotNull('kode_projek')
             ->where('kode_projek', '!=', '')
+            ->where(function ($query) {
+                $query->where(function ($outbound) {
+                    $outbound->where('jenis_transaksi', 'KELUAR')
+                        ->where('sub_jenis', 'BARANG_KE_SITE');
+                })->orWhere(function ($transfer) {
+                    $transfer->where('jenis_transaksi', 'TRANSFER')
+                        ->whereNotNull('gudang_asal_id')
+                        ->whereNull('gudang_tujuan_id')
+                        ->where('sub_jenis', '!=', 'PENGEMBALIAN_PROYEK');
+                });
+            })
             ->where(function ($q) {
                 $q->whereIn('status', ['COMPLETED', 'completed'])
                     ->orWhereNull('status');
@@ -451,6 +590,8 @@ class TransaksiController extends Controller
             ->pluck('nama_customer')
             ->values();
 
+        $projectInventory = $this->calculateProjectInventorySnapshot();
+
         $barangList = Barang::select([
             'id', 'kode_barang', 'nama_barang', 'part_number',
             'brand', 'tipe', 'kategori', 'deskripsi',
@@ -466,10 +607,10 @@ class TransaksiController extends Controller
                 $q->select([
                     'id', 'transaksi_id', 'barang_id', 'qty', 'kondisi',
                 ])->with([
-                    'transaksi:id,no_transaksi,jenis_transaksi,sub_jenis,gudang_asal_id,gudang_tujuan_id,nomor_imc',
+                    'transaksi:id,no_transaksi,jenis_transaksi,sub_jenis,gudang_asal_id,gudang_tujuan_id,nomor_imc,kode_projek,tanggal,status',
                 ]);
             },
-        ])->get()->map(function ($b) use ($stokNetMap, $gudangList, $kondisiByBarangGudang) {
+        ])->get()->map(function ($b) use ($stokNetMap, $gudangList, $kondisiByBarangGudang, $projectInventory) {
             $stoksFormatted = $gudangList->map(function ($g) use ($b, $stokNetMap, $kondisiByBarangGudang) {
                 if ($b->is_wajib_sn) {
                     $jumlah = $b->serials
@@ -539,6 +680,57 @@ class TransaksiController extends Controller
                     'status' => $s->status,
                     'nomor_imc' => $s->nomer_imc,
                 ])->values(),
+                'project_stocks' => (function () use ($b, $projectInventory) {
+                    $rawStocks = $projectInventory['stocks'][$b->id] ?? [];
+                    $projectSerials = $projectInventory['serials'][$b->id] ?? [];
+                    $projectCodes = array_unique(array_merge(array_keys($rawStocks), array_keys($projectSerials)));
+                    $result = [];
+
+                    foreach ($projectCodes as $code) {
+                        $raw = $rawStocks[$code] ?? [];
+                        $counts = [
+                            'baru' => (int) ($raw['Baru'] ?? 0),
+                            'bekas' => (int) ($raw['Bekas'] ?? 0),
+                            'rusak' => (int) ($raw['Rusak'] ?? 0),
+                        ];
+
+                        if ($b->is_wajib_sn) {
+                            $counts = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+                            foreach (($projectSerials[$code] ?? []) as $serial) {
+                                $condition = strtoupper(trim((string) ($serial['kondisi'] ?? 'BARU')));
+                                if (str_contains($condition, 'RUSAK') || str_contains($condition, 'DAMAGED')) {
+                                    $counts['rusak']++;
+                                } elseif (str_contains($condition, 'BEKAS') || str_contains($condition, 'SECOND') || str_contains($condition, 'USED')) {
+                                    $counts['bekas']++;
+                                } else {
+                                    $counts['baru']++;
+                                }
+                            }
+                        }
+
+                        $counts['aktif'] = $counts['baru'] + $counts['bekas'] + $counts['rusak'];
+                        $result[(string) $code] = $counts;
+                    }
+
+                    return $result;
+                })(),
+                'project_batches' => (function () use ($b, $projectInventory) {
+                    $result = [];
+                    foreach (($projectInventory['batches'][$b->id] ?? []) as $code => $batches) {
+                        $result[(string) $code] = array_values(array_filter(
+                            $batches,
+                            fn ($batch) => (int) ($batch['max_stock'] ?? 0) > 0
+                        ));
+                    }
+                    return $result;
+                })(),
+                'project_serials' => (function () use ($b, $projectInventory) {
+                    $result = [];
+                    foreach (($projectInventory['serials'][$b->id] ?? []) as $code => $serials) {
+                        $result[(string) $code] = array_values($serials);
+                    }
+                    return $result;
+                })(),
                 'transaksi_details' => $b->transaksiDetails->map(function ($td) use ($stokNetMap, $b) {
                     $gudangId = $td->transaksi?->gudang_tujuan_id;
                     $sisaQty = $b->is_wajib_sn

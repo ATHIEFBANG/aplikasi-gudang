@@ -80,158 +80,47 @@ export default function ModalTransferGudangRow({
                 )}
             </div>
 
-            {/* 1. KATEGORI TUJUAN */}
+            {/* 1. ARAH PERPINDAHAN */}
             <div className="space-y-1.5">
-                <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                    Kategori Tujuan *
-                </Label>
+                <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Arah Perpindahan *</Label>
                 <div className="flex flex-wrap gap-2">
                     {[
-                        { id: 'GUDANG', label: 'Tujuan ke Gudang', icon: Warehouse },
-                        { id: 'PROYEK', label: 'Tujuan ke Proyek', icon: BriefcaseBusiness }
-                    ].map(category => {
-                        const Icon = category.icon;
-                        const selected = (row.tujuan_tipe || 'GUDANG') === category.id;
-
-                        return (
-                            <button
-                                key={category.id}
-                                type="button"
-                                disabled={isProcessing || isEditMode}
-                                onClick={() => onFieldChange(rowIdx, 'tujuan_tipe', category.id)}
-                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-bold transition-all ${selected ? (category.id === 'PROYEK' ? 'border-emerald-500 bg-emerald-600 text-white shadow-sm' : 'border-blue-500 bg-blue-600 text-white shadow-sm') : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'} ${isProcessing || isEditMode ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
-                            >
-                                <Icon className="h-3.5 w-3.5" />
-                                <span>{category.label}</span>
-                                {selected && <Check className="h-3 w-3" />}
-                            </button>
-                        );
+                        { id: 'GUDANG_KE_GUDANG', label: 'Gudang → Gudang', icon: Warehouse },
+                        { id: 'GUDANG_KE_PROYEK', label: 'Gudang → Proyek', icon: BriefcaseBusiness },
+                        { id: 'PROYEK_KE_GUDANG', label: 'Proyek → Gudang', icon: BriefcaseBusiness }
+                    ].map(option => {
+                        const Icon = option.icon;
+                        const selected = (row.arah_transfer || ((row.tujuan_tipe || 'GUDANG') === 'PROYEK' ? 'GUDANG_KE_PROYEK' : 'GUDANG_KE_GUDANG')) === option.id;
+                        return <button key={option.id} type="button" disabled={isProcessing || isEditMode} onClick={() => onFieldChange(rowIdx, 'arah_transfer', option.id)} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-bold transition-all ${selected ? 'border-blue-500 bg-blue-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'} ${isProcessing || isEditMode ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}>
+                            <Icon className="h-3.5 w-3.5" /><span>{option.label}</span>{selected && <Check className="h-3 w-3" />}
+                        </button>;
                     })}
                 </div>
             </div>
 
-            {/* 2. RUTE GUDANG & SURAT JALAN */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
-                <div className="space-y-2.5">
-                    <div className="space-y-1">
-                        <Label className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
-                            1. Gudang Asal (Pengirim) *
-                        </Label>
-
-                        <HybridDropdown
-                            value={
-                                gudangs.find(
-                                    g =>
-                                        String(g.id) ===
-                                        String(row.gudang_asal_id)
-                                )?.nama_gudang || ''
-                            }
-                            options={gudangOptions}
-                            onChange={(val, selectedOpt) => {
-                                const targetId =
-                                    selectedOpt?.id ||
-                                    gudangs.find(
-                                        g =>
-                                            g.nama_gudang
-                                                .toLowerCase()
-                                                .trim() ===
-                                            String(val)
-                                                .toLowerCase()
-                                                .trim()
-                                    )?.id;
-
-                                onFieldChange(
-                                    rowIdx,
-                                    'gudang_asal_id',
-                                    targetId
-                                        ? String(targetId)
-                                        : ''
-                                );
-                            }}
-                            placeholder="Pilih Gudang Asal..."
-                            searchPlaceholder="Cari Gudang Asal..."
-                            disabled={isProcessing || isEditMode}
-                            inputClassName="h-8 text-xs font-semibold"
-                        />
-                    </div>
-
-                    <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                            Nomor OMC (Surat Jalan Asal) *
-                        </Label>
-
-                        <Input
-                            placeholder="Ketik nomor OMC..."
-                            disabled={isProcessing}
-                            value={row.nomor_omc}
-                            onChange={e =>
-                                onFieldChange(
-                                    rowIdx,
-                                    'nomor_omc',
-                                    e.target.value
-                                )
-                            }
-                            className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                            required
-                        />
-                    </div>
-                </div>
-
-                <div className="space-y-2.5">
-                    {(row.tujuan_tipe || 'GUDANG') === 'PROYEK' ? (
+            {/* 2. SUMBER, TUJUAN, DAN DOKUMEN */}
+            {(() => {
+                const arah = row.arah_transfer || ((row.tujuan_tipe || 'GUDANG') === 'PROYEK' ? 'GUDANG_KE_PROYEK' : 'GUDANG_KE_GUDANG');
+                const projectReturn = arah === 'PROYEK_KE_GUDANG';
+                const projectOutbound = arah === 'GUDANG_KE_PROYEK';
+                const sourceWarehouse = !projectReturn;
+                return <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className="space-y-2.5">
                         <div className="space-y-1">
-                            <Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                                2. Kode Proyek Tujuan *
-                            </Label>
-                            <HybridDropdown
-                                value={row.kode_projek || ''}
-                                options={projectOptions}
-                                allowCustom={false}
-                                onChange={val => onFieldChange(rowIdx, 'kode_projek', val)}
-                                placeholder="Pilih Kode Proyek..."
-                                searchPlaceholder="Cari Kode Proyek..."
-                                disabled={isProcessing || isEditMode}
-                                inputClassName="h-8 text-xs font-semibold text-emerald-600 dark:text-emerald-400"
-                            />
-                            <p className="text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
-                                Diambil dari transaksi Barang Keluar kategori Proyek.
-                            </p>
+                            <Label className="text-[11px] font-bold text-rose-600 dark:text-rose-400">{projectReturn ? '1. Proyek Asal *' : '1. Gudang Asal (Pengirim) *'}</Label>
+                            {projectReturn ? <HybridDropdown value={row.kode_projek || ''} options={projectOptions} allowCustom={false} onChange={val => onFieldChange(rowIdx, 'kode_projek', val)} placeholder="Pilih Proyek Asal..." searchPlaceholder="Cari Proyek Asal..." disabled={isProcessing || isEditMode} inputClassName="h-8 text-xs font-semibold" /> : <HybridDropdown value={gudangs.find(g => String(g.id) === String(row.gudang_asal_id))?.nama_gudang || ''} options={gudangOptions} onChange={(val, selectedOpt) => { const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang?.toLowerCase().trim() === String(val).toLowerCase().trim())?.id; onFieldChange(rowIdx, 'gudang_asal_id', targetId ? String(targetId) : ''); }} placeholder="Pilih Gudang Asal..." searchPlaceholder="Cari Gudang Asal..." disabled={isProcessing || isEditMode} inputClassName="h-8 text-xs font-semibold" />}
                         </div>
-                    ) : (
-                        <>
-                            <div className="space-y-1">
-                                <Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                                    2. Gudang Tujuan (Penerima) *
-                                </Label>
-                                <HybridDropdown
-                                    value={gudangs.find(g => String(g.id) === String(row.gudang_tujuan_id))?.nama_gudang || ''}
-                                    options={gudangOptions}
-                                    onChange={(val, selectedOpt) => {
-                                        const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang.toLowerCase().trim() === String(val).toLowerCase().trim())?.id;
-                                        onFieldChange(rowIdx, 'gudang_tujuan_id', targetId ? String(targetId) : '');
-                                    }}
-                                    placeholder="Pilih Gudang Penerima..."
-                                    searchPlaceholder="Cari Gudang Penerima..."
-                                    disabled={isProcessing || isEditMode}
-                                    inputClassName="h-8 text-xs font-semibold text-emerald-600 dark:text-emerald-400"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                                    Nomor IMC (Opsional)
-                                </Label>
-                                <Input
-                                    placeholder="Ketik nomor IMC..."
-                                    disabled={isProcessing}
-                                    value={row.nomor_imc || ''}
-                                    onChange={e => onFieldChange(rowIdx, 'nomor_imc', e.target.value)}
-                                    className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                                />
-                            </div>
-                        </>
-                    )}
-                </div>
-            </div>
+                        <div className="space-y-1">
+                            <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nomor OMC (Surat Jalan) *</Label>
+                            <Input placeholder="Ketik nomor OMC..." disabled={isProcessing} value={row.nomor_omc || ''} onChange={e => onFieldChange(rowIdx, 'nomor_omc', e.target.value)} className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700" required />
+                        </div>
+                    </div>
+                    <div className="space-y-2.5">
+                        {projectOutbound ? <div className="space-y-1"><Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">2. Kode Proyek Tujuan *</Label><HybridDropdown value={row.kode_projek || ''} options={projectOptions} allowCustom={false} onChange={val => onFieldChange(rowIdx, 'kode_projek', val)} placeholder="Pilih Kode Proyek..." searchPlaceholder="Cari Kode Proyek..." disabled={isProcessing || isEditMode} inputClassName="h-8 text-xs font-semibold" /></div> : <div className="space-y-1"><Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">2. Gudang Tujuan (Penerima) *</Label><HybridDropdown value={gudangs.find(g => String(g.id) === String(row.gudang_tujuan_id))?.nama_gudang || ''} options={gudangOptions} onChange={(val, selectedOpt) => { const targetId = selectedOpt?.id || gudangs.find(g => g.nama_gudang?.toLowerCase().trim() === String(val).toLowerCase().trim())?.id; onFieldChange(rowIdx, 'gudang_tujuan_id', targetId ? String(targetId) : ''); }} placeholder="Pilih Gudang Tujuan..." searchPlaceholder="Cari Gudang Tujuan..." disabled={isProcessing || isEditMode} inputClassName="h-8 text-xs font-semibold" /></div>}
+                        {!projectOutbound && <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Nomor IMC (Opsional)</Label><Input placeholder="Ketik nomor IMC..." disabled={isProcessing} value={row.nomor_imc || ''} onChange={e => onFieldChange(rowIdx, 'nomor_imc', e.target.value)} className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700" /></div>}
+                    </div>
+                </div>;
+            })()}
 
             {/* 2. DETAIL BARANG */}
             <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
@@ -270,8 +159,8 @@ export default function ModalTransferGudangRow({
                                 }
                             }}
                             placeholder={
-                                !row.gudang_asal_id
-                                    ? 'Pilih Gudang Asal Dulu...'
+                                !(row.arah_transfer === 'PROYEK_KE_GUDANG' ? row.kode_projek : row.gudang_asal_id)
+                                    ? (row.arah_transfer === 'PROYEK_KE_GUDANG' ? 'Pilih Proyek Asal Dulu...' : 'Pilih Gudang Asal Dulu...')
                                     : (
                                         pplOptions.length === 0
                                             ? 'Stok Kosong di Gudang Ini'
@@ -282,7 +171,7 @@ export default function ModalTransferGudangRow({
                             disabled={
                                 isProcessing ||
                                 isEditMode ||
-                                !row.gudang_asal_id
+                                !(row.arah_transfer === 'PROYEK_KE_GUDANG' ? row.kode_projek : row.gudang_asal_id)
                             }
                             inputClassName="h-8 text-xs font-mono font-bold"
                         />
@@ -335,8 +224,8 @@ export default function ModalTransferGudangRow({
                                 }
                             }}
                             placeholder={
-                                !row.gudang_asal_id
-                                    ? 'Pilih Gudang Asal Dulu...'
+                                !(row.arah_transfer === 'PROYEK_KE_GUDANG' ? row.kode_projek : row.gudang_asal_id)
+                                    ? (row.arah_transfer === 'PROYEK_KE_GUDANG' ? 'Pilih Proyek Asal Dulu...' : 'Pilih Gudang Asal Dulu...')
                                     : (
                                         namaOptions.length === 0
                                             ? 'Stok Kosong di Gudang Ini'
@@ -347,7 +236,7 @@ export default function ModalTransferGudangRow({
                             disabled={
                                 isProcessing ||
                                 isEditMode ||
-                                !row.gudang_asal_id
+                                !(row.arah_transfer === 'PROYEK_KE_GUDANG' ? row.kode_projek : row.gudang_asal_id)
                             }
                             inputClassName="h-8 text-xs"
                         />

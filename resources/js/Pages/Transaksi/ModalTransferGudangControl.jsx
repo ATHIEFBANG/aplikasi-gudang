@@ -91,6 +91,16 @@ export function useModalTransferGudangControl({
             : 0;
     }, [gudangs]);
 
+    const getBarangStockInProject = useCallback((barang, projectCode) => {
+        if (!barang || !projectCode) return 0;
+        const stock = barang.project_stocks?.[String(projectCode)];
+        if (stock) return Number(stock.aktif ?? (Number(stock.baru || 0) + Number(stock.bekas || 0) + Number(stock.rusak || 0)));
+        const serials = barang.project_serials?.[String(projectCode)];
+        if (Array.isArray(serials)) return serials.length;
+        const batches = barang.project_batches?.[String(projectCode)];
+        return Array.isArray(batches) ? batches.reduce((sum, batch) => sum + Number(batch.max_stock || 0), 0) : 0;
+    }, []);
+
     const getBarangKondisiStok = useCallback((barang, gudangIdOrName) => {
         if (!barang || !gudangIdOrName) {
             return {
@@ -137,6 +147,7 @@ export function useModalTransferGudangControl({
         return {
             sub_jenis: 'TRANSFER_GUDANG',
             tujuan_tipe: 'GUDANG',
+            arah_transfer: 'GUDANG_KE_GUDANG',
             tanggal: new Date().toISOString().slice(0, 10),
             nomor_omc: '',
             nomor_imc: '',
@@ -187,14 +198,15 @@ export function useModalTransferGudangControl({
     }, [isOpen, gudangs]);
 
     const getBarangPplOptionsForRow = useCallback(row => {
-        if (!row?.gudang_asal_id) return [];
-
-        const gudangId = String(row.gudang_asal_id);
+        const projectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG';
+        const sourceId = projectReturn ? row?.kode_projek : row?.gudang_asal_id;
+        if (!sourceId) return [];
+        const stokBarang = b => projectReturn ? getBarangStockInProject(b, sourceId) : getBarangStockInWarehouse(b, sourceId);
 
         return barangs
-            .filter(b => getBarangStockInWarehouse(b, gudangId) > 0)
+            .filter(b => stokBarang(b) > 0)
             .map(b => {
-                const stok = getBarangStockInWarehouse(b, gudangId);
+                const stok = stokBarang(b);
                 const isSn =
                     isBooleanFlag(b.is_wajib_sn) ||
                     isBooleanFlag(b.is_sn);
@@ -247,17 +259,18 @@ export function useModalTransferGudangControl({
                     )
                 };
             });
-    }, [barangs, getBarangStockInWarehouse]);
+    }, [barangs, getBarangStockInWarehouse, getBarangStockInProject]);
 
     const getBarangNamaOptionsForRow = useCallback(row => {
-        if (!row?.gudang_asal_id) return [];
-
-        const gudangId = String(row.gudang_asal_id);
+        const projectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG';
+        const sourceId = projectReturn ? row?.kode_projek : row?.gudang_asal_id;
+        if (!sourceId) return [];
+        const stokBarang = b => projectReturn ? getBarangStockInProject(b, sourceId) : getBarangStockInWarehouse(b, sourceId);
 
         return barangs
-            .filter(b => getBarangStockInWarehouse(b, gudangId) > 0)
+            .filter(b => stokBarang(b) > 0)
             .map(b => {
-                const stok = getBarangStockInWarehouse(b, gudangId);
+                const stok = stokBarang(b);
 
                 const nama =
                     [b.brand, b.tipe, b.kategori]
@@ -284,7 +297,7 @@ export function useModalTransferGudangControl({
                     )
                 };
             });
-    }, [barangs, getBarangStockInWarehouse]);
+    }, [barangs, getBarangStockInWarehouse, getBarangStockInProject]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -395,6 +408,18 @@ export function useModalTransferGudangControl({
             const updated = [...prev];
             const current = updated[rowIdx];
 
+            if (field === 'arah_transfer') {
+                updated[rowIdx] = {
+                    ...current,
+                    arah_transfer: value,
+                    tujuan_tipe: value === 'GUDANG_KE_PROYEK' ? 'PROYEK' : 'GUDANG',
+                    gudang_asal_id: value === 'PROYEK_KE_GUDANG' ? '' : (current.gudang_asal_id || ''),
+                    gudang_tujuan_id: value === 'GUDANG_KE_PROYEK' ? '' : (current.gudang_tujuan_id || ''),
+                    kode_projek: '', barang_id: '', qty: 0, serials: [], kondisi: 'Baru', nomor_imc: '', non_sn_selections: {}
+                };
+                return updated;
+            }
+
             if (field === 'tujuan_tipe') {
                 updated[rowIdx] = {
                     ...current,
@@ -411,8 +436,8 @@ export function useModalTransferGudangControl({
                 updated[rowIdx] = {
                     ...current,
                     kode_projek: value,
-                    gudang_tujuan_id: '',
-                    nomor_imc: ''
+                    gudang_tujuan_id: current.arah_transfer === 'PROYEK_KE_GUDANG' ? current.gudang_tujuan_id : '',
+                    barang_id: '', qty: 0, serials: [], non_sn_selections: {}, nomor_imc: ''
                 };
 
                 return updated;
@@ -422,7 +447,7 @@ export function useModalTransferGudangControl({
                 updated[rowIdx] = {
                     ...current,
                     gudang_tujuan_id: value,
-                    kode_projek: '',
+                    kode_projek: current.arah_transfer === 'PROYEK_KE_GUDANG' ? current.kode_projek : '',
                     nomor_imc: current.tujuan_tipe === 'GUDANG' ? current.nomor_imc : ''
                 };
 
@@ -539,20 +564,26 @@ export function useModalTransferGudangControl({
             const r = rows[i];
             const rowNum = i + 1;
 
-            if (!r.gudang_asal_id) {
+            const arah = r.arah_transfer || ((r.tujuan_tipe || 'GUDANG') === 'PROYEK' ? 'GUDANG_KE_PROYEK' : 'GUDANG_KE_GUDANG');
+            const projectReturn = arah === 'PROYEK_KE_GUDANG';
+            if (!projectReturn && !r.gudang_asal_id) {
                 alert(`Baris #${rowNum}: Gudang Asal wajib dipilih.`);
+                return;
+            }
+            if (projectReturn && !r.kode_projek?.trim()) {
+                alert(`Baris #${rowNum}: Proyek Asal wajib dipilih.`);
                 return;
             }
 
             const tujuanTipe = r.tujuan_tipe || 'GUDANG';
 
-            if (tujuanTipe === 'GUDANG') {
+            if (tujuanTipe === 'GUDANG' || projectReturn) {
                 if (!r.gudang_tujuan_id) {
                     alert(`Baris #${rowNum}: Gudang Tujuan wajib dipilih.`);
                     return;
                 }
 
-                if (String(r.gudang_asal_id) === String(r.gudang_tujuan_id)) {
+                if (!projectReturn && String(r.gudang_asal_id) === String(r.gudang_tujuan_id)) {
                     alert(`Baris #${rowNum}: Gudang Asal dan Gudang Tujuan tidak boleh sama.`);
                     return;
                 }
@@ -585,10 +616,9 @@ export function useModalTransferGudangControl({
                 return;
             }
 
-            const stockAvailable = getBarangStockInWarehouse(
-                targetBarang,
-                r.gudang_asal_id
-            );
+            const stockAvailable = projectReturn
+                ? getBarangStockInProject(targetBarang, r.kode_projek)
+                : getBarangStockInWarehouse(targetBarang, r.gudang_asal_id);
 
             if (stockAvailable <= 0) {
                 alert(
@@ -668,11 +698,12 @@ export function useModalTransferGudangControl({
                     tanggal: r.tanggal,
                     kondisi: r.kondisi || 'Baru',
                     nomor_omc: r.nomor_omc?.trim(),
+                    arah_transfer: r.arah_transfer || ((r.tujuan_tipe || 'GUDANG') === 'PROYEK' ? 'GUDANG_KE_PROYEK' : 'GUDANG_KE_GUDANG'),
                     tujuan_tipe: r.tujuan_tipe || 'GUDANG',
-                    nomor_imc: r.tujuan_tipe === 'PROYEK' ? null : (r.nomor_imc?.trim() || null),
-                    kode_projek: r.tujuan_tipe === 'PROYEK' ? r.kode_projek?.trim() : null,
-                    gudang_asal_id: parseInt(r.gudang_asal_id, 10),
-                    gudang_tujuan_id: r.tujuan_tipe === 'PROYEK' ? null : parseInt(r.gudang_tujuan_id, 10),
+                    nomor_imc: r.arah_transfer === 'GUDANG_KE_PROYEK' || r.tujuan_tipe === 'PROYEK' ? null : (r.nomor_imc?.trim() || null),
+                    kode_projek: ['GUDANG_KE_PROYEK','PROYEK_KE_GUDANG'].includes(r.arah_transfer) || r.tujuan_tipe === 'PROYEK' ? r.kode_projek?.trim() : null,
+                    gudang_asal_id: r.arah_transfer === 'PROYEK_KE_GUDANG' ? null : parseInt(r.gudang_asal_id, 10),
+                    gudang_tujuan_id: r.arah_transfer === 'GUDANG_KE_PROYEK' || r.tujuan_tipe === 'PROYEK' ? null : parseInt(r.gudang_tujuan_id, 10),
                     barang_id: parseInt(r.barang_id, 10),
                     qty: parseInt(r.qty, 10),
                     serials: r.serials || [],
@@ -713,6 +744,7 @@ export function useModalTransferGudangControl({
         isEditMode,
         selectedItem,
         getBarangStockInWarehouse,
+        getBarangStockInProject,
         onClose
     ]);
 
@@ -723,6 +755,7 @@ export function useModalTransferGudangControl({
         gudangOptions,
         projectOptions,
         getBarangStockInWarehouse,
+        getBarangStockInProject,
         getBarangKondisiStok,
         getBarangPplOptions: getBarangPplOptionsForRow,
         getBarangPplOptionsForRow,

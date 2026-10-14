@@ -50,8 +50,8 @@ export default function ModalTransferGudang({
             onClose={onClose}
             title={
                 isEditMode
-                    ? 'Edit Data Transfer Antar-Gudang'
-                    : 'Tambah Transfer Antar-Gudang'
+                    ? 'Edit Data Transfer Gudang'
+                    : 'Transfer Gudang / Proyek'
             }
             onSubmit={handleSubmit}
             submitLabel={
@@ -84,9 +84,7 @@ export default function ModalTransferGudang({
                     <AlertDescription className="text-[11px] leading-relaxed">
                         <strong>Mutasi Internal:</strong> Transfer akan memotong
                         stok di <strong>Gudang Asal</strong> dan menambahkannya
-                        ke <strong>Gudang Tujuan</strong> secara langsung.
-                        Silakan pilih gudang asal, gudang tujuan, serta unit
-                        barang secara akurat.
+                        ke <strong>Gudang Tujuan</strong> atau mengubah lokasi barang ke proyek. Pengembalian dari proyek akan menambah stok gudang kembali. Pilih arah, sumber, tujuan, dan barang dengan benar.
                     </AlertDescription>
                 </Alert>
             )}
@@ -97,13 +95,11 @@ export default function ModalTransferGudang({
                         b => String(b.id) === String(row.barang_id)
                     );
 
-                    const stockInOrigin =
-                        targetBarang && row.gudang_asal_id
-                            ? getBarangStockInWarehouse(
-                                targetBarang,
-                                row.gudang_asal_id
-                            )
-                            : null;
+                    const stockInOrigin = targetBarang
+                        ? (row.arah_transfer === 'PROYEK_KE_GUDANG'
+                            ? Number(targetBarang.project_stocks?.[String(row.kode_projek)]?.aktif || 0)
+                            : row.gudang_asal_id ? getBarangStockInWarehouse(targetBarang, row.gudang_asal_id) : null)
+                        : null;
 
                     const pplOptions =
                         getBarangPplOptionsForRow(row);

@@ -402,6 +402,10 @@ export default function TabTransaksi({
     };
 
     const handleOpenEdit = item => {
+        if (item?.sub_jenis === 'PENGEMBALIAN_PROYEK') {
+            setToast({ isOpen: true, type: 'info', title: 'Pengembalian Proyek', message: 'Transaksi pengembalian tidak dapat diedit langsung. Batalkan transaksi lalu buat pengembalian baru dengan data yang benar.' });
+            return;
+        }
         setIsEditMode(true);
         setSelectedItem(item);
 

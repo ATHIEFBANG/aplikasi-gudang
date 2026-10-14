@@ -97,6 +97,7 @@ export default function CrudTable({
                         let displayLabel = rawSub?.replace(/_/g, ' ');
                         if (rawSub === 'BARANG_KE_SITE') displayLabel = 'PROYEK';
                         else if (rawSub === 'PEMAKAIAN_INTERNAL') displayLabel = 'NON PROYEK';
+                        else if (rawSub === 'PENGEMBALIAN_PROYEK') displayLabel = 'PENGEMBALIAN PROYEK';
 
                         const textColor = {
                             PEMBELIAN: 'text-emerald-600 dark:text-emerald-400',
@@ -105,6 +106,7 @@ export default function CrudTable({
                             BARANG_KE_SITE: 'text-rose-600 dark:text-rose-400',
                             PEMAKAIAN_INTERNAL: 'text-purple-600 dark:text-purple-400',
                             TRANSFER_GUDANG: 'text-blue-600 dark:text-blue-400',
+                            PENGEMBALIAN_PROYEK: 'text-amber-600 dark:text-amber-400',
                         };
 
                         return (
