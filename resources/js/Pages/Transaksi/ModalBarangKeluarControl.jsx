@@ -471,7 +471,7 @@ export function useModalBarangKeluarControl({
 
         router[isEditMode ? 'put' : 'post'](targetUrl, payload, {
             preserveScroll: true,
-            only: ['transaksis', 'filters', 'barangs', 'gudangs'],
+            only: ['transaksis', 'filters', 'barangs', 'gudangs', 'projectOptions'],
             onSuccess: page => {
                 setIsProcessing(false);
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import Modal from '@/components/Modal';
+import Modal from '@/components/FormModal';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";

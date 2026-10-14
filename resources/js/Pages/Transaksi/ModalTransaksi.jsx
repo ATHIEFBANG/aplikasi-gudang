@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import Modal from '@/components/Modal';
+import Modal from '@/components/FormModal';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ import {
     CheckSquare 
 } from 'lucide-react';
 import { router } from '@inertiajs/react';
-import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import HybridDropdown from '@/components/HybridDropdown';
 
 const MAX_ROWS_LIMIT = 50;
 

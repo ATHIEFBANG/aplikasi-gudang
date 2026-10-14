@@ -1,8 +1,8 @@
 
 import React, { useMemo, useRef } from 'react';
-import TabelPivot from '@/components/gabungan/TabelPivot';
-import FilterPanel from '@/components/gabungan/FilterPanel';
-import Search from '@/components/gabungan/Search';
+import TabelPivot from '@/components/TabelPivot';
+import FilterPanel from '@/components/FilterPanel';
+import Search from '@/components/Search';
 import { Card, CardContent } from '@/components/ui/card';
 import { BriefcaseBusiness, Building2 } from 'lucide-react';
 

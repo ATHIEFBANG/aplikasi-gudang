@@ -84,19 +84,13 @@ class RincianAsetController extends Controller
         $endDate = $request->input('end_date');
 
         if ($type === 'PROYEK') {
-            $query->where('transaksis.sub_jenis', 'BARANG_KE_SITE');
-
             if (!empty($projects)) {
                 $query->whereIn('transaksis.kode_projek', $projects);
             }
         }
 
-        if ($type === 'NON_PROYEK') {
-            $query->where('transaksis.sub_jenis', 'PEMAKAIAN_INTERNAL');
-
-            if (!empty($departments)) {
-                $query->whereIn('transaksis.pihak_asal', $departments);
-            }
+        if ($type === 'NON_PROYEK' && !empty($departments)) {
+            $query->whereIn('transaksis.pihak_asal', $departments);
         }
 
         if (!empty($gudangs)) {
@@ -191,7 +185,6 @@ class RincianAsetController extends Controller
                 '=',
                 'transaksi_details.barang_id'
             )
-            ->where('transaksis.jenis_transaksi', 'KELUAR')
             ->where(function ($q) {
                 $q->whereIn(
                     'transaksis.status',
@@ -199,6 +192,29 @@ class RincianAsetController extends Controller
                 )
                     ->orWhereNull('transaksis.status');
             });
+
+        if ($type === 'PROYEK') {
+            // Gabungkan pengeluaran proyek biasa dan transfer gudang yang ditujukan ke proyek.
+            $query->where(function ($q) {
+                $q->where(function ($outbound) {
+                    $outbound
+                        ->where('transaksis.jenis_transaksi', 'KELUAR')
+                        ->where('transaksis.sub_jenis', 'BARANG_KE_SITE');
+                })->orWhere(function ($transfer) {
+                    $transfer
+                        ->where(function ($kind) {
+                            $kind->where('transaksis.jenis_transaksi', 'TRANSFER')
+                                ->orWhere('transaksis.sub_jenis', 'TRANSFER_GUDANG');
+                        })
+                        ->whereNotNull('transaksis.kode_projek')
+                        ->where('transaksis.kode_projek', '!=', '');
+                });
+            });
+        } else {
+            $query
+                ->where('transaksis.jenis_transaksi', 'KELUAR')
+                ->where('transaksis.sub_jenis', 'PEMAKAIAN_INTERNAL');
+        }
 
         $this->applyPivotFilters($query, $request, $type);
 
@@ -274,8 +290,21 @@ class RincianAsetController extends Controller
     private function getProjectOptions(): array
     {
         return Transaksi::query()
-            ->where('jenis_transaksi', 'KELUAR')
-            ->where('sub_jenis', 'BARANG_KE_SITE')
+            ->where(function ($q) {
+                $q->where(function ($outbound) {
+                    $outbound
+                        ->where('jenis_transaksi', 'KELUAR')
+                        ->where('sub_jenis', 'BARANG_KE_SITE');
+                })->orWhere(function ($transfer) {
+                    $transfer
+                        ->where(function ($kind) {
+                            $kind->where('jenis_transaksi', 'TRANSFER')
+                                ->orWhere('sub_jenis', 'TRANSFER_GUDANG');
+                        })
+                        ->whereNotNull('kode_projek')
+                        ->where('kode_projek', '!=', '');
+                });
+            })
             ->whereNotNull('kode_projek')
             ->where('kode_projek', '!=', '')
             ->where(function ($q) {

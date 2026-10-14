@@ -1,5 +1,5 @@
 import React from 'react';
-import Modal from '@/components/Modal';
+import Modal from '@/components/FormModal';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import {
     Hash, 
     Check 
 } from 'lucide-react';
-import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import HybridDropdown from '@/components/HybridDropdown';
 
 import { 
     useModalBarangControl, 

@@ -1,5 +1,5 @@
 import React from 'react';
-import Modal from '@/components/Modal';
+import Modal from '@/components/FormModal';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,7 +16,8 @@ export default function ModalTransferGudang({
     isEditMode = false,
     selectedItem = null,
     gudangs = [],
-    barangs = []
+    barangs = [],
+    projectOptions = []
 }) {
     const {
         isProcessing,
@@ -39,6 +40,7 @@ export default function ModalTransferGudang({
         selectedItem,
         gudangs,
         barangs,
+        projectOptions,
         onClose
     });
 
@@ -120,6 +122,7 @@ export default function ModalTransferGudang({
                             barangs={barangs}
                             gudangs={gudangs}
                             gudangOptions={gudangOptions}
+                            projectOptions={projectOptions}
                             pplOptions={pplOptions}
                             namaOptions={namaOptions}
                             stockInOrigin={stockInOrigin}

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import Tabel from '@/components/gabungan/Tabel';
+import Tabel from '@/components/Tabel';
 import { Badge } from '@/components/ui/badge';
 
 const ALL_COLUMNS = [
@@ -64,7 +64,7 @@ export default function CrudTable({
             label: col.key === 'asal' && mainTab === 'TRANSFER'
                 ? 'GUDANG ASAL'
                 : col.key === 'gudang_tujuan' && mainTab === 'TRANSFER'
-                    ? 'GUDANG TUJUAN'
+                    ? 'TUJUAN TRANSFER'
                     : col.key === 'gudang_tujuan' && mainTab === 'KELUAR'
                         ? 'TUJUAN / KEPERLUAN'
                         : col.label,
@@ -277,7 +277,7 @@ export default function CrudTable({
 
                     case 'gudang_tujuan': {
                         const tujuanText = mainTab === 'TRANSFER'
-                            ? item.gudang_tujuan?.nama_gudang
+                            ? (item.gudang_tujuan?.nama_gudang || (item.kode_projek ? `Proyek: ${item.kode_projek}` : '-'))
                             : mainTab === 'KELUAR'
                                 ? item.pihak_asal
                                 : item.gudang_tujuan?.nama_gudang;

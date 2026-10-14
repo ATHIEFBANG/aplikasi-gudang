@@ -11,6 +11,7 @@ export default function TransaksiIndex({
     suppliers = [],
     barangs = [],
     customerOptions = [],
+    projectOptions = [],
     filters = {}
 }) {
     return (
@@ -46,6 +47,7 @@ export default function TransaksiIndex({
                     suppliers={suppliers}
                     barangs={barangs}
                     customerOptions={customerOptions}
+                    projectOptions={projectOptions}
                     filters={filters}
                 />
             </div>

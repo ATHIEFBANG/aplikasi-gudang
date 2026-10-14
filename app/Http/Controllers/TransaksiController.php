@@ -106,6 +106,14 @@ class TransaksiController extends Controller
                                     'status' => 'IN_WAREHOUSE',
                                 ]);
                             }
+                        } elseif (!empty($t->kode_projek)) {
+                            // Transfer ke proyek diperlakukan sebagai barang keluar: tidak masuk gudang lain.
+                            foreach ($d->serials as $s) {
+                                $s->update([
+                                    'gudang_id' => null,
+                                    'status' => 'IN_USE',
+                                ]);
+                            }
                         }
                     }
                 }
@@ -421,6 +429,20 @@ class TransaksiController extends Controller
                 return $g;
             });
 
+        $projectOptions = Transaksi::query()
+            ->where('jenis_transaksi', 'KELUAR')
+            ->where('sub_jenis', 'BARANG_KE_SITE')
+            ->whereNotNull('kode_projek')
+            ->where('kode_projek', '!=', '')
+            ->where(function ($q) {
+                $q->whereIn('status', ['COMPLETED', 'completed'])
+                    ->orWhereNull('status');
+            })
+            ->distinct()
+            ->orderBy('kode_projek')
+            ->pluck('kode_projek')
+            ->values();
+
         $customerOptions = Transaksi::query()
             ->whereNotNull('nama_customer')
             ->where('nama_customer', '!=', '')
@@ -552,6 +574,7 @@ class TransaksiController extends Controller
             'gudangs' => $gudangList,
             'suppliers' => Supplier::all(['id', 'nama_supplier']),
             'customerOptions' => $customerOptions,
+            'projectOptions' => $projectOptions,
             'barangs' => $barangList,
             'filters' => [
                 'jenis_transaksi' => $jenis,

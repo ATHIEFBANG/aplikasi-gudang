@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import Toolbar from '@/components/gabungan/Toolbar';
+import Toolbar from '@/components/Toolbar';
 import CrudTable from './CrudTable';
 import ModalBarangMasuk from './ModalBarangMasuk';
 import ModalBarangKeluar from './ModalBarangKeluar';
 import ModalTransferGudang from './ModalTransferGudang';
-import HybridDropdown from '@/components/gabungan/HybridDropdown';
-import DateRangeFilter from '@/components/gabungan/DateRangeFilter';
+import HybridDropdown from '@/components/HybridDropdown';
+import DateRangeFilter from '@/components/DateRangeFilter';
 import { Toast } from '@/components/ui/Notifikasi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ import {
 import { router, usePage } from '@inertiajs/react';
 import { useConfirm } from '@/Layouts/AuthenticatedLayout';
 
-const TRANSAKSI_PROPS = ['transaksis', 'filters', 'barangs', 'gudangs', 'customerOptions'];
+const TRANSAKSI_PROPS = ['transaksis', 'filters', 'barangs', 'gudangs', 'customerOptions', 'projectOptions'];
 
 export default function TabTransaksi({
     transaksis,
@@ -30,6 +30,7 @@ export default function TabTransaksi({
     suppliers = [],
     barangs = [],
     customerOptions = [],
+    projectOptions = [],
     filters = {}
 }) {
     const { auth, flash } = usePage().props;
@@ -696,6 +697,7 @@ export default function TabTransaksi({
                 selectedItem={selectedItem}
                 gudangs={gudangs}
                 barangs={barangs}
+                projectOptions={projectOptions}
             />
 
             <Toast
