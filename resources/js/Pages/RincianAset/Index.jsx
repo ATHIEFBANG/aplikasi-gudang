@@ -13,6 +13,7 @@ const getPivotData = data => Array.isArray(data) ? data : data?.data || [];
 export default function AnalisisBarangKeluarIndex({
     activeTab = 'PROYEK',
     projectPivot = [],
+    transferProjectPivot = [],
     nonProjectPivot = [],
     projectOptions = [],
     departmentOptions = [],
@@ -23,6 +24,7 @@ export default function AnalisisBarangKeluarIndex({
     const [currentTab, setCurrentTab] = useState(initialTab);
     const [searchTerm, setSearchTerm] = useState(filters?.search || '');
     const [project, setProject] = useState(filters?.project || '');
+    const [projectView, setProjectView] = useState(filters?.project_view || 'OUTBOUND');
     const [department, setDepartment] = useState(filters?.department || '');
     const [startDate, setStartDate] = useState(filters?.start_date || '');
     const [endDate, setEndDate] = useState(filters?.end_date || '');
@@ -36,6 +38,7 @@ export default function AnalisisBarangKeluarIndex({
     useEffect(() => {
         setSearchTerm(filters?.search || '');
         setProject(filters?.project || '');
+        setProjectView(filters?.project_view || 'OUTBOUND');
         setDepartment(filters?.department || '');
         setStartDate(filters?.start_date || '');
         setEndDate(filters?.end_date || '');
@@ -53,8 +56,13 @@ export default function AnalisisBarangKeluarIndex({
     );
 
     const activeData = currentTab === 'PROYEK'
-        ? getPivotData(projectPivot)
+        ? getPivotData(projectView === 'TRANSFER' ? transferProjectPivot : projectPivot)
         : getPivotData(nonProjectPivot);
+
+    const handleProjectViewChange = nextView => {
+        setProjectView(nextView);
+        navigateWithFilters({ project_view: nextView, page: 1 });
+    };
 
     const navigateWithFilters = (params = {}) => {
         setIsProcessing(true);
@@ -63,6 +71,7 @@ export default function AnalisisBarangKeluarIndex({
             tab: params.tab ?? currentTab,
             search: params.search ?? searchTerm,
             project: params.project ?? project,
+            project_view: params.project_view ?? projectView,
             department: params.department ?? department,
             start_date: params.start_date ?? startDate,
             end_date: params.end_date ?? endDate,
@@ -76,6 +85,7 @@ export default function AnalisisBarangKeluarIndex({
 
         if (query.tab === 'NON_PROYEK') {
             delete query.project;
+            delete query.project_view;
         }
 
         Object.keys(query).forEach(key => {
@@ -179,11 +189,10 @@ export default function AnalisisBarangKeluarIndex({
                 <div className="px-1 sm:px-2">
                     <div>
                         <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white">
-                            Analisis Barang Keluar
+                            Analisis Rincian Aset
                         </h1>
-
                         <p className="mt-1 text-sm sm:text-base text-slate-500 dark:text-slate-400">
-                            Analisis pengeluaran barang berdasarkan proyek dan kebutuhan non proyek.
+                            Analisis pengeluaran barang/Aset Transfer berdasarkan proyek dan kebutuhan non proyek.
                         </p>
                     </div>
                 </div>
@@ -193,6 +202,8 @@ export default function AnalisisBarangKeluarIndex({
                         activeTab={currentTab}
                         onTabChange={handleTabChange}
                         dataList={activeData}
+                        projectView={projectView}
+                        onProjectViewChange={handleProjectViewChange}
                         project={project}
                         projectOptions={projectFilterOptions}
                         department={department}

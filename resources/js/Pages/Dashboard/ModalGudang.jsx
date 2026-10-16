@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Modal from '@/components/FormModal';
+import Modal from '@/components/gabungan/FormModal';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { router } from '@inertiajs/react';

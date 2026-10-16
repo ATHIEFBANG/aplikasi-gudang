@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HistoryMovingController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProyekController;
 use App\Http\Controllers\RincianAsetController;
 use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\TransaksiBarangMasukController;
@@ -26,6 +27,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [DashboardController::class, 'storeGudang'])->name('store');
         Route::put('/{id}', [DashboardController::class, 'updateGudang'])->name('update');
         Route::delete('/{id}', [DashboardController::class, 'destroyGudang'])->name('destroy');
+    });
+
+    // MASTER DATA PROYEK
+    Route::prefix('proyek')->name('proyek.')->controller(ProyekController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::put('/{proyek}', 'update')->name('update');
+        Route::delete('/{proyek}', 'destroy')->name('destroy');
     });
 
     // MASTER BARANG

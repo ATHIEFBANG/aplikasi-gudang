@@ -2,7 +2,7 @@ import { Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect, createContext, useContext } from 'react';
 
 // --- IMPORT LOGO COMPONENT ---
-import ApplicationLogo from '@/components/ApplicationLogo';
+import ApplicationLogo from '@/components/gabungan/ApplicationLogo';
 
 // --- IMPORT KOMPONEN NOTIFIKASI, CONFIRM MODAL & LOADING ---
 import { Toast, ConfirmModal } from '@/components/ui/Notifikasi';

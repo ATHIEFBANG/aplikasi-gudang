@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Barang;
+use App\Models\Proyek;
 use App\Models\BarangSerial;
 use App\Models\Gudang;
 use App\Models\Stok;
@@ -36,6 +37,22 @@ class TransaksiBarangKeluarController extends Controller
                 'items.*.serials'           => 'nullable|array',
                 'items.*.serials.*'         => 'nullable|string|max:100',
             ]);
+
+            foreach ($validated['items'] as $index => $item) {
+                if ($item['sub_jenis'] !== 'BARANG_KE_SITE') continue;
+                $kode = trim((string) ($item['kode_projek'] ?? ''));
+                if ($kode === '') {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "items.{$index}.kode_projek" => 'Pilih kode proyek dari Master Data Proyek.'
+                    ]);
+                }
+                $projectExists = Proyek::where('kode_projek', $kode)->where('is_active', true)->exists();
+                if (!$projectExists) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "items.{$index}.kode_projek" => "Kode proyek '{$kode}' tidak ditemukan atau sedang nonaktif di Master Data Proyek."
+                    ]);
+                }
+            }
 
             $barangIds   = array_unique(array_column($validated['items'], 'barang_id'));
             $gudangIds   = array_unique(array_column($validated['items'], 'gudang_asal_id'));
@@ -217,6 +234,14 @@ class TransaksiBarangKeluarController extends Controller
                         );
                     }
 
+                    $projectRecord = $subJenis === 'BARANG_KE_SITE'
+                        ? Proyek::where('kode_projek', trim((string) ($item['kode_projek'] ?? '')))
+                            ->where('is_active', true)->lockForUpdate()->first()
+                        : null;
+                    if ($subJenis === 'BARANG_KE_SITE' && !$projectRecord) {
+                        throw new \Exception('Proyek tidak ditemukan atau sudah dinonaktifkan. Pilih proyek aktif dari Master Data Proyek.');
+                    }
+
                     $transaksi = Transaksi::create([
                         'no_transaksi'     => $noTransaksi,
                         'jenis_transaksi'  => 'KELUAR',
@@ -227,13 +252,9 @@ class TransaksiBarangKeluarController extends Controller
                         'nomor_imc'        => !empty($item['nomor_imc'])
                             ? trim($item['nomor_imc'])
                             : null,
-                        'pihak_asal'       => $item['pihak_asal'],
-                        'kode_projek'      => !empty($item['kode_projek'])
-                            ? trim($item['kode_projek'])
-                            : null,
-                        'nama_customer'    => !empty($item['nama_customer'])
-                            ? trim($item['nama_customer'])
-                            : null,
+                        'pihak_asal'       => $projectRecord ? $projectRecord->nama_projek : $item['pihak_asal'],
+                        'kode_projek'      => $projectRecord ? $projectRecord->kode_projek : null,
+                        'nama_customer'    => $projectRecord ? ($projectRecord->nama_customer ?: ($item['nama_customer'] ?? null)) : null,
                         'gudang_asal_id'   => $gudangAsalId,
                         'gudang_tujuan_id' => null,
                         'pic_user_id'      => $request->user()->id,
@@ -287,9 +308,10 @@ class TransaksiBarangKeluarController extends Controller
                 }
 
                 if (!empty($serialsToUpdateIds)) {
-                    BarangSerial::whereIn('id', $serialsToUpdateIds)->update([
+                    DB::table('barang_serials')->whereIn('id', $serialsToUpdateIds)->update([
                         'gudang_id'  => null,
                         'status'     => 'IN_USE',
+                        'kode_projek' => $projectRecord ? $projectRecord->kode_projek : null,
                         'updated_at' => $now,
                     ]);
                 }
@@ -328,7 +350,7 @@ class TransaksiBarangKeluarController extends Controller
             'nomor_omc'     => 'required|string|max:100',
             'nomor_imc'     => 'nullable|string|max:100',
             'pihak_asal'    => 'required|string|max:255',
-            'kode_projek'   => 'nullable|string|max:100',
+            'kode_projek'   => 'nullable|string|max:100|exists:proyeks,kode_projek',
             'nama_customer' => 'nullable|string|max:255',
             'keterangan'    => 'nullable|string|max:500',
         ]);

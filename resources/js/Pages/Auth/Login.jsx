@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import InputError from '@/components/InputError';
-import ApplicationLogo from '@/components/ApplicationLogo';
+import InputError from '@/components/gabungan/InputError';
+import ApplicationLogo from '@/components/gabungan/ApplicationLogo';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

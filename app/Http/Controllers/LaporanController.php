@@ -81,8 +81,6 @@ class LaporanController extends Controller
             ->get()
             ->keyBy('barang_id');
 
-        // Transfer ke proyek dihitung sebagai barang keluar; transfer antar-gudang
-        // saja yang menjadi transfer masuk/keluar antar-lokasi.
         $mutasiBulan = TransaksiDetail::select(
             'td.barang_id',
             DB::raw("SUM(CASE
@@ -98,27 +96,17 @@ class LaporanController extends Controller
                 THEN td.qty ELSE 0
             END) as masuk_rusak"),
             DB::raw("SUM(CASE
-                WHEN (
-                    t.jenis_transaksi = 'KELUAR'
-                    OR (
-                        (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
-                        AND t.gudang_tujuan_id IS NULL
-                        AND t.kode_projek IS NOT NULL
-                        AND t.kode_projek != ''
-                    )
-                ) " .
+                WHEN t.jenis_transaksi = 'KELUAR' " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as keluar_bulan"),
             DB::raw("SUM(CASE
-                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
-                AND t.gudang_tujuan_id IS NOT NULL " .
+                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as trf_in"),
             DB::raw("SUM(CASE
-                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
-                AND t.gudang_tujuan_id IS NOT NULL " .
+                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as trf_out")
@@ -143,18 +131,7 @@ class LaporanController extends Controller
             })
             ->whereIn('td.barang_id', $barangIds)
             ->whereBetween('t.tanggal', [$startDate, $endDate])
-            ->where(function ($q) {
-                $q->where('t.jenis_transaksi', 'KELUAR')
-                    ->orWhere(function ($projectTransfer) {
-                        $projectTransfer->where(function ($transferType) {
-                            $transferType->where('t.jenis_transaksi', 'TRANSFER')
-                                ->orWhere('t.sub_jenis', 'TRANSFER_GUDANG');
-                        })
-                            ->whereNull('t.gudang_tujuan_id')
-                            ->whereNotNull('t.kode_projek')
-                            ->where('t.kode_projek', '!=', '');
-                    });
-            })
+            ->where('t.jenis_transaksi', 'KELUAR')
             ->when($gudangId !== 'ALL', function ($q) use ($gudangId) {
                 $q->where('t.gudang_asal_id', (int) $gudangId);
             })
@@ -572,8 +549,6 @@ class LaporanController extends Controller
             ->get()
             ->keyBy('barang_id');
 
-        // Transfer ke proyek dihitung sebagai barang keluar; transfer antar-gudang
-        // saja yang menjadi transfer masuk/keluar antar-lokasi.
         $mutasiBulan = TransaksiDetail::select(
             'td.barang_id',
             DB::raw("SUM(CASE
@@ -589,27 +564,17 @@ class LaporanController extends Controller
                 THEN td.qty ELSE 0
             END) as masuk_rusak"),
             DB::raw("SUM(CASE
-                WHEN (
-                    t.jenis_transaksi = 'KELUAR'
-                    OR (
-                        (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
-                        AND t.gudang_tujuan_id IS NULL
-                        AND t.kode_projek IS NOT NULL
-                        AND t.kode_projek != ''
-                    )
-                ) " .
+                WHEN t.jenis_transaksi = 'KELUAR' " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as keluar_bulan"),
             DB::raw("SUM(CASE
-                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
-                AND t.gudang_tujuan_id IS NOT NULL " .
+                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as trf_in"),
             DB::raw("SUM(CASE
-                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
-                AND t.gudang_tujuan_id IS NOT NULL " .
+                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as trf_out")

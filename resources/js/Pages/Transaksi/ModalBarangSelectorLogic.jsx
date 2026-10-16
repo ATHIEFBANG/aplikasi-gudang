@@ -93,7 +93,7 @@ export function useModalBarangSelectorLogic({
      * GUDANG
      * ========================================================= */
 
-    const isProjectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG';
+    const isProjectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG' || (row?.sub_jenis === 'PENGEMBALIAN' && row?.return_source !== 'MANUAL' && Boolean(row?.kode_projek));
     const targetProjectCode = String(row?.kode_projek || '');
     const targetGudangId = useMemo(
         () => isProjectReturn ? null : resolveGudangId(gudangs, row?.gudang_asal_id),
@@ -282,10 +282,31 @@ export function useModalBarangSelectorLogic({
         if (isWajibSn || !targetBarang || (!targetGudangId && !isProjectReturn)) return [];
 
         if (isProjectReturn) {
-            return (targetBarang.project_batches?.[targetProjectCode] || [])
-                .filter(batch => Number(batch.max_stock || 0) > 0)
-                .filter(batch => allowRusak || !isRusakCondition(batch.kondisi))
-                .map(batch => ({ ...batch, badgeClass: getKondisiBadgeClass(normalizeKondisi(batch.kondisi)) }));
+            const projectBatches = targetBarang.project_batches?.[targetProjectCode];
+            if (Array.isArray(projectBatches) && projectBatches.length) {
+                return projectBatches
+                    .filter(batch => Number(batch.max_stock || 0) > 0)
+                    .filter(batch => allowRusak || !isRusakCondition(batch.kondisi))
+                    .map(batch => ({ ...batch, badgeClass: getKondisiBadgeClass(normalizeKondisi(batch.kondisi)) }));
+            }
+
+            // Fallback untuk data yang hanya mengirim saldo proyek per kondisi.
+            const stock = targetBarang.project_stocks?.[targetProjectCode];
+            if (!stock) return [];
+            const result = [];
+            const conditions = [
+                { key: 'Baru', kondisi: 'Baru', max_stock: Number(stock.baru || 0) },
+                { key: 'Bekas', kondisi: 'Bekas', max_stock: Number(stock.bekas || 0) },
+                ...(allowRusak ? [{ key: 'Rusak', kondisi: 'Rusak', max_stock: Number(stock.rusak || 0) }] : [])
+            ];
+            conditions.forEach(batch => {
+                if (batch.max_stock > 0) result.push({
+                    ...batch,
+                    nomor_imc: targetBarang.kode_barang || 'STOK-PROYEK',
+                    badgeClass: getKondisiBadgeClass(batch.kondisi)
+                });
+            });
+            return result;
         }
 
         const kondisiStok = targetBarang.kondisi_stok?.[targetGudangId];

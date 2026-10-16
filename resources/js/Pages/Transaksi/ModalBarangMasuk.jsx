@@ -1,5 +1,5 @@
 import React from 'react';
-import Modal from '@/components/FormModal';
+import Modal from '@/components/gabungan/FormModal';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,11 +14,13 @@ export default function ModalBarangMasuk({
     selectedItem = null,
     gudangs = [],
     suppliers = [],
-    barangs = []
+    barangs = [],
+    projectOptions = []
 }) {
     const {
         isProcessing,
         rows,
+        setRows,
         gudangOptions,
         supplierOptions,
         getBarangPplOptionsForRow,
@@ -29,6 +31,7 @@ export default function ModalBarangMasuk({
         handleBarangChange,
         handleQtyChange,
         handleManualSerialChange,
+        handleToggleProjectSerial,
         handleBulkPasteExcel,
         handleSubmitForm,
     } = useModalBarangMasukControl({
@@ -38,6 +41,7 @@ export default function ModalBarangMasuk({
         gudangs,
         suppliers,
         barangs,
+        projectOptions,
         onClose
     });
 
@@ -73,8 +77,8 @@ export default function ModalBarangMasuk({
                             <ClipboardPaste className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                             <span>Paste dari Excel</span>
                         </Button>
-                        <Badge 
-                            variant="secondary" 
+                        <Badge
+                            variant="secondary"
                             className="bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-[11px] font-mono font-bold px-2.5 py-1"
                         >
                             {rows.length} / {MAX_ROWS_LIMIT} Baris
@@ -94,8 +98,8 @@ export default function ModalBarangMasuk({
 
             <div className="space-y-4">
                 {rows.map((row, rowIdx) => {
-                    const pplOptions = getBarangPplOptionsForRow();
-                    const namaOptions = getBarangNamaOptionsForRow();
+                    const pplOptions = getBarangPplOptionsForRow(row);
+                    const namaOptions = getBarangNamaOptionsForRow(row);
 
                     return (
                         <ModalBarangMasukRow
@@ -109,6 +113,7 @@ export default function ModalBarangMasuk({
                             gudangs={gudangs}
                             gudangOptions={gudangOptions}
                             supplierOptions={supplierOptions}
+                            projectOptions={projectOptions}
                             pplOptions={pplOptions}
                             namaOptions={namaOptions}
                             onRemoveRow={handleRemoveRow}
@@ -116,6 +121,8 @@ export default function ModalBarangMasuk({
                             onBarangChange={handleBarangChange}
                             onQtyChange={handleQtyChange}
                             onManualSerialChange={handleManualSerialChange}
+                            onToggleProjectSerial={handleToggleProjectSerial}
+                            setRows={setRows}
                         />
                     );
                 })}

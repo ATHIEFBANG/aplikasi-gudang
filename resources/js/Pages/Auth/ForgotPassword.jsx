@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ApplicationLogo from '@/components/ApplicationLogo';
+import ApplicationLogo from '@/components/gabungan/ApplicationLogo';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { 

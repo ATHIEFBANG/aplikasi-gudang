@@ -1,5 +1,5 @@
 import React from 'react';
-import Modal from '@/components/FormModal';
+import Modal from '@/components/gabungan/FormModal';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,7 +14,8 @@ export default function ModalBarangKeluar({
     selectedItem = null,
     gudangs = [],
     barangs = [],
-    customerOptions = []
+    customerOptions = [],
+    projectOptions = []
 }) {
     const {
         isProcessing,
@@ -35,6 +36,7 @@ export default function ModalBarangKeluar({
         selectedItem,
         gudangs,
         barangs,
+        projectOptions,
         onClose
     });
 
@@ -89,6 +91,7 @@ export default function ModalBarangKeluar({
                             pplOptions={pplOptions}
                             namaOptions={namaOptions}
                             customerOptions={customerOptions}
+                            projectOptions={projectOptions}
                             stockInOrigin={stockInOrigin}
                             setRows={setRows}
                             onRemoveRow={handleRemoveRow}

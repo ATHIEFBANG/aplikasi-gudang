@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import Tabel from '@/components/Tabel';
+import Tabel from '@/components/gabungan/Tabel';
 import { Badge } from '@/components/ui/badge';
 
 const ALL_COLUMNS = [
@@ -40,7 +40,7 @@ export default function CrudTable({
 
         if (mainTab === 'MASUK') {
             visibleKeys = [
-                'no_transaksi', 'sub_jenis', 'kode_ppl', 'nama_barang', 'part_number',
+                'no_transaksi', 'sub_jenis', 'kode_projek', 'kode_ppl', 'nama_barang', 'part_number',
                 'satuan', 'tanggal', 'qty', 'harga', 'total_harga', 'kondisi',
                 'nomor_imc', 'asal', 'gudang_tujuan', 'serials'
             ];
@@ -61,7 +61,9 @@ export default function CrudTable({
 
         return activeCols.map(col => ({
             ...col,
-            label: col.key === 'asal' && mainTab === 'TRANSFER'
+            label: col.key === 'kode_projek' && mainTab === 'MASUK'
+                ? 'KODE PROYEK ASAL'
+                : col.key === 'asal' && mainTab === 'TRANSFER'
                 ? 'GUDANG ASAL'
                 : col.key === 'gudang_tujuan' && mainTab === 'TRANSFER'
                     ? 'TUJUAN TRANSFER'

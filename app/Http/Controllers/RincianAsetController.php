@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BarangSerial;
 use App\Models\Gudang;
+use App\Models\Proyek;
 use App\Models\Transaksi;
 use App\Models\TransaksiDetail;
 use Illuminate\Http\Request;
@@ -194,22 +195,9 @@ class RincianAsetController extends Controller
             });
 
         if ($type === 'PROYEK') {
-            // Gabungkan pengeluaran proyek biasa dan transfer gudang yang ditujukan ke proyek.
-            $query->where(function ($q) {
-                $q->where(function ($outbound) {
-                    $outbound
-                        ->where('transaksis.jenis_transaksi', 'KELUAR')
-                        ->where('transaksis.sub_jenis', 'BARANG_KE_SITE');
-                })->orWhere(function ($transfer) {
-                    $transfer
-                        ->where(function ($kind) {
-                            $kind->where('transaksis.jenis_transaksi', 'TRANSFER')
-                                ->orWhere('transaksis.sub_jenis', 'TRANSFER_GUDANG');
-                        })
-                        ->whereNotNull('transaksis.kode_projek')
-                        ->where('transaksis.kode_projek', '!=', '');
-                });
-            });
+            // Pengeluaran proyek biasa dipisahkan dari aset transfer yang masih aktif di proyek.
+            $query->where('transaksis.jenis_transaksi', 'KELUAR')
+                ->where('transaksis.sub_jenis', 'BARANG_KE_SITE');
         } else {
             $query
                 ->where('transaksis.jenis_transaksi', 'KELUAR')
@@ -294,34 +282,215 @@ class RincianAsetController extends Controller
         })->values()->all();
     }
 
-    private function getProjectOptions(): array
+    /**
+     * Snapshot aset transfer non-SN dan SN yang masih aktif di proyek.
+     * Hanya transfer ke proyek dikurangi oleh transaksi MASUK/PENGEMBALIAN.
+     * Pengeluaran biasa BARANG_KE_SITE tidak dimasukkan ke saldo aset transfer.
+     */
+    private function getTransferProjectPivot(Request $request, array $priceMap): array
     {
-        return Transaksi::query()
+        $selectedProjects = $this->normalizeFilterArray($request->input('project', []));
+        $search = mb_strtolower(trim((string) $request->input('search', '')));
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        $activeProjects = Proyek::query()->get([
+            'kode_projek', 'nama_projek', 'nama_customer', 'lokasi', 'is_active',
+        ])->keyBy('kode_projek');
+
+        $passesCommonFilters = function (array $row) use ($selectedProjects, $search, $startDate, $endDate): bool {
+            if ($selectedProjects && !in_array((string) ($row['project'] ?? ''), $selectedProjects, true)) {
+                return false;
+            }
+            if ($startDate && !empty($row['tanggal']) && $row['tanggal'] < $startDate) return false;
+            if ($endDate && !empty($row['tanggal']) && $row['tanggal'] > $endDate) return false;
+            if ($search !== '') {
+                $haystack = mb_strtolower(implode(' ', [
+                    $row['project'] ?? '', $row['project_name'] ?? '', $row['nama_customer'] ?? '',
+                    $row['kode_barang'] ?? '', $row['nama_barang'] ?? '', $row['brand'] ?? '',
+                    $row['tipe'] ?? '', $row['kategori'] ?? '', $row['part_number'] ?? '',
+                    implode(' ', $row['serials'] ?? []),
+                ]));
+                if (!str_contains($haystack, $search)) return false;
+            }
+            return true;
+        };
+
+        $result = [];
+
+        // 1. SN yang masih berstatus IN_USE dan sudah diberi kode proyek.
+        $activeSerials = DB::table('barang_serials as bs')
+            ->join('barangs as b', 'b.id', '=', 'bs.barang_id')
+            ->where('bs.status', 'IN_USE')
+            ->whereNull('bs.gudang_id')
+            ->whereNotNull('bs.kode_projek')
+            ->where('bs.kode_projek', '!=', '')
+            ->orderBy('bs.kode_projek')->orderBy('b.kode_barang')->orderBy('bs.kondisi')->orderBy('bs.serial_number')
+            ->get([
+                'bs.id as serial_id', 'bs.barang_id', 'bs.kode_projek', 'bs.serial_number',
+                'bs.kondisi', 'bs.nomer_imc', 'b.kode_barang', 'b.nama_barang', 'b.brand',
+                'b.tipe', 'b.kategori', 'b.part_number',
+            ]);
+
+        $activeSerialIds = $activeSerials->pluck('serial_id')->map(fn($id) => (int) $id)->all();
+        $serialTransferDates = [];
+        if ($activeSerialIds) {
+            $dateRows = DB::table('transaksi_detail_serials as tds')
+                ->join('transaksi_details as td', 'td.id', '=', 'tds.transaksi_detail_id')
+                ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+                ->whereIn('tds.barang_serial_id', $activeSerialIds)
+                ->where(function ($q) {
+                    $q->whereIn('t.status', ['COMPLETED', 'completed'])->orWhereNull('t.status');
+                })
+                ->where(function ($q) {
+                    $q->where('t.jenis_transaksi', 'TRANSFER')->orWhere('t.sub_jenis', 'TRANSFER_GUDANG');
+                })
+                ->whereNull('t.gudang_tujuan_id')
+                ->whereNotNull('t.kode_projek')->where('t.kode_projek', '!=', '')
+                ->select('tds.barang_serial_id', 't.kode_projek', 't.tanggal', 't.no_transaksi')
+                ->orderBy('t.tanggal')->orderBy('t.id')
+                ->get();
+            foreach ($dateRows as $dateRow) {
+                $serialTransferDates[(int) $dateRow->barang_serial_id] = [
+                    'kode_projek' => (string) $dateRow->kode_projek,
+                    'tanggal' => $dateRow->tanggal,
+                    'no_transaksi' => $dateRow->no_transaksi,
+                ];
+            }
+        }
+
+        $serialGroups = [];
+        foreach ($activeSerials as $serial) {
+            $code = (string) $serial->kode_projek;
+            $dateInfo = $serialTransferDates[(int) $serial->serial_id] ?? [];
+            if (!empty($dateInfo['kode_projek']) && $dateInfo['kode_projek'] !== $code) {
+                // Serial sudah berpindah proyek; jangan pakai tanggal transfer proyek sebelumnya.
+                $dateInfo = [];
+            }
+            $condition = $this->normalizeTransferCondition($serial->kondisi);
+            $key = implode('|', [$code, (int) $serial->barang_id, $condition]);
+            $serialGroups[$key] ??= [
+                'project' => $code,
+                'barang_id' => (int) $serial->barang_id,
+                'kode_barang' => $serial->kode_barang,
+                'nama_barang' => $serial->nama_barang,
+                'brand' => $serial->brand,
+                'tipe' => $serial->tipe,
+                'kategori' => $serial->kategori,
+                'part_number' => $serial->part_number,
+                'kondisi' => $condition,
+                'serials' => [],
+                'tanggal' => null,
+                'no_transaksi' => null,
+            ];
+            $serialGroups[$key]['serials'][] = trim((string) $serial->serial_number);
+            $serialGroups[$key]['tanggal'] = max((string) ($serialGroups[$key]['tanggal'] ?? ''), (string) ($dateInfo['tanggal'] ?? '')) ?: null;
+            if (!empty($dateInfo['no_transaksi'])) $serialGroups[$key]['no_transaksi'] = $dateInfo['no_transaksi'];
+        }
+
+        foreach ($serialGroups as $row) {
+            $project = $activeProjects->get($row['project']);
+            $row['project_name'] = $project->nama_projek ?? $row['project'];
+            $row['nama_customer'] = $project->nama_customer ?? null;
+            $row['lokasi'] = $project->lokasi ?? null;
+            $row['qty'] = count($row['serials']);
+            $row['jumlah'] = $row['qty'];
+            $row['harga'] = (float) ($priceMap[$row['barang_id']] ?? 0);
+            $row['nilai_aset'] = $row['qty'] * $row['harga'];
+            $row['qty_transfer_total'] = $row['qty'];
+            $row['qty_dikembalikan'] = 0;
+            $row['status_aset'] = 'Aktif di Proyek';
+            if ($passesCommonFilters($row)) $result[] = $row;
+        }
+
+        // 2. Non-SN dihitung dari buku mutasi: transfer proyek (+) dikurangi pengembalian (-).
+        $ledgerRows = DB::table('transaksi_details as td')
+            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+            ->join('barangs as b', 'b.id', '=', 'td.barang_id')
             ->where(function ($q) {
-                $q->where(function ($outbound) {
-                    $outbound
-                        ->where('jenis_transaksi', 'KELUAR')
-                        ->where('sub_jenis', 'BARANG_KE_SITE');
-                })->orWhere(function ($transfer) {
-                    $transfer
-                        ->where(function ($kind) {
-                            $kind->where('jenis_transaksi', 'TRANSFER')
-                                ->orWhere('sub_jenis', 'TRANSFER_GUDANG');
-                        })
-                        ->whereNotNull('kode_projek')
-                        ->where('kode_projek', '!=', '');
+                $q->whereIn('t.status', ['COMPLETED', 'completed'])->orWhereNull('t.status');
+            })
+            ->where(function ($q) {
+                $q->where(function ($transfer) {
+                    $transfer->where(function ($kind) {
+                        $kind->where('t.jenis_transaksi', 'TRANSFER')->orWhere('t.sub_jenis', 'TRANSFER_GUDANG');
+                    })->whereNull('t.gudang_tujuan_id')->whereNotNull('t.kode_projek')->where('t.kode_projek', '!=', '');
+                })->orWhere(function ($return) {
+                    $return->where('t.jenis_transaksi', 'MASUK')->where('t.sub_jenis', 'PENGEMBALIAN')
+                        ->whereNotNull('t.kode_projek')->where('t.kode_projek', '!=', '');
                 });
             })
-            ->whereNotNull('kode_projek')
-            ->where('kode_projek', '!=', '')
-            ->where(function ($q) {
-                $q->whereIn(
-                    'status',
-                    ['COMPLETED', 'completed']
-                )
-                    ->orWhereNull('status');
-            })
-            ->distinct()
+            ->where('b.is_wajib_sn', false)
+            ->orderBy('t.tanggal')->orderBy('t.id')->orderBy('td.id')
+            ->get([
+                'td.barang_id', 'td.qty', 'td.kondisi as detail_kondisi', 't.kondisi as header_kondisi',
+                't.kode_projek', 't.jenis_transaksi', 't.sub_jenis', 't.tanggal', 't.no_transaksi',
+                'b.kode_barang', 'b.nama_barang', 'b.brand', 'b.tipe', 'b.kategori', 'b.part_number',
+            ]);
+
+        $balances = [];
+        foreach ($ledgerRows as $movement) {
+            $code = trim((string) $movement->kode_projek);
+            $condition = $this->normalizeTransferCondition($movement->detail_kondisi ?: $movement->header_kondisi);
+            $isReturn = $movement->jenis_transaksi === 'MASUK' && $movement->sub_jenis === 'PENGEMBALIAN';
+            $key = implode('|', [$code, (int) $movement->barang_id, $condition]);
+            $balances[$key] ??= [
+                'project' => $code,
+                'barang_id' => (int) $movement->barang_id,
+                'kode_barang' => $movement->kode_barang,
+                'nama_barang' => $movement->nama_barang,
+                'brand' => $movement->brand,
+                'tipe' => $movement->tipe,
+                'kategori' => $movement->kategori,
+                'part_number' => $movement->part_number,
+                'kondisi' => $condition,
+                'qty_transfer_total' => 0,
+                'qty_dikembalikan' => 0,
+                'tanggal' => null,
+                'no_transaksi' => null,
+            ];
+            if ($isReturn) {
+                $balances[$key]['qty_dikembalikan'] += (int) $movement->qty;
+            } else {
+                $balances[$key]['qty_transfer_total'] += (int) $movement->qty;
+                $balances[$key]['tanggal'] = $movement->tanggal;
+                $balances[$key]['no_transaksi'] = $movement->no_transaksi;
+            }
+        }
+
+        foreach ($balances as $row) {
+            $row['qty'] = max(0, (int) $row['qty_transfer_total'] - (int) $row['qty_dikembalikan']);
+            if ($row['qty'] <= 0) continue;
+            $row['jumlah'] = $row['qty'];
+            $row['serials'] = [];
+            $project = $activeProjects->get($row['project']);
+            $row['project_name'] = $project->nama_projek ?? $row['project'];
+            $row['nama_customer'] = $project->nama_customer ?? null;
+            $row['lokasi'] = $project->lokasi ?? null;
+            $row['harga'] = (float) ($priceMap[$row['barang_id']] ?? 0);
+            $row['nilai_aset'] = $row['qty'] * $row['harga'];
+            $row['status_aset'] = 'Aktif di Proyek';
+            if ($passesCommonFilters($row)) $result[] = $row;
+        }
+
+        usort($result, function ($a, $b) {
+            return [$a['project'], $a['kode_barang'], $a['kondisi']] <=> [$b['project'], $b['kode_barang'], $b['kondisi']];
+        });
+
+        return array_values($result);
+    }
+
+    private function normalizeTransferCondition(?string $value): string
+    {
+        $condition = strtoupper(trim((string) $value));
+        if (str_contains($condition, 'RUSAK') || str_contains($condition, 'DAMAGED')) return 'Rusak';
+        if (str_contains($condition, 'BEKAS') || str_contains($condition, 'SECOND') || str_contains($condition, 'USED')) return 'Bekas';
+        return 'Baru';
+    }
+
+    private function getProjectOptions(): array
+    {
+        return Proyek::query()
             ->orderBy('kode_projek')
             ->pluck('kode_projek')
             ->values()
@@ -378,6 +547,7 @@ class RincianAsetController extends Controller
             'PROYEK',
             $priceMap
         );
+        $transferProjectPivot = $this->getTransferProjectPivot($request, $priceMap);
 
         $nonProjectPivot = $this->getPivotRows(
             $request,
@@ -388,6 +558,7 @@ class RincianAsetController extends Controller
         return Inertia::render('RincianAset/Index', [
             'activeTab' => $tab,
             'projectPivot' => $projectPivot,
+            'transferProjectPivot' => $transferProjectPivot,
             'nonProjectPivot' => $nonProjectPivot,
             'gudangs' => $gudangs,
             'projectOptions' => $projectOptions,
@@ -396,6 +567,7 @@ class RincianAsetController extends Controller
                 'tab' => $tab,
                 'search' => $request->input('search', ''),
                 'project' => $request->input('project', ''),
+                'project_view' => in_array($request->input('project_view', 'OUTBOUND'), ['OUTBOUND', 'TRANSFER'], true) ? $request->input('project_view', 'OUTBOUND') : 'OUTBOUND',
                 'department' => $request->input('department', ''),
                 'gudang_id' => $request->input(
                     'gudang_id',

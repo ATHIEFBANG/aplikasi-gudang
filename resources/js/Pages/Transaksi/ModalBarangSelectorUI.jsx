@@ -23,7 +23,7 @@ export default function ModalBarangSelectorUI({
     stockInOrigin = 0,
     allowRusak = false
 }) {
-    const isProjectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG';
+    const isProjectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG' || (row?.sub_jenis === 'PENGEMBALIAN' && row?.return_source !== 'MANUAL' && Boolean(row?.kode_projek));
     const sourceSelected = isProjectReturn ? Boolean(row?.kode_projek) : Boolean(row?.gudang_asal_id);
     const selector = useModalBarangSelectorLogic({
         row,

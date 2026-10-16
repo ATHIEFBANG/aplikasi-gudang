@@ -1,5 +1,5 @@
 import React from 'react';
-import Modal from '@/components/FormModal';
+import Modal from '@/components/gabungan/FormModal';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -51,7 +51,7 @@ export default function ModalTransferGudang({
             title={
                 isEditMode
                     ? 'Edit Data Transfer Gudang'
-                    : 'Transfer Gudang / Proyek'
+                    : 'Transfer Gudang'
             }
             onSubmit={handleSubmit}
             submitLabel={
@@ -84,7 +84,7 @@ export default function ModalTransferGudang({
                     <AlertDescription className="text-[11px] leading-relaxed">
                         <strong>Mutasi Internal:</strong> Transfer akan memotong
                         stok di <strong>Gudang Asal</strong> dan menambahkannya
-                        ke <strong>Gudang Tujuan</strong> atau mengubah lokasi barang ke proyek. Pengembalian dari proyek akan menambah stok gudang kembali. Pilih arah, sumber, tujuan, dan barang dengan benar.
+                        ke <strong>Gudang Tujuan</strong> Transfer hanya untuk perpindahan stok antargudang. Pengeluaran ke proyek dilakukan melalui Barang Keluar.
                     </AlertDescription>
                 </Alert>
             )}

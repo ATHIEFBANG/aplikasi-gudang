@@ -1,4 +1,4 @@
-import InputError from '@/components/InputError';
+import InputError from '@/components/gabungan/InputError';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { Input } from '@/components/ui/input';

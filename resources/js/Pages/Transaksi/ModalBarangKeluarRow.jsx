@@ -3,8 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Trash2, Check } from 'lucide-react';
-import HybridDropdown from '@/components/HybridDropdown';
-import DatePicker from '@/components/DatePicker';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import DatePicker from '@/components/gabungan/DatePicker';
 import ModalBarangSelectorUI from './ModalBarangSelectorUI';
 import { CATEGORIES_KELUAR, LIST_KEPERLUAN_PATEN } from './ModalBarangKeluarControl';
 
@@ -24,6 +24,7 @@ export default function ModalBarangKeluarRow({
     pplOptions = [],
     namaOptions = [],
     customerOptions = [],
+    projectOptions = [],
     stockInOrigin,
     setRows,
     onRemoveRow,
@@ -149,49 +150,19 @@ export default function ModalBarangKeluarRow({
                 <div className="space-y-2.5">
                     {isProyek ? (
                         <>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                                        Kode Proyek
-                                    </Label>
-                                    <Input
-                                        placeholder="Ketik Kode..."
-                                        disabled={isProcessing}
-                                        value={row.kode_projek || ''}
-                                        onChange={e => onFieldChange(rowIdx, 'kode_projek', e.target.value)}
-                                        className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-mono text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                                        Nama Customer
-                                    </Label>
-                                    <HybridDropdown
-                                        value={row.nama_customer || ''}
-                                        options={customerOptions}
-                                        allowCustom={true}
-                                        onChange={val => onFieldChange(rowIdx, 'nama_customer', val)}
-                                        placeholder="Nama Customer..."
-                                        searchPlaceholder="Cari Nama Customer..."
-                                        disabled={isProcessing}
-                                        inputClassName="h-8 text-xs bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                                    />
-                                </div>
-                            </div>
-
                             <div className="space-y-1">
-                                <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-                                    Site Tujuan *
-                                </Label>
-                                <Input
-                                    placeholder="Ketik Site Tujuan..."
-                                    disabled={isProcessing}
-                                    value={row.pihak_asal}
-                                    onChange={e => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
-                                    className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                                    required
+                                <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Kode Proyek / Site Tujuan *</Label>
+                                <HybridDropdown
+                                    value={row.kode_projek || ''}
+                                    options={projectOptions}
+                                    allowCustom={false}
+                                    onChange={val => onFieldChange(rowIdx, 'kode_projek', val)}
+                                    placeholder="Pilih proyek dari master data..."
+                                    searchPlaceholder="Cari kode proyek..."
+                                    disabled={isProcessing || isEditMode}
+                                    inputClassName="h-8 border-rose-300 text-xs font-semibold dark:border-rose-900"
                                 />
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">Customer dan nama site mengikuti Master Data Proyek.</p>
                             </div>
                         </>
                     ) : (

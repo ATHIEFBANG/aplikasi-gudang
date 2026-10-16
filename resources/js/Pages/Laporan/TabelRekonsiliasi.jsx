@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import Tabel from '@/components/Tabel';
+import Tabel from '@/components/gabungan/Tabel';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown } from 'lucide-react';
 

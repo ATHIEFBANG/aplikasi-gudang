@@ -3,9 +3,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Trash2, Check, Minus, Plus, Coins } from 'lucide-react';
-import HybridDropdown from '@/components/HybridDropdown';
-import DatePicker from '@/components/DatePicker';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import DatePicker from '@/components/gabungan/DatePicker';
 import { CATEGORIES_MASUK } from './ModalBarangMasukControl';
+import ModalBarangSelectorUI from './ModalBarangSelectorUI';
+
+const normalizeSerialCondition = value => {
+    const condition = String(value || '').toUpperCase().trim();
+    if (condition.includes('RUSAK') || condition.includes('DAMAGED')) return 'Rusak';
+    if (condition.includes('BEKAS') || condition.includes('SECOND') || condition.includes('USED')) return 'Bekas';
+    return 'Baru';
+};
 
 export default function ModalBarangMasukRow({
     row,
@@ -17,24 +25,37 @@ export default function ModalBarangMasukRow({
     gudangs,
     gudangOptions,
     supplierOptions,
+    projectOptions = [],
     pplOptions,
     namaOptions,
     onRemoveRow,
     onFieldChange,
     onBarangChange,
     onQtyChange,
-    onManualSerialChange
+    onManualSerialChange,
+    onToggleProjectSerial,
+    setRows
 }) {
     const targetBarang = barangs.find(b => String(b.id) === String(row.barang_id));
     const isWajibSn = Boolean(targetBarang?.is_wajib_sn);
     const isWajibPn = Boolean(targetBarang?.is_wajib_pn);
-    const statusText = isWajibSn && isWajibPn 
-        ? 'Wajib SN & PN' 
-        : isWajibSn 
-        ? 'Wajib SN' 
-        : isWajibPn 
-        ? 'Wajib PN' 
+    const statusText = isWajibSn && isWajibPn
+        ? 'Wajib SN & PN'
+        : isWajibSn
+        ? 'Wajib SN'
+        : isWajibPn
+        ? 'Wajib PN'
         : 'Standar';
+
+    const isProjectReturn = row.sub_jenis === 'PENGEMBALIAN' && row.return_source !== 'MANUAL';
+    const isProjectSnReturn = isProjectReturn && isWajibSn;
+    const projectSerialOptions = targetBarang?.project_serials?.[String(row.kode_projek)] || [];
+    const selectedProjectSerialConditions = [...new Set(projectSerialOptions
+        .filter(serial => (row.serials || []).includes(String(serial.serial_number || '')))
+        .map(serial => normalizeSerialCondition(serial.kondisi)))];
+    const displayedProjectSnCondition = selectedProjectSerialConditions.length > 1
+        ? 'Campuran'
+        : selectedProjectSerialConditions[0] || 'Pilih SN terlebih dahulu';
 
     const kondisiOptions = (row.sub_jenis === 'PEMBELIAN' || row.sub_jenis === 'PEMINJAMAN')
         ? [
@@ -62,7 +83,7 @@ export default function ModalBarangMasukRow({
             case 'PENGEMBALIAN':
                 return {
                     pihakAsalLabel: 'Asal Barang *',
-                    pihakAsalPlaceholder: 'Ketik kode proyek, nama site dan customer...'
+                    pihakAsalPlaceholder: 'Ketik asal barang / pihak pengembali...'
                 };
             default:
                 return {
@@ -75,13 +96,19 @@ export default function ModalBarangMasukRow({
     const hargaSatuanNum = parseFloat(row.harga) || 0;
     const qtyNum = parseInt(row.qty, 10) || 1;
     const subtotalBeli = row.sub_jenis === 'PEMBELIAN' ? hargaSatuanNum * qtyNum : 0;
-    const currentNamaBarang = targetBarang 
+    const currentNamaBarang = targetBarang
         ? ([targetBarang.brand, targetBarang.tipe, targetBarang.kategori].filter(Boolean).join(' ') || targetBarang.nama_barang || targetBarang.kode_barang)
         : '';
 
     const activePplOptions = useMemo(() => {
         if (!barangs || barangs.length === 0) return pplOptions;
-        return barangs.map((b) => {
+        return barangs.filter(b => {
+            if (row.sub_jenis !== 'PENGEMBALIAN' || !row.kode_projek) return true;
+            const code = String(row.kode_projek);
+            if (b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1') return (b.project_serials?.[code] || []).length > 0;
+            const stock = b.project_stocks?.[code] || {};
+            return Number(stock.aktif ?? (Number(stock.baru || 0) + Number(stock.bekas || 0) + Number(stock.rusak || 0))) > 0;
+        }).map((b) => {
             const isSn = Boolean(b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1');
             const isPn = Boolean(b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1');
             return {
@@ -91,28 +118,30 @@ export default function ModalBarangMasukRow({
                 is_wajib_sn: isSn,
                 is_wajib_pn: isPn,
                 subLabel: (
-                    <div className="flex items-center gap-1 text-[9px] leading-tight mt-0.5 font-sans">
-                        {isSn && (
-                            <span className="text-amber-500 dark:text-amber-400 font-semibold">
-                                Wajib SN
-                            </span>
-                        )}
+                    <div className="flex flex-wrap items-center gap-1.5 text-[9px] leading-tight mt-0.5 font-sans">
+                        {isSn && <span className="text-amber-500 dark:text-amber-400 font-semibold">Wajib SN</span>}
                         {isSn && isPn && <span className="text-slate-400 dark:text-slate-600">&bull;</span>}
-                        {isPn && (
-                            <span className="text-cyan-600 dark:text-cyan-400 font-semibold">
-                                Wajib PN
-                            </span>
-                        )}
-                        {!isSn && !isPn && (
-                            <span className="text-slate-400 dark:text-slate-500 font-normal">
-                                Standar
-                            </span>
+                        {isPn && <span className="text-cyan-600 dark:text-cyan-400 font-semibold">Wajib PN</span>}
+                        {!isSn && !isPn && <span className="text-slate-400 dark:text-slate-500 font-normal">Standar</span>}
+                        {row.sub_jenis === 'PENGEMBALIAN' && row.kode_projek && (
+                            <>
+                                <span className="text-slate-400">&bull;</span>
+                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                    Stok: {isSn
+                                        ? (b.project_serials?.[String(row.kode_projek)] || []).length
+                                        : Number(b.project_stocks?.[String(row.kode_projek)]?.aktif ?? (
+                                            Number(b.project_stocks?.[String(row.kode_projek)]?.baru || 0) +
+                                            Number(b.project_stocks?.[String(row.kode_projek)]?.bekas || 0) +
+                                            Number(b.project_stocks?.[String(row.kode_projek)]?.rusak || 0)
+                                        ))}
+                                </span>
+                            </>
                         )}
                     </div>
                 )
             };
         });
-    }, [barangs, pplOptions]);
+    }, [barangs, pplOptions, row.sub_jenis, row.kode_projek]);
 
     return (
         <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 relative group space-y-3 transition-all">
@@ -170,16 +199,64 @@ export default function ModalBarangMasukRow({
 
             {/* 2. Pengirim/Asal & Gudang Tujuan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
-                <div className="space-y-1">
-                    <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{pihakAsalLabel}</Label>
-                    <Input
-                        placeholder={pihakAsalPlaceholder}
-                        disabled={isProcessing}
-                        value={row.pihak_asal}
-                        onChange={(e) => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
-                        className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                        required
-                    />
+            <div className="space-y-1">
+                {row.sub_jenis === 'PENGEMBALIAN' ? (
+                    <div className="-space-y-1">
+                        <div className="flex min-h-6 flex-wrap items-center justify-between gap-1">
+                            <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                                Asal Barang *
+                            </Label>
+
+                            <div className="-translate-y-2 flex items-center gap-1.5">
+                                {[
+                                    { value: 'PROJECT', label: 'Proyek' },
+                                    { value: 'MANUAL', label: 'Manual' }
+                                ].map(option => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => onFieldChange(rowIdx, 'return_source', option.value)}
+                                        disabled={isProcessing || isEditMode}
+                                        className={`rounded-md border px-1 py-1 text-[8px] font-semibold transition-colors ${
+                                            ((row.return_source || 'PROJECT') === option.value)
+                                                ? 'border-blue-500 bg-blue-600 text-white'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                                        }`}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {isProjectReturn ? (
+                            <HybridDropdown
+                                value={row.kode_projek || ''}
+                                options={projectOptions}
+                                allowCustom={false}
+                                onChange={value => onFieldChange(rowIdx, 'kode_projek', value)}
+                                placeholder="Pilih proyek asal..."
+                                searchPlaceholder="Cari kode proyek..."
+                                disabled={isProcessing || isEditMode}
+                                inputClassName="h-8 text-xs font-semibold"
+                            />
+                        ) : (
+                            <Input
+                                placeholder="Ketik asal barang / pihak pengembali..."
+                                disabled={isProcessing || isEditMode}
+                                value={row.pihak_asal || ''}
+                                onChange={e => onFieldChange(rowIdx, 'pihak_asal', e.target.value)}
+                                className="h-8 text-xs bg-slate-50 font-medium text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+                                required
+                            />
+                        )}
+                    </div>
+                    ) : (
+                        <>
+                            <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{pihakAsalLabel}</Label>
+                            <Input placeholder={pihakAsalPlaceholder} disabled={isProcessing} value={row.pihak_asal} onChange={(e) => onFieldChange(rowIdx, 'pihak_asal', e.target.value)} className="h-8 text-xs bg-slate-50 dark:bg-slate-950 font-medium text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700" required />
+                        </>
+                    )}
                 </div>
                 <div className="space-y-2.5">
                     <div className="space-y-1">
@@ -232,9 +309,9 @@ export default function ModalBarangMasukRow({
                                     return;
                                 }
                                 const cleanKode = String(selectedOpt?.value || val).split(' ')[0].trim().toLowerCase();
-                                const found = barangs.find(b => 
-                                    b.id === selectedOpt?.id || 
-                                    b.kode_barang.toLowerCase() === cleanKode || 
+                                const found = barangs.find(b =>
+                                    b.id === selectedOpt?.id ||
+                                    b.kode_barang.toLowerCase() === cleanKode ||
                                     b.kode_barang.toLowerCase() === String(val).trim().toLowerCase()
                                 );
                                 if (found) onBarangChange(rowIdx, found.id);
@@ -272,9 +349,9 @@ export default function ModalBarangMasukRow({
                 </div>
 
                 {/* BARIS 2: TANGGAL, SATUAN, QUANTITY, KONDISI FISIK */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${isProjectReturn ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-3`}>
                     <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal Transaksi *</Label>
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Tanggal *</Label>
                         <DatePicker
                             disabled={isProcessing}
                             value={row.tanggal}
@@ -293,58 +370,28 @@ export default function ModalBarangMasukRow({
                         />
                     </div>
 
-                    {/* Stepper Quantity (Maksimal 10) */}
+                    {/* Quantity pengembalian mengikuti pilihan selector, seperti transfer */}
                     <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                            <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Quantity *</Label>
-                            <span className="text-[10px] text-slate-400 font-mono">(Maks. 10)</span>
-                        </div>
-                        <div className="flex items-center">
-                            <button
-                                type="button"
-                                disabled={isProcessing || row.qty <= 1}
-                                onClick={() => onQtyChange(rowIdx, row.qty - 1)}
-                                className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
-                            >
-                                <Minus className="w-3 h-3" />
-                            </button>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={10}
-                                disabled={isProcessing}
-                                value={row.qty}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => onQtyChange(rowIdx, e.target.value)}
-                                className="h-8 w-full text-center font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-blue-500"
-                                required
-                            />
-                            <button
-                                type="button"
-                                disabled={isProcessing || row.qty >= 10}
-                                onClick={() => onQtyChange(rowIdx, row.qty + 1)}
-                                className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"
-                            >
-                                <Plus className="w-3 h-3" />
-                            </button>
-                        </div>
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Qty</Label>
+                        {isProjectReturn ? (
+                            <div className="flex h-8 items-center justify-center rounded-md border border-slate-700 bg-slate-900/60 px-3 text-xs font-bold text-cyan-300">
+                                {Number(row.qty || 0)}
+                            </div>
+                        ) : (
+                            <div className="flex items-center">
+                                <button type="button" disabled={isProcessing || row.qty <= 1} onClick={() => onQtyChange(rowIdx, row.qty - 1)} className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"><Minus className="w-3 h-3" /></button>
+                                <Input type="number" min={1} max={10} disabled={isProcessing} value={row.qty} onFocus={(e) => e.target.select()} onChange={(e) => onQtyChange(rowIdx, e.target.value)} className="h-8 w-full text-center font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-blue-500" required />
+                                <button type="button" disabled={isProcessing || row.qty >= 10} onClick={() => onQtyChange(rowIdx, row.qty + 1)} className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"><Plus className="w-3 h-3" /></button>
+                            </div>
+                        )}
                     </div>
 
-                    <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kondisi Fisik *</Label>
-                        <HybridDropdown
-                            value={row.kondisi || ''}
-                            options={kondisiOptions}
-                            onChange={(val, selectedOpt) => {
-                                const resVal = selectedOpt?.value !== undefined ? selectedOpt.value : (val ?? '');
-                                onFieldChange(rowIdx, 'kondisi', resVal);
-                            }}
-                            placeholder="Pilih Kondisi..."
-                            searchPlaceholder="Cari Kondisi..."
-                            disabled={isProcessing}
-                            inputClassName="h-8 text-xs font-semibold"
-                        />
-                    </div>
+                    {!isProjectReturn && (
+                        <div className="space-y-1">
+                            <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Kondisi Fisik *</Label>
+                            <HybridDropdown value={row.kondisi || ''} options={kondisiOptions} onChange={(val, selectedOpt) => onFieldChange(rowIdx, 'kondisi', selectedOpt?.value !== undefined ? selectedOpt.value : (val ?? ''))} placeholder="Pilih Kondisi..." searchPlaceholder="Cari Kondisi..." disabled={isProcessing} inputClassName="h-8 text-xs font-semibold" />
+                        </div>
+                    )}
                 </div>
 
                 {/* BARIS 3: PART NUMBER & HARGA SATUAN */}
@@ -392,36 +439,24 @@ export default function ModalBarangMasukRow({
                 </div>
             </div>
 
-            {/* 4. Input Manual Serial Number */}
-            {isWajibSn && !isEditMode && (
-                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center justify-between">
-                        <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                            Daftar Serial Number ({row.serials.length} Unit) *
-                        </Label>
-                        <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                            {row.serials.filter(s => Boolean(s?.trim())).length} / {row.qty} Terisi
-                        </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-44 overflow-y-auto p-1">
-                        {row.serials.map((sn, snIdx) => (
-                            <div key={`sn-inbound-${rowIdx}-${snIdx}`} className="space-y-0.5">
-                                <Label className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                                    SN Unit #{snIdx + 1}
-                                </Label>
-                                <Input
-                                    placeholder={`Ketik Serial Number #${snIdx + 1}`}
-                                    disabled={isProcessing}
-                                    value={sn}
-                                    onChange={(e) => onManualSerialChange(rowIdx, snIdx, e.target.value)}
-                                    className="h-8 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-mono border-slate-200 dark:border-slate-700"
-                                    required
-                                />
-                            </div>
-                        ))}
-                    </div>
+            {/* 4. Selector bersama SN / Non-SN untuk pengembalian dari proyek */}
+            {isProjectReturn && Boolean(row.kode_projek) && !isEditMode ? (
+                <ModalBarangSelectorUI
+                    row={row}
+                    rowIdx={rowIdx}
+                    targetBarang={targetBarang}
+                    gudangs={gudangs}
+                    setRows={setRows}
+                    isProcessing={isProcessing}
+                    isEditMode={false}
+                    allowRusak
+                />
+            ) : isWajibSn && !isEditMode ? (
+                <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
+                    <div className="flex items-center justify-between"><Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Daftar Serial Number ({row.serials.length} Unit) *</Label><span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">{row.serials.filter(s => Boolean(s?.trim())).length} / {row.qty} Terisi</span></div>
+                    <div className="grid max-h-44 grid-cols-1 gap-2.5 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">{row.serials.map((sn, snIdx) => <div key={`sn-inbound-${rowIdx}-${snIdx}`} className="space-y-0.5"><Label className="text-[10px] font-mono text-slate-500 dark:text-slate-400">SN Unit #{snIdx + 1}</Label><Input placeholder={`Ketik Serial Number #${snIdx + 1}`} disabled={isProcessing} value={sn} onChange={e => onManualSerialChange(rowIdx, snIdx, e.target.value)} className="h-8 border-slate-200 bg-white text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" required /></div>)}</div>
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }

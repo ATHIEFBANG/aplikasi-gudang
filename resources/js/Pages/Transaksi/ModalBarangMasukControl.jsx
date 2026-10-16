@@ -62,6 +62,7 @@ export function useModalBarangMasukControl({
     gudangs = [],
     suppliers = [],
     barangs = [],
+    projectOptions = [],
     onClose
 }) {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -74,6 +75,8 @@ export function useModalBarangMasukControl({
             tanggal: new Date().toISOString().slice(0, 10),
             nomor_imc: '',
             pihak_asal: '',
+            kode_projek: '',
+            return_source: 'PROJECT',
             gudang_tujuan_id: gudangs[0]?.id ? String(gudangs[0].id) : '',
             barang_id: defaultBarang?.id ? String(defaultBarang.id) : '',
             qty: 1,
@@ -93,24 +96,31 @@ export function useModalBarangMasukControl({
         return (suppliers || []).map(s => s.nama_supplier || s);
     }, [suppliers]);
 
-    const getBarangPplOptionsForRow = useCallback(() => {
-        return barangs.map(b => ({
-            value: b.kode_barang,
-            label: b.kode_barang,
-            id: b.id
-        }));
-    }, [barangs]);
-
-    const getBarangNamaOptionsForRow = useCallback(() => {
-        return barangs.map(b => {
-            const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
-            return {
-                value: kombinasiNama,
-                label: kombinasiNama,
-                id: b.id
-            };
+    const getEligibleBarangsForRow = useCallback((row = null) => {
+        if (row?.sub_jenis !== 'PENGEMBALIAN' || !row?.kode_projek) return barangs;
+        const code = String(row.kode_projek);
+        return barangs.filter(barang => {
+            const isSn = barang.is_wajib_sn === true || barang.is_wajib_sn === 1 || barang.is_wajib_sn === '1';
+            if (isSn) return (barang.project_serials?.[code] || []).length > 0;
+            const stock = barang.project_stocks?.[code] || {};
+            return Number(stock.aktif ?? (Number(stock.baru || 0) + Number(stock.bekas || 0) + Number(stock.rusak || 0))) > 0;
         });
     }, [barangs]);
+
+    const getBarangPplOptionsForRow = useCallback((row = null) => {
+        return getEligibleBarangsForRow(row).map(b => {
+            const isSn = b.is_wajib_sn === true || b.is_wajib_sn === 1 || b.is_wajib_sn === '1';
+            const isPn = b.is_wajib_pn === true || b.is_wajib_pn === 1 || b.is_wajib_pn === '1';
+            return { value: b.kode_barang, label: b.kode_barang, id: b.id, is_wajib_sn: isSn, is_wajib_pn: isPn };
+        });
+    }, [getEligibleBarangsForRow]);
+
+    const getBarangNamaOptionsForRow = useCallback((row = null) => {
+        return getEligibleBarangsForRow(row).map(b => {
+            const kombinasiNama = [b.brand, b.tipe, b.kategori].filter(Boolean).join(' ') || b.nama_barang || b.kode_barang;
+            return { value: kombinasiNama, label: kombinasiNama, id: b.id };
+        });
+    }, [getEligibleBarangsForRow]);
 
     useEffect(() => {
         if (isOpen) {
@@ -125,9 +135,11 @@ export function useModalBarangMasukControl({
                 setRows([{
                     id: selectedItem.id,
                     sub_jenis: selectedItem.sub_jenis || 'PEMBELIAN',
+                    return_source: selectedItem.sub_jenis === 'PENGEMBALIAN' ? (selectedItem.kode_projek ? 'PROJECT' : 'MANUAL') : '',
                     tanggal: formatToISODate(selectedItem.tanggal),
                     nomor_imc: selectedItem.nomor_imc || '',
                     pihak_asal: selectedItem.pihak_asal || '',
+                    kode_projek: selectedItem.kode_projek || '',
                     gudang_tujuan_id: selectedItem.gudang_tujuan_id ? String(selectedItem.gudang_tujuan_id) : '',
                     barang_id: detail.barang_id ? String(detail.barang_id) : '',
                     qty: detail.qty || 1,
@@ -163,20 +175,24 @@ export function useModalBarangMasukControl({
             const updated = [...prev];
             const currentRow = updated[rowIdx];
             let newKondisi = field === 'kondisi' ? value : currentRow.kondisi;
-            
+
             if (newKondisi && newKondisi.toUpperCase() === 'BAIK') {
                 newKondisi = 'Baru';
             }
             if (field === 'sub_jenis') {
-                if ((value === 'PEMBELIAN' || value === 'PEMINJAMAN') && newKondisi === 'Rusak') {
-                    newKondisi = 'Baru';
-                }
+                if ((value === 'PEMBELIAN' || value === 'PEMINJAMAN') && newKondisi === 'Rusak') newKondisi = 'Baru';
+                updated[rowIdx] = { ...currentRow, [field]: value, return_source: value === 'PENGEMBALIAN' ? 'PROJECT' : '', kode_projek: '', pihak_asal: '', barang_id: '', serials: [], qty: value === 'PENGEMBALIAN' ? 0 : 1, non_sn_selections: {}, kondisi: newKondisi };
+                return updated;
             }
-            updated[rowIdx] = { 
-                ...currentRow, 
-                [field]: value,
-                kondisi: newKondisi
-            };
+            if (field === 'return_source') {
+                updated[rowIdx] = { ...currentRow, return_source: value, kode_projek: '', pihak_asal: '', barang_id: '', serials: [], non_sn_selections: {}, qty: value === 'PROJECT' ? 0 : 1 };
+                return updated;
+            }
+            if (field === 'kode_projek') {
+                updated[rowIdx] = { ...currentRow, kode_projek: value, pihak_asal: value ? `Proyek ${value}` : '', barang_id: '', serials: [], non_sn_selections: {}, qty: 0 };
+                return updated;
+            }
+            updated[rowIdx] = { ...currentRow, [field]: value, kondisi: newKondisi };
             return updated;
         });
     };
@@ -200,17 +216,21 @@ export function useModalBarangMasukControl({
             const isSn = Boolean(targetBarang?.is_wajib_sn);
             const currentQty = currentRow.qty || 1;
 
+            const isProjectReturn = currentRow.sub_jenis === 'PENGEMBALIAN' && currentRow.return_source !== 'MANUAL' && Boolean(currentRow.kode_projek);
             updated[rowIdx] = {
                 ...currentRow,
                 barang_id: realId,
-                qty: currentQty,
-                serials: isSn ? Array(currentQty).fill('') : []
+                qty: isProjectReturn ? 0 : currentQty,
+                non_sn_selections: isProjectReturn ? {} : (currentRow.non_sn_selections || {}),
+                serials: isSn ? (isProjectReturn ? [] : Array(currentQty).fill('')) : []
             };
             return updated;
         });
     };
 
     const handleQtyChange = (rowIdx, val) => {
+        const rowToChange = rows[rowIdx];
+        if (rowToChange?.sub_jenis === 'PENGEMBALIAN' && rowToChange.return_source !== 'MANUAL') return;
         let count = parseInt(val, 10);
         if (isNaN(count) || count < 1) count = 1;
         if (count > 10) count = 10;
@@ -220,9 +240,10 @@ export function useModalBarangMasukControl({
             const targetBarang = barangs.find(b => String(b.id) === String(currentRow.barang_id));
             const isSn = Boolean(targetBarang?.is_wajib_sn);
             let newSerials = currentRow.serials || [];
+            const isProjectReturn = currentRow.sub_jenis === 'PENGEMBALIAN' && currentRow.return_source !== 'MANUAL' && Boolean(currentRow.kode_projek);
             if (isSn) {
                 newSerials = [...newSerials];
-                while (newSerials.length < count) newSerials.push('');
+                if (!isProjectReturn) while (newSerials.length < count) newSerials.push('');
                 newSerials = newSerials.slice(0, count);
             }
             updated[rowIdx] = {
@@ -233,13 +254,26 @@ export function useModalBarangMasukControl({
             return updated;
         });
     };
-    
+
     const handleManualSerialChange = (rowIdx, snIdx, val) => {
         setRows(prev => {
             const updated = [...prev];
             const currentSerials = [...(updated[rowIdx].serials || [])];
             currentSerials[snIdx] = val;
             updated[rowIdx] = { ...updated[rowIdx], serials: currentSerials };
+            return updated;
+        });
+    };
+
+    const handleToggleProjectSerial = (rowIdx, serialNumber, checked) => {
+        setRows(prev => {
+            const updated = [...prev];
+            const current = updated[rowIdx];
+            const serials = Array.isArray(current.serials) ? current.serials : [];
+            const nextSerials = checked
+                ? [...new Set([...serials, serialNumber])]
+                : serials.filter(sn => sn !== serialNumber);
+            updated[rowIdx] = { ...current, serials: nextSerials, qty: nextSerials.length };
             return updated;
         });
     };
@@ -384,7 +418,7 @@ export function useModalBarangMasukControl({
 
             let targetGudangId = gudangs[0]?.id ? String(gudangs[0].id) : '';
             if (rawGudangTujuan && rawGudangTujuan !== '-') {
-                const foundG = gudangs.find(g => 
+                const foundG = gudangs.find(g =>
                     g.nama_gudang.toLowerCase().trim() === rawGudangTujuan.toLowerCase().trim() ||
                     rawGudangTujuan.toLowerCase().includes(g.nama_gudang.toLowerCase().trim())
                 );
@@ -452,7 +486,12 @@ export function useModalBarangMasukControl({
             const r = rows[i];
             const rowNum = i + 1;
 
-            if (!r.pihak_asal.trim()) {
+            const isProjectReturn = r.sub_jenis === 'PENGEMBALIAN' && r.return_source !== 'MANUAL' && Boolean(r.kode_projek);
+            if (r.sub_jenis === 'PENGEMBALIAN' && r.return_source !== 'MANUAL' && !r.kode_projek?.trim()) {
+                alert(`Baris #${rowNum}: Pilih proyek asal atau ubah ke mode Manual.`);
+                return;
+            }
+            if (!isProjectReturn && !r.pihak_asal.trim()) {
                 alert(`Baris #${rowNum}: Pihak Asal / Supplier wajib diisi.`);
                 return;
             }
@@ -466,6 +505,10 @@ export function useModalBarangMasukControl({
             }
             if (!r.barang_id) {
                 alert(`Baris #${rowNum}: Harap pilih barang terlebih dahulu.`);
+                return;
+            }
+            if (isProjectReturn && Number(r.qty || 0) < 1) {
+                alert(`Baris #${rowNum}: Pilih SN atau jumlah stok Non-SN yang akan dikembalikan terlebih dahulu.`);
                 return;
             }
 
@@ -498,7 +541,7 @@ export function useModalBarangMasukControl({
                     usedSerialsInForm.add(lowerSn);
 
                     // 2. Cek duplikat terhadap database / master data
-                    if (existingDatabaseSerials.has(lowerSn)) {
+                    if (!isProjectReturn && existingDatabaseSerials.has(lowerSn)) {
                         alert(`Baris #${rowNum}: Serial Number "${cleanSn}" sudah terdaftar di sistem. Harap gunakan Serial Number yang unik.`);
                         return;
                     }
@@ -523,7 +566,8 @@ export function useModalBarangMasukControl({
                     tanggal: r.tanggal,
                     kondisi: r.kondisi ? (r.kondisi.toUpperCase() === 'BAIK' ? 'Baru' : r.kondisi) : 'Baru',
                     nomor_imc: r.nomor_imc.trim(),
-                    pihak_asal: r.pihak_asal.trim(),
+                    pihak_asal: r.sub_jenis === 'PENGEMBALIAN' && r.return_source !== 'MANUAL' && r.kode_projek ? `Proyek ${r.kode_projek}` : r.pihak_asal.trim(),
+                    kode_projek: r.sub_jenis === 'PENGEMBALIAN' && r.return_source !== 'MANUAL' ? (r.kode_projek || null) : null,
                     gudang_tujuan_id: parseInt(r.gudang_tujuan_id, 10),
                     barang_id: parseInt(r.barang_id, 10),
                     qty: parseInt(r.qty, 10),
@@ -552,6 +596,7 @@ export function useModalBarangMasukControl({
     return {
         isProcessing,
         rows,
+        setRows,
         gudangOptions,
         supplierOptions,
         getBarangPplOptionsForRow,
@@ -562,6 +607,7 @@ export function useModalBarangMasukControl({
         handleBarangChange,
         handleQtyChange,
         handleManualSerialChange,
+        handleToggleProjectSerial,
         handleBulkPasteExcel,
         handleSubmitForm,
     };

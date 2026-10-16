@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Filter, RotateCcw, X } from 'lucide-react';
-import Search from '@/components/Search';
-import DateRangeFilter from '@/components/DateRangeFilter';
-import Button from '@/components/Button';
+import Search from '@/components/gabungan/Search';
+import DateRangeFilter from '@/components/gabungan/DateRangeFilter';
+import Button from '@/components/gabungan/Button';
 
 const FILTER_BUTTON_ID = 'filter-panel-trigger';
 

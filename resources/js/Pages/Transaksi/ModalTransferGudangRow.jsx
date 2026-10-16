@@ -2,9 +2,9 @@ import React, { useMemo } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Trash2, Warehouse, BriefcaseBusiness, Check } from 'lucide-react';
-import HybridDropdown from '@/components/HybridDropdown';
-import DatePicker from '@/components/DatePicker';
+import { Trash2, Warehouse, Check } from 'lucide-react';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import DatePicker from '@/components/gabungan/DatePicker';
 import ModalBarangSelectorUI from './ModalBarangSelectorUI';
 import { isBooleanFlag } from './ModalBarangSelectorLogic';
 
@@ -85,9 +85,7 @@ export default function ModalTransferGudangRow({
                 <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Arah Perpindahan *</Label>
                 <div className="flex flex-wrap gap-2">
                     {[
-                        { id: 'GUDANG_KE_GUDANG', label: 'Gudang → Gudang', icon: Warehouse },
-                        { id: 'GUDANG_KE_PROYEK', label: 'Gudang → Proyek', icon: BriefcaseBusiness },
-                        { id: 'PROYEK_KE_GUDANG', label: 'Proyek → Gudang', icon: BriefcaseBusiness }
+                        { id: 'GUDANG_KE_GUDANG', label: 'Gudang → Gudang', icon: Warehouse }
                     ].map(option => {
                         const Icon = option.icon;
                         const selected = (row.arah_transfer || ((row.tujuan_tipe || 'GUDANG') === 'PROYEK' ? 'GUDANG_KE_PROYEK' : 'GUDANG_KE_GUDANG')) === option.id;

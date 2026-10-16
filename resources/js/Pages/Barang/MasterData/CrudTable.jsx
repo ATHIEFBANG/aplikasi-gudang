@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import Tabel from '@/components/Tabel';
+import Tabel from '@/components/gabungan/Tabel';
 import { Badge } from '@/components/ui/badge';
 
 export default function CrudTable({

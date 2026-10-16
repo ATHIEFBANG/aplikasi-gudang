@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import Toolbar from '@/components/Toolbar';
+import Toolbar from '@/components/gabungan/Toolbar';
 import CrudTable from './CrudTable';
 import ModalBarangMasuk from './ModalBarangMasuk';
 import ModalBarangKeluar from './ModalBarangKeluar';
 import ModalTransferGudang from './ModalTransferGudang';
-import HybridDropdown from '@/components/HybridDropdown';
-import DateRangeFilter from '@/components/DateRangeFilter';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
+import DateRangeFilter from '@/components/gabungan/DateRangeFilter';
 import { Toast } from '@/components/ui/Notifikasi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ import {
 import { router, usePage } from '@inertiajs/react';
 import { useConfirm } from '@/Layouts/AuthenticatedLayout';
 
-const TRANSAKSI_PROPS = ['transaksis', 'filters', 'barangs', 'gudangs', 'customerOptions', 'projectOptions'];
+const TRANSAKSI_PROPS = ['transaksis', 'filters', 'barangs', 'gudangs', 'customerOptions', 'projectOptions', 'returnProjectOptions'];
 
 export default function TabTransaksi({
     transaksis,
@@ -31,6 +31,7 @@ export default function TabTransaksi({
     barangs = [],
     customerOptions = [],
     projectOptions = [],
+    returnProjectOptions = [],
     filters = {}
 }) {
     const { auth, flash } = usePage().props;
@@ -313,7 +314,7 @@ export default function TabTransaksi({
     };
 
     const handleCancelSelected = () => {
-        if (!canWrite || selectedIds.length === 0 || !['KELUAR', 'TRANSFER'].includes(mainTab)) {
+        if (!canWrite || selectedIds.length === 0 || !['MASUK', 'KELUAR', 'TRANSFER'].includes(mainTab)) {
             return;
         }
 
@@ -322,6 +323,11 @@ export default function TabTransaksi({
         );
 
         if (selectedItems.length === 0) return;
+
+        if (mainTab === 'MASUK' && selectedItems.some(item => !(item.sub_jenis === 'PENGEMBALIAN' && item.kode_projek))) {
+            setToast({ isOpen: true, type: 'info', title: 'Pilihan Tidak Sesuai', message: 'Pembatalan dari tab Barang Masuk hanya tersedia untuk transaksi Pengembalian Proyek. Pilih transaksi pengembalian saja.' });
+            return;
+        }
 
         confirm({
             title: 'Batalkan Transaksi',
@@ -337,7 +343,9 @@ export default function TabTransaksi({
                 for (const item of selectedItems) {
                     const url = mainTab === 'TRANSFER'
                         ? `/transaksi-transfer/${item.id}/cancel`
-                        : `/transaksi-keluar/${item.id}/cancel`;
+                        : mainTab === 'MASUK'
+                            ? `/transaksi-masuk/${item.id}/cancel`
+                            : `/transaksi-keluar/${item.id}/cancel`;
 
                     await new Promise(resolve => {
                         router.post(url, {}, {
@@ -402,8 +410,12 @@ export default function TabTransaksi({
     };
 
     const handleOpenEdit = item => {
-        if (item?.sub_jenis === 'PENGEMBALIAN_PROYEK') {
-            setToast({ isOpen: true, type: 'info', title: 'Pengembalian Proyek', message: 'Transaksi pengembalian tidak dapat diedit langsung. Batalkan transaksi lalu buat pengembalian baru dengan data yang benar.' });
+        if (item?.sub_jenis === 'PENGEMBALIAN_PROYEK' || (item?.sub_jenis === 'PENGEMBALIAN' && item?.kode_projek)) {
+            setToast({ isOpen: true, type: 'info', title: 'Pengembalian Proyek', message: 'Transaksi pengembalian aset proyek tidak dapat diedit langsung. Batalkan transaksi lalu buat pengembalian baru dengan data yang benar.' });
+            return;
+        }
+        if (item?.jenis_transaksi === 'TRANSFER' && item?.kode_projek && !item?.gudang_tujuan_id) {
+            setToast({ isOpen: true, type: 'info', title: 'Transfer ke Proyek', message: 'Transfer aset ke proyek tidak dapat diedit langsung karena memengaruhi saldo proyek. Batalkan transaksi jika masih aman, lalu buat transfer baru.' });
             return;
         }
         setIsEditMode(true);
@@ -441,9 +453,10 @@ export default function TabTransaksi({
                 selectedCount={selectedIds.length}
                 onDeleteSelected={isAdmin ? handleDeleteSelected : undefined}
                 onCancelSelected={
-                    canWrite && ['KELUAR', 'TRANSFER'].includes(mainTab)
-                        ? handleCancelSelected
-                        : undefined
+                    canWrite && (
+                        ['KELUAR', 'TRANSFER'].includes(mainTab) ||
+                        (mainTab === 'MASUK' && dataList.some(item => selectedIds.includes(item.id) && item.sub_jenis === 'PENGEMBALIAN' && item.kode_projek))
+                    ) ? handleCancelSelected : undefined
                 }
                 onReset={isAdmin ? handleReset : undefined}
                 onExport={handleExport}
@@ -676,6 +689,7 @@ export default function TabTransaksi({
                 gudangs={gudangs}
                 suppliers={suppliers}
                 barangs={barangs}
+                projectOptions={returnProjectOptions}
             />
 
             <ModalBarangKeluar
@@ -689,6 +703,7 @@ export default function TabTransaksi({
                 gudangs={gudangs}
                 barangs={barangs}
                 customerOptions={customerOptions}
+                projectOptions={projectOptions}
             />
 
             <ModalTransferGudang

@@ -43,6 +43,7 @@ export function useModalBarangKeluarControl({
     selectedItem = null,
     gudangs = [],
     barangs = [],
+    projectOptions = [],
     onClose
 }) {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -307,6 +308,8 @@ export function useModalBarangKeluarControl({
                 }
             } else if (field === 'pihak_asal') {
                 pihakAsal = value;
+            } else if (field === 'kode_projek') {
+                pihakAsal = value ? String(value) : '';
             }
 
             updated[rowIdx] = {
@@ -391,8 +394,12 @@ export function useModalBarangKeluarControl({
                 return;
             }
 
+            if (r.sub_jenis === 'BARANG_KE_SITE' && !r.kode_projek?.trim()) {
+                alert(`Baris #${rowNum}: Kode proyek wajib dipilih dari Master Data Proyek.`);
+                return;
+            }
             if (!r.pihak_asal?.trim()) {
-                const labelTarget = r.sub_jenis === 'BARANG_KE_SITE' ? 'Site Tujuan / Teknisi' : 'Departemen Keperluan';
+                const labelTarget = r.sub_jenis === 'BARANG_KE_SITE' ? 'Site Tujuan / Proyek' : 'Departemen Keperluan';
                 alert(`Baris #${rowNum}: ${labelTarget} wajib diisi.`);
                 return;
             }
