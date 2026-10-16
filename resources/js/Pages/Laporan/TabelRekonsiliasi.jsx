@@ -10,7 +10,7 @@ const REKONSILIASI_COLUMNS = [
     { key: 'stok_awal', label: 'STOK AWAL' },
     { key: 'masuk', label: 'MASUK (+)' },
     { key: 'keluar', label: 'KELUAR (-)' },
-    { key: 'transfer_net', label: 'TRF' },
+    { key: 'transfer_net', label: 'TRANSFER ANTARGUDANG' },
     { key: 'stok_akhir', label: 'STOK USABLE' },
     { key: 'sisa_fisik', label: 'SISA FISIK DI GUDANG' },
     { key: 'grand_total', label: 'STOK KESELURUHAN' },
@@ -203,19 +203,19 @@ function TransferNetDropdown({ item }) {
             style={{ top: menuPosition.top, left: menuPosition.left, zIndex: 99999 }}
         >
             <div className="text-[10px] font-sans font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 pb-1 border-b border-slate-100 dark:border-slate-800">
-                Rincian Transfer
+                Rincian Transfer Antargudang
             </div>
 
             <div className="space-y-1">
                 <div className="flex justify-between items-center rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/70">
-                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Trf Masuk (+)</span>
+                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Transfer Masuk (+)</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">
                         +{trfIn.toLocaleString('id-ID')} Unit
                     </span>
                 </div>
 
                 <div className="flex justify-between items-center rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/70">
-                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Trf Keluar (-)</span>
+                    <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300">Transfer Keluar (-)</span>
                     <span className="font-bold text-rose-600 dark:text-rose-400">
                         -{trfOut.toLocaleString('id-ID')} Unit
                     </span>
@@ -223,7 +223,7 @@ function TransferNetDropdown({ item }) {
 
                 <div className="pt-2 mt-1 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
                     <span className="font-sans text-[11px] font-semibold text-slate-700 dark:text-slate-200">
-                        Net Transfer
+                        Net Transfer Antargudang
                     </span>
                     <span className="font-bold text-indigo-600 dark:text-indigo-400">
                         {trfNet >= 0 ? `+${trfNet.toLocaleString('id-ID')}` : trfNet.toLocaleString('id-ID')} Unit

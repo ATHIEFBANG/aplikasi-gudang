@@ -54,9 +54,25 @@ class HistoryMovingController extends Controller
         if ($jenis === 'MASUK') {
             $query->where('jenis_transaksi', 'MASUK')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         } elseif ($jenis === 'KELUAR') {
-            $query->where('jenis_transaksi', 'KELUAR')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+            $query->where(function ($q) {
+                $q->where(function ($normal) {
+                    $normal->where('jenis_transaksi', 'KELUAR')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+                })->orWhere(function ($project) {
+                    // Data lama: perpindahan ke proyek tersimpan sebagai TRANSFER tanpa gudang tujuan.
+                    $project->where('jenis_transaksi', 'TRANSFER')
+                        ->whereNotNull('kode_projek')
+                        ->where('kode_projek', '!=', '')
+                        ->whereNull('gudang_tujuan_id');
+                });
+            });
         } elseif ($jenis === 'TRANSFER') {
-            $query->where(fn($q) => $q->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'));
+            $query->where(function ($q) {
+                $q->where(function ($transfer) {
+                    $transfer->where(function ($type) {
+                        $type->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG');
+                    })->whereNotNull('gudang_asal_id')->whereNotNull('gudang_tujuan_id');
+                });
+            });
         }
 
         // 3. Filter Gudang
@@ -155,9 +171,25 @@ class HistoryMovingController extends Controller
         if ($jenis === 'MASUK') {
             $query->where('jenis_transaksi', 'MASUK')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
         } elseif ($jenis === 'KELUAR') {
-            $query->where('jenis_transaksi', 'KELUAR')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+            $query->where(function ($q) {
+                $q->where(function ($normal) {
+                    $normal->where('jenis_transaksi', 'KELUAR')->where('sub_jenis', '!=', 'TRANSFER_GUDANG');
+                })->orWhere(function ($project) {
+                    // Data lama: perpindahan ke proyek tersimpan sebagai TRANSFER tanpa gudang tujuan.
+                    $project->where('jenis_transaksi', 'TRANSFER')
+                        ->whereNotNull('kode_projek')
+                        ->where('kode_projek', '!=', '')
+                        ->whereNull('gudang_tujuan_id');
+                });
+            });
         } elseif ($jenis === 'TRANSFER') {
-            $query->where(fn($q) => $q->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG'));
+            $query->where(function ($q) {
+                $q->where(function ($transfer) {
+                    $transfer->where(function ($type) {
+                        $type->where('jenis_transaksi', 'TRANSFER')->orWhere('sub_jenis', 'TRANSFER_GUDANG');
+                    })->whereNotNull('gudang_asal_id')->whereNotNull('gudang_tujuan_id');
+                });
+            });
         }
 
         if ($gudangId && $gudangId !== 'ALL') {
@@ -239,7 +271,7 @@ class HistoryMovingController extends Controller
                         $detail?->qty ?? 0,
                         $r->kondisi ?: 'Baru',
                         $r->gudangAsal?->nama_gudang ?: ($r->pihak_asal ?: '-'),
-                        $r->gudangTujuan?->nama_gudang ?: ($r->pihak_asal ?: '-'),
+                        $r->gudangTujuan?->nama_gudang ?: (($r->kode_projek && !$r->gudang_tujuan_id) ? 'Proyek ' . $r->kode_projek : ($r->pihak_asal ?: '-')),
                         $r->kode_projek ?: '-',
                         $r->nama_customer ?: '-',
                         $r->nomor_imc ?: '-',

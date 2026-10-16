@@ -96,17 +96,17 @@ class LaporanController extends Controller
                 THEN td.qty ELSE 0
             END) as masuk_rusak"),
             DB::raw("SUM(CASE
-                WHEN t.jenis_transaksi = 'KELUAR' " .
+                WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as keluar_bulan"),
             DB::raw("SUM(CASE
-                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " .
+                WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')) " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as trf_in"),
             DB::raw("SUM(CASE
-                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " .
+                WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')) " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as trf_out")
@@ -131,7 +131,14 @@ class LaporanController extends Controller
             })
             ->whereIn('td.barang_id', $barangIds)
             ->whereBetween('t.tanggal', [$startDate, $endDate])
-            ->where('t.jenis_transaksi', 'KELUAR')
+            ->where(function ($q) {
+                $q->where('t.jenis_transaksi', 'KELUAR')
+                  ->orWhere(function ($project) {
+                      $project->where('t.jenis_transaksi', 'TRANSFER')
+                          ->whereNotNull('t.kode_projek')->where('t.kode_projek', '!=', '')
+                          ->whereNull('t.gudang_tujuan_id');
+                  });
+            })
             ->when($gudangId !== 'ALL', function ($q) use ($gudangId) {
                 $q->where('t.gudang_asal_id', (int) $gudangId);
             })
@@ -180,12 +187,12 @@ class LaporanController extends Controller
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
                     THEN td.qty
-                    WHEN t.jenis_transaksi = 'KELUAR' {$asalCond}
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
                     THEN -td.qty
-                    WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
+                    WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
@@ -197,11 +204,11 @@ class LaporanController extends Controller
                      AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
                       OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
                     THEN td.qty
-                    WHEN t.jenis_transaksi = 'KELUAR' {$asalCond}
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
                      AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
                       OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
                     THEN -td.qty
-                    WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
+                    WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
                      AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
                       OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
                     THEN {$trfCase}
@@ -211,10 +218,10 @@ class LaporanController extends Controller
                     WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond}
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
                     THEN td.qty
-                    WHEN t.jenis_transaksi = 'KELUAR' {$asalCond}
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
                     THEN -td.qty
-                    WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
+                    WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
                     THEN {$trfCase}
                     ELSE 0
@@ -259,7 +266,14 @@ class LaporanController extends Controller
 
             $keluarPerGudang = DB::table('transaksi_details as td')
                 ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
-                ->where('t.jenis_transaksi', 'KELUAR')
+                ->where(function ($q) {
+                    $q->where('t.jenis_transaksi', 'KELUAR')
+                      ->orWhere(function ($project) {
+                          $project->where('t.jenis_transaksi', 'TRANSFER')
+                              ->whereNotNull('t.kode_projek')->where('t.kode_projek', '!=', '')
+                              ->whereNull('t.gudang_tujuan_id');
+                      });
+                })
                 ->whereNotNull('t.gudang_asal_id')
                 ->where(function ($q) {
                     $q->whereIn('t.status', ['COMPLETED', 'completed'])->orWhereNull('t.status');
@@ -272,7 +286,9 @@ class LaporanController extends Controller
             $transferInPerGudang = DB::table('transaksi_details as td')
                 ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
                 ->where(function ($q) {
-                    $q->where('t.jenis_transaksi', 'TRANSFER')->orWhere('t.sub_jenis', 'TRANSFER_GUDANG');
+                    $q->where(function ($type) {
+                        $type->where('t.jenis_transaksi', 'TRANSFER')->orWhere('t.sub_jenis', 'TRANSFER_GUDANG');
+                    })->whereNotNull('t.gudang_asal_id')->whereNotNull('t.gudang_tujuan_id');
                 })
                 ->whereNotNull('t.gudang_tujuan_id')
                 ->where(function ($q) {
@@ -286,7 +302,9 @@ class LaporanController extends Controller
             $transferOutPerGudang = DB::table('transaksi_details as td')
                 ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
                 ->where(function ($q) {
-                    $q->where('t.jenis_transaksi', 'TRANSFER')->orWhere('t.sub_jenis', 'TRANSFER_GUDANG');
+                    $q->where(function ($type) {
+                        $type->where('t.jenis_transaksi', 'TRANSFER')->orWhere('t.sub_jenis', 'TRANSFER_GUDANG');
+                    })->whereNotNull('t.gudang_asal_id')->whereNotNull('t.gudang_tujuan_id');
                 })
                 ->whereNotNull('t.gudang_asal_id')
                 ->where(function ($q) {
@@ -564,17 +582,17 @@ class LaporanController extends Controller
                 THEN td.qty ELSE 0
             END) as masuk_rusak"),
             DB::raw("SUM(CASE
-                WHEN t.jenis_transaksi = 'KELUAR' " .
+                WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as keluar_bulan"),
             DB::raw("SUM(CASE
-                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " .
+                WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')) " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as trf_in"),
             DB::raw("SUM(CASE
-                WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG') " .
+                WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')) " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_asal_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as trf_out")
@@ -612,12 +630,12 @@ class LaporanController extends Controller
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
                     THEN td.qty
-                    WHEN t.jenis_transaksi = 'KELUAR' {$asalCond}
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
                     THEN -td.qty
-                    WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
+                    WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
@@ -629,11 +647,11 @@ class LaporanController extends Controller
                      AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
                       OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
                     THEN td.qty
-                    WHEN t.jenis_transaksi = 'KELUAR' {$asalCond}
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
                      AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
                       OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
                     THEN -td.qty
-                    WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
+                    WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
                      AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
                       OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
                     THEN {$trfCase}
@@ -643,10 +661,10 @@ class LaporanController extends Controller
                     WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond}
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
                     THEN td.qty
-                    WHEN t.jenis_transaksi = 'KELUAR' {$asalCond}
+                    WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
                     THEN -td.qty
-                    WHEN (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG')
+                    WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
                      AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
                     THEN {$trfCase}
                     ELSE 0
