@@ -520,10 +520,18 @@ class TransaksiController extends Controller
                 return $g;
             });
 
+        // Dropdown proyek untuk Barang Keluar: kode proyek + subteks nama proyek/customer.
         $projectOptions = Proyek::query()
             ->where('is_active', true)
             ->orderBy('kode_projek')
-            ->pluck('kode_projek')
+            ->get()
+            ->map(fn ($proyek) => [
+                'value' => (string) $proyek->kode_projek,
+                'label' => (string) $proyek->kode_projek,
+                'kode_projek' => (string) $proyek->kode_projek,
+                'nama_projek' => $proyek->nama_projek ?? '',
+                'nama_customer' => $proyek->nama_customer ?? '',
+            ])
             ->values();
 
         [$projectStocksByBarang, $projectSerialsByBarang] = $this->getProjectInventorySnapshot();
@@ -545,7 +553,14 @@ class TransaksiController extends Controller
                 if (!empty($outstandingProjectCodes)) $q->orWhereIn('kode_projek', $outstandingProjectCodes);
             })
             ->orderBy('kode_projek')
-            ->pluck('kode_projek')
+            ->get()
+            ->map(fn ($proyek) => [
+                'value' => (string) $proyek->kode_projek,
+                'label' => (string) $proyek->kode_projek,
+                'kode_projek' => (string) $proyek->kode_projek,
+                'nama_projek' => $proyek->nama_projek ?? '',
+                'nama_customer' => $proyek->nama_customer ?? '',
+            ])
             ->values();
 
         $customerOptions = Transaksi::query()

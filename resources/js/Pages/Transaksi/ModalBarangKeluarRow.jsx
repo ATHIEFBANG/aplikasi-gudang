@@ -155,6 +155,27 @@ export default function ModalBarangKeluarRow({
                                 <HybridDropdown
                                     value={row.kode_projek || ''}
                                     options={projectOptions}
+                                    renderOption={(option, isSelected) => {
+                                        const namaProyek = option?.nama_projek || option?.nama_proyek || option?.project_name || '';
+                                        const namaCustomer = option?.nama_customer || option?.customer_name || '';
+                                        return (
+                                            <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-0.5">
+                                                <span className={`truncate font-semibold ${isSelected ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
+                                                    {option?.label || option?.kode_projek || option?.value || ''}
+                                                </span>
+                                                {namaProyek && (
+                                                    <span className={`truncate text-[10px] font-normal ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                        {namaProyek}
+                                                    </span>
+                                                )}
+                                                {namaCustomer && (
+                                                    <span className={`truncate text-[10px] font-normal ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                        Customer: {namaCustomer}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    }}
                                     allowCustom={false}
                                     onChange={val => onFieldChange(rowIdx, 'kode_projek', val)}
                                     placeholder="Pilih proyek dari master data..."
