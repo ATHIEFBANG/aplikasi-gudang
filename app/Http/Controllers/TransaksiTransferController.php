@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use App\Models\Barang;
 use App\Models\Proyek;
 use App\Models\BarangSerial;
@@ -13,13 +11,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-
 class TransaksiTransferController extends Controller
 {
     public function store(Request $request)
     {
         set_time_limit(120);
-
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.tanggal' => 'required|date',
@@ -41,10 +37,8 @@ class TransaksiTransferController extends Controller
             'items.*.non_sn_selections.*.kondisi' => 'required|string|max:100',
             'items.*.non_sn_selections.*.qty' => 'required|integer|min:1|max:50',
         ]);
-
         foreach ($validated['items'] as $index => $item) {
             $arah = $item['arah_transfer'] ?? (($item['tujuan_tipe'] ?? 'GUDANG') === 'PROYEK' ? 'GUDANG_KE_PROYEK' : 'GUDANG_KE_GUDANG');
-
             if ($arah !== 'GUDANG_KE_GUDANG' || ($item['tujuan_tipe'] ?? 'GUDANG') !== 'GUDANG') {
                 throw ValidationException::withMessages([
                     "items.{$index}.arah_transfer" => 'Transfer hanya mendukung perpindahan Gudang ke Gudang. Untuk pengeluaran ke proyek, gunakan menu Barang Keluar.'
@@ -61,13 +55,10 @@ class TransaksiTransferController extends Controller
                 ]);
             }
         }
-
         $barangIds = array_unique(array_column($validated['items'], 'barang_id'));
         $gudangAsalIds = array_unique(array_column($validated['items'], 'gudang_asal_id'));
         $barangs = Barang::whereIn('id', $barangIds)->get()->keyBy('id');
-
         $allCleanSns = [];
-
         foreach ($validated['items'] as $item) {
             foreach (($item['serials'] ?? []) as $sn) {
                 $clean = trim((string) $sn);
@@ -80,9 +71,7 @@ class TransaksiTransferController extends Controller
         if (count($allCleanSns) !== count(array_unique($allCleanSns))) {
             throw new \Exception('Terdapat Serial Number yang dipilih lebih dari satu kali dalam transaksi transfer.');
         }
-
         $allCleanSns = array_values(array_unique($allCleanSns));
-
         DB::transaction(function () use (
             $validated,
             $request,
@@ -98,7 +87,6 @@ class TransaksiTransferController extends Controller
             $stockLogsToInsert = [];
             $conditionStockCache = [];
             $reservedConditionStock = [];
-
             if (!empty($allCleanSns)) {
                 $serialsMap = BarangSerial::whereIn('barang_id', $barangIds)
                     ->whereIn('gudang_id', $gudangAsalIds)
@@ -131,7 +119,6 @@ class TransaksiTransferController extends Controller
                 $qty = (int) $item['qty'];
                 $serials = array_values(array_filter(array_map('trim', $item['serials'] ?? [])));
                 $barang = $barangs->get($barangId);
-
                 if (!$barang) {
                     throw new \Exception("Data barang #{$barangId} tidak ditemukan.");
                 }
@@ -139,28 +126,22 @@ class TransaksiTransferController extends Controller
                 if (!$isProject && $gudangAsalId === $gudangTujuanId) {
                     throw new \Exception('Gudang Asal dan Gudang Tujuan tidak boleh sama.');
                 }
-
                 $stokAsal = Stok::where('barang_id', $barangId)
                     ->where('gudang_id', $gudangAsalId)
                     ->lockForUpdate()
                     ->first();
-
                 if (!$stokAsal || $stokAsal->jumlah < $qty) {
                     $stokTersedia = $stokAsal?->jumlah ?? 0;
-
                     throw new \Exception(
                         "Stok barang '{$barang->nama_barang}' di gudang asal tidak mencukupi " .
                         "(Tersedia: {$stokTersedia}, Diminta: {$qty})."
                     );
                 }
-
                 $isSn = $this->isBooleanFlag($barang->is_wajib_sn) ||
                     $this->isBooleanFlag($barang->is_sn);
-
                 $conditionGroups = [];
                 $groupSerials = [];
                 $nomorImcParts = [];
-
                 if (!empty($item['nomor_imc'])) {
                     $nomorImcParts[] = trim($item['nomor_imc']);
                 }
@@ -175,22 +156,18 @@ class TransaksiTransferController extends Controller
                     foreach ($serials as $sn) {
                         $snKey = $barangId . '_' . $gudangAsalId . '_' . $sn;
                         $serialRecord = $serialsMap->get($snKey);
-
                         if (!$serialRecord) {
                             throw new \Exception(
                                 "Serial Number '{$sn}' untuk barang '{$barang->nama_barang}' " .
                                 'tidak ditemukan di gudang asal atau tidak tersedia untuk ditransfer.'
                             );
                         }
-
                         $condition = $this->normalizeCondition($serialRecord->kondisi);
                         $conditionGroups[$condition] = ($conditionGroups[$condition] ?? 0) + 1;
                         $groupSerials[$condition][] = $serialRecord;
-
                         if (!empty($serialRecord->nomer_imc)) {
                             $nomorImcParts[] = trim($serialRecord->nomer_imc);
                         }
-
                         $serialsToUpdate[(int) $serialRecord->id] = [
                             'gudang_id' => $isProject ? null : $gudangTujuanId,
                             'status' => $isProject ? 'IN_USE' : 'IN_WAREHOUSE',
@@ -203,16 +180,12 @@ class TransaksiTransferController extends Controller
                             "Barang '{$barang->nama_barang}' bukan barang SN sehingga Serial Number tidak boleh dikirim."
                         );
                     }
-
                     $selections = $item['non_sn_selections'] ?? [];
-
                     if (!empty($selections)) {
                         $selectedTotal = 0;
-
                         foreach ($selections as $selection) {
                             $condition = $this->normalizeCondition($selection['kondisi'] ?? 'Baru');
                             $selectionQty = (int) ($selection['qty'] ?? 0);
-
                             if ($condition === 'Campuran') {
                                 throw new \Exception(
                                     "Kondisi Campuran tidak boleh dikirim sebagai satu pilihan. Pisahkan menjadi Baru, Bekas, dan Rusak."
@@ -222,10 +195,8 @@ class TransaksiTransferController extends Controller
                             if ($selectionQty <= 0) {
                                 continue;
                             }
-
                             $selectedTotal += $selectionQty;
                             $conditionGroups[$condition] = ($conditionGroups[$condition] ?? 0) + $selectionQty;
-
                             if (!empty($selection['nomor_imc'])) {
                                 $nomorImcParts[] = trim($selection['nomor_imc']);
                             }
@@ -239,43 +210,35 @@ class TransaksiTransferController extends Controller
                         }
                     } else {
                         $fallbackCondition = $this->normalizeCondition($item['kondisi'] ?? 'Baru');
-
                         if ($fallbackCondition === 'Campuran') {
                             throw new \Exception(
                                 "Detail kondisi barang '{$barang->nama_barang}' tidak valid."
                             );
                         }
-
                         $conditionGroups[$fallbackCondition] = $qty;
                     }
 
                     foreach ($conditionGroups as $condition => $conditionQty) {
                         $cacheKey = $barangId . '_' . $gudangAsalId;
-
                         if (!isset($conditionStockCache[$cacheKey])) {
                             $conditionStockCache[$cacheKey] = $this->getNonSnConditionStock(
                                 $barangId,
                                 $gudangAsalId
                             );
                         }
-
                         $availableCondition = (int) (
                             $conditionStockCache[$cacheKey][$condition] ?? 0
                         );
-
                         $reservedKey = $cacheKey . '_' . $condition;
                         $reservedQty = (int) ($reservedConditionStock[$reservedKey] ?? 0);
-
                         if ($reservedQty + $conditionQty > $availableCondition) {
                             $sisa = max(0, $availableCondition - $reservedQty);
-
                             throw new \Exception(
                                 "Stok kondisi {$condition} untuk barang '{$barang->nama_barang}' " .
                                 "tidak mencukupi di gudang asal " .
                                 "(Tersedia: {$sisa}, Diminta: {$conditionQty})."
                             );
                         }
-
                         $reservedConditionStock[$reservedKey] =
                             $reservedQty + $conditionQty;
                     }
@@ -286,12 +249,10 @@ class TransaksiTransferController extends Controller
                         "Kondisi transfer barang '{$barang->nama_barang}' tidak valid."
                     );
                 }
-
                 $conditionKeys = array_keys($conditionGroups);
                 $kondisiFix = count($conditionKeys) > 1
                     ? 'Campuran'
                     : $conditionKeys[0];
-
                 $nomorImcParts = array_values(
                     array_unique(
                         array_filter(
@@ -299,14 +260,11 @@ class TransaksiTransferController extends Controller
                         )
                     )
                 );
-
                 $nomorImc = implode(', ', $nomorImcParts);
-
                 $noTransaksi = 'TRX-TRF-' .
                     date('YmdHis') .
                     '-' .
                     strtoupper(Str::random(4));
-
                 $transaksi = Transaksi::create([
                     'no_transaksi' => $noTransaksi,
                     'jenis_transaksi' => 'TRANSFER',
@@ -324,15 +282,12 @@ class TransaksiTransferController extends Controller
                     'pic_user_id' => $request->user()->id,
                     'status' => 'COMPLETED',
                 ]);
-
                 $stokTujuan = null;
-
                 if ($gudangTujuanId) {
                     $stokTujuan = Stok::where('barang_id', $barangId)
                         ->where('gudang_id', $gudangTujuanId)
                         ->lockForUpdate()
                         ->first();
-
                     if (!$stokTujuan) {
                         $stokTujuan = Stok::create([
                             'barang_id' => $barangId,
@@ -350,17 +305,13 @@ class TransaksiTransferController extends Controller
                         'harga' => 0,
                         'kondisi' => $condition,
                     ]);
-
                     $stokAsal->decrement('jumlah', $conditionQty);
-
                     if ($stokTujuan) {
                         $stokTujuan->increment('jumlah', $conditionQty);
                     }
-
                     $tujuanDescription = $isProject
                         ? "Proyek {$kodeProjek}"
                         : "Gudang #{$gudangTujuanId}";
-
                     $stockLogsToInsert[] = [
                         'barang_id' => $barangId,
                         'gudang_id' => $gudangAsalId,
@@ -372,7 +323,6 @@ class TransaksiTransferController extends Controller
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
-
                     if ($stokTujuan) {
                         $stockLogsToInsert[] = [
                             'barang_id' => $barangId,
@@ -415,7 +365,6 @@ class TransaksiTransferController extends Controller
                 StockLog::insert($stockLogsToInsert);
             }
         });
-
         return redirect()
             ->back()
             ->with('success', count($validated['items']) . ' transaksi transfer berhasil dicatat.');
@@ -424,15 +373,12 @@ class TransaksiTransferController extends Controller
     public function update(Request $request, int $id)
     {
         $transaksi = Transaksi::with(['details'])->findOrFail($id);
-
         if ($transaksi->status === 'CANCELLED') {
             return redirect()->back()->with('error', 'Transaksi yang sudah dibatalkan tidak dapat diedit.');
         }
-
         $isProjectTransfer = $transaksi->jenis_transaksi === 'TRANSFER'
             && empty($transaksi->gudang_tujuan_id)
             && !empty($transaksi->kode_projek);
-
         if ($isProjectTransfer) {
             return redirect()->back()->with('error', 'Transfer ke proyek tidak dapat diedit langsung karena memengaruhi saldo aset proyek. Batalkan transaksi jika masih aman, lalu buat transaksi baru.');
         }
@@ -447,11 +393,9 @@ class TransaksiTransferController extends Controller
             'qty' => 'nullable|integer|min:1|max:50',
             'keterangan' => 'nullable|string|max:500',
         ]);
-
         $kondisiFix = !empty($validated['kondisi']) && $validated['kondisi'] !== '-'
             ? trim($validated['kondisi'])
             : ($transaksi->kondisi !== '-' ? $transaksi->kondisi : 'Baru');
-
         DB::transaction(function () use ($transaksi, $validated, $kondisiFix) {
             $transaksi->update([
                 'tanggal' => $validated['tanggal'],
@@ -470,7 +414,6 @@ class TransaksiTransferController extends Controller
                 ]);
             }
         });
-
         return redirect()
             ->back()
             ->with('success', 'Data transfer gudang berhasil diperbarui.');
@@ -480,17 +423,14 @@ class TransaksiTransferController extends Controller
     {
         DB::transaction(function () use ($id, $request) {
             $transaksi = Transaksi::with(['details'])->findOrFail($id);
-
             if ($transaksi->status === 'CANCELLED') {
                 throw new \Exception(
                     'Transaksi transfer ini sudah dibatalkan sebelumnya.'
                 );
             }
-
             $now = now();
             $isProjectTransfer = !$transaksi->gudang_tujuan_id && !empty($transaksi->kode_projek)
                 && ($transaksi->jenis_transaksi === 'TRANSFER' || $transaksi->sub_jenis === 'TRANSFER_GUDANG');
-
             foreach ($transaksi->details as $detail) {
                 if ($isProjectTransfer) {
                     $hasLaterProjectMovement = DB::table('transaksi_details as later_detail')
@@ -517,11 +457,9 @@ class TransaksiTransferController extends Controller
                                 });
                         })
                         ->exists();
-
                     if ($hasLaterProjectMovement) {
                         throw new \Exception('Transfer ke proyek ini tidak bisa dibatalkan karena sudah ada mutasi atau pengembalian lanjutan untuk barang yang sama. Periksa saldo proyek terlebih dahulu.');
                     }
-
                     $serialIdsForCheck = DB::table('transaksi_detail_serials')
                         ->where('transaksi_detail_id', $detail->id)
                         ->pluck('barang_serial_id');
@@ -538,7 +476,6 @@ class TransaksiTransferController extends Controller
                         }
                     }
                 }
-
                 $stokAsal = Stok::firstOrCreate(
                     [
                         'barang_id' => $detail->barang_id,
@@ -546,16 +483,13 @@ class TransaksiTransferController extends Controller
                     ],
                     ['jumlah' => 0]
                 );
-
                 $stokAsal->increment('jumlah', $detail->qty);
-
                 $stokTujuan = $transaksi->gudang_tujuan_id
                     ? Stok::where('barang_id', $detail->barang_id)
                         ->where('gudang_id', $transaksi->gudang_tujuan_id)
                         ->lockForUpdate()
                         ->first()
                     : null;
-
                 if ($stokTujuan && $stokTujuan->jumlah < $detail->qty) {
                     throw new \Exception(
                         'Stok di gudang tujuan tidak mencukupi untuk melakukan pembatalan.'
@@ -565,11 +499,9 @@ class TransaksiTransferController extends Controller
                 if ($stokTujuan) {
                     $stokTujuan->decrement('jumlah', $detail->qty);
                 }
-
                 $serialIds = DB::table('transaksi_detail_serials')
                     ->where('transaksi_detail_id', $detail->id)
                     ->pluck('barang_serial_id');
-
                 if ($serialIds->isNotEmpty()) {
                     DB::table('barang_serials')->whereIn('id', $serialIds)->update([
                         'gudang_id' => $transaksi->gudang_asal_id,
@@ -578,7 +510,6 @@ class TransaksiTransferController extends Controller
                         'updated_at' => $now,
                     ]);
                 }
-
                 StockLog::create([
                     'barang_id' => $detail->barang_id,
                     'gudang_id' => $transaksi->gudang_asal_id,
@@ -592,7 +523,6 @@ class TransaksiTransferController extends Controller
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
-
                 if ($transaksi->gudang_tujuan_id) {
                     StockLog::create([
                         'barang_id' => $detail->barang_id,
@@ -610,7 +540,6 @@ class TransaksiTransferController extends Controller
 
             $transaksi->update(['status' => 'CANCELLED']);
         });
-
         return redirect()
             ->back()
             ->with('success', 'Transfer gudang berhasil dibatalkan dan stok dikembalikan.');
@@ -627,7 +556,6 @@ class TransaksiTransferController extends Controller
     private function normalizeCondition(?string $condition): string
     {
         $value = strtoupper(trim((string) $condition));
-
         if (str_contains($value, 'RUSAK') || str_contains($value, 'DAMAGED')) {
             return 'Rusak';
         }
@@ -654,7 +582,6 @@ class TransaksiTransferController extends Controller
             'Bekas' => 0,
             'Rusak' => 0,
         ];
-
         $details = DB::table('transaksi_details')
             ->join(
                 'transaksis',
@@ -687,7 +614,6 @@ class TransaksiTransferController extends Controller
                 'transaksis.kondisi as transaksi_kondisi',
             ])
             ->get();
-
         foreach ($details as $detail) {
             $qty = (int) $detail->qty;
             $condition = $this->normalizeCondition(
@@ -696,7 +622,6 @@ class TransaksiTransferController extends Controller
                     ? $detail->detail_kondisi
                     : ($detail->transaksi_kondisi ?? 'Baru')
             );
-
             if ($condition === 'Campuran') {
                 continue;
             }

@@ -674,11 +674,7 @@ class LaporanController extends Controller
             ->get()
             ->keyBy('barang_id');
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-        ];
+        $monthNames = [1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'];
 
         $csvFileName = "Laporan_Logistik_{$monthNames[$bulan]}_{$tahun}_" . date('His') . ".csv";
 
@@ -771,10 +767,7 @@ class LaporanController extends Controller
                         $selisih = $usableFisik - $stokAkhir;
                         if ($kBaru >= $selisih) {
                             $kBaru -= $selisih;
-                        } else {
-                            $selisih -= $kBaru;
-                            $kBaru = 0;
-                            $kBekas = max(0, $kBekas - $selisih);
+                        } else {$selisih -= $kBaru;$kBaru = 0;$kBekas = max(0, $kBekas - $selisih);
                         }
                     }
                 }
