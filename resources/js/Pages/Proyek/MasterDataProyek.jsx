@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, MapPin, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import FormModal from '@/components/gabungan/FormModal';
 import Tabel from '@/components/gabungan/Tabel';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
 
 const EMPTY_FORM = {
     kode_projek: '',
@@ -31,6 +32,8 @@ export default function MasterDataProyek({ proyekData = [] }) {
     const [errors, setErrors] = useState({});
     const [selectedIds, setSelectedIds] = useState([]);
     const [deleting, setDeleting] = useState(false);
+
+    const customerOptions = [...new Set(proyekData.map(item => String(item.nama_customer || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
 
     const totalData = proyekData.length;
     const totalPages = Math.max(1, Math.ceil(totalData / perPage));
@@ -141,7 +144,7 @@ export default function MasterDataProyek({ proyekData = [] }) {
                 setModalOpen(false);
                 setEditing(null);
                 setForm({ ...EMPTY_FORM });
-                setErrors({});
+                        setErrors({});
             },
             onFinish: () => setProcessing(false),
         };
@@ -341,12 +344,18 @@ export default function MasterDataProyek({ proyekData = [] }) {
 
                         <label className="block space-y-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
                             Customer
-                            <Input
+                            <HybridDropdown
                                 value={form.nama_customer}
-                                onChange={e => setForm({ ...form, nama_customer: e.target.value })}
-                                className="mt-1"
+                                options={customerOptions}
+                                onChange={value => setForm(previous => ({ ...previous, nama_customer: value }))}
+                                placeholder="Pilih atau ketik nama customer..."
+                                searchPlaceholder="Cari nama customer..."
+                                allowCustom
                                 disabled={processing}
+                                className="mt-1"
+                                inputClassName="h-10 text-sm"
                             />
+                            {errors.nama_customer && <p className="text-xs font-normal text-rose-500">{errors.nama_customer}</p>}
                         </label>
 
                         <label className="block space-y-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
