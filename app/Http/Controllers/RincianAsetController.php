@@ -3,9 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\BarangSerial;
-use App\Models\Gudang;
-use App\Models\Proyek;
-use App\Models\Transaksi;
 use App\Models\TransaksiDetail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -195,12 +192,17 @@ class RincianAsetController extends Controller
             });
 
         if ($type === 'PROYEK') {
-            // Pengeluaran proyek biasa dipisahkan dari aset transfer yang masih aktif di proyek.
-            $query->where('transaksis.jenis_transaksi', 'KELUAR')
-                ->where('transaksis.sub_jenis', 'BARANG_KE_SITE');
+            $query->where(function ($movement) {
+                $movement->where(function ($outbound) {
+                    $outbound->where('transaksis.jenis_transaksi', 'KELUAR')
+                        ->where('transaksis.sub_jenis', 'BARANG_KE_SITE');
+                })->orWhere(function ($return) {
+                    $return->where('transaksis.jenis_transaksi', 'MASUK')
+                        ->whereIn('transaksis.sub_jenis', ['PENGEMBALIAN', 'PENGEMBALIAN_PROYEK']);
+                });
+            })->whereNotNull('transaksis.kode_projek')->where('transaksis.kode_projek', '!=', '');
         } else {
-            $query
-                ->where('transaksis.jenis_transaksi', 'KELUAR')
+            $query->where('transaksis.jenis_transaksi', 'KELUAR')
                 ->where('transaksis.sub_jenis', 'PEMAKAIAN_INTERNAL');
         }
 
@@ -222,6 +224,7 @@ class RincianAsetController extends Controller
                 'transaksis.pihak_asal',
                 'transaksis.gudang_asal_id',
                 'transaksis.sub_jenis as transaction_sub_jenis',
+                'transaksis.jenis_transaksi as transaction_jenis_transaksi',
                 'transaksis.tanggal',
                 'transaksis.no_transaksi',
             ])
@@ -245,11 +248,10 @@ class RincianAsetController extends Controller
 
         return $rows->map(function ($row) use ($priceMap, $serialMap) {
             $barangId = (int) $row->barang_id;
-            $isProjectReturn = $row->transaction_sub_jenis === 'PENGEMBALIAN_PROYEK';
+            $isProjectReturn = $row->transaction_jenis_transaksi === 'MASUK'
+                && in_array($row->transaction_sub_jenis, ['PENGEMBALIAN', 'PENGEMBALIAN_PROYEK'], true);
             $qty = (int) $row->qty;
-            if ($isProjectReturn) {
-                $qty = -abs($qty);
-            }
+            if ($isProjectReturn) $qty = -abs($qty);
             $harga = (float) ($priceMap[$barangId] ?? 0);
             $serials = $serialMap[(int) $row->detail_id] ?? [];
 
@@ -282,36 +284,6 @@ class RincianAsetController extends Controller
         })->values()->all();
     }
 
-    private function getProjectOptions(): array
-    {
-        return Proyek::query()
-            ->orderBy('kode_projek')
-            ->pluck('kode_projek')
-            ->values()
-            ->all();
-    }
-
-    private function getDepartmentOptions(): array
-    {
-        return Transaksi::query()
-            ->where('jenis_transaksi', 'KELUAR')
-            ->where('sub_jenis', 'PEMAKAIAN_INTERNAL')
-            ->whereNotNull('pihak_asal')
-            ->where('pihak_asal', '!=', '')
-            ->where(function ($q) {
-                $q->whereIn(
-                    'status',
-                    ['COMPLETED', 'completed']
-                )
-                    ->orWhereNull('status');
-            })
-            ->distinct()
-            ->orderBy('pihak_asal')
-            ->pluck('pihak_asal')
-            ->values()
-            ->all();
-    }
-
     public function index(Request $request): Response
     {
         $tab = strtoupper(
@@ -323,18 +295,6 @@ class RincianAsetController extends Controller
         }
 
         $priceMap = $this->getLatestInboundPrices();
-
-        $gudangs = Gudang::query()
-            ->where('is_active', true)
-            ->orderBy('nama_gudang')
-            ->get([
-                'id',
-                'nama_gudang',
-                'kode_gudang',
-            ]);
-
-        $projectOptions = $this->getProjectOptions();
-        $departmentOptions = $this->getDepartmentOptions();
 
         $projectPivot = $this->getPivotRows(
             $request,
@@ -352,9 +312,6 @@ class RincianAsetController extends Controller
             'activeTab' => $tab,
             'projectPivot' => $projectPivot,
             'nonProjectPivot' => $nonProjectPivot,
-            'gudangs' => $gudangs,
-            'projectOptions' => $projectOptions,
-            'departmentOptions' => $departmentOptions,
             'filters' => [
                 'tab' => $tab,
                 'search' => $request->input('search', ''),

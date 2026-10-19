@@ -238,9 +238,16 @@ export default function ModalBarangMasukRow({
                                         const namaCustomer = option?.nama_customer || option?.customer_name || '';
                                         return (
                                             <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-0.5">
-                                                <span className={`truncate font-semibold ${isSelected ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
-                                                    {option?.label || option?.kode_projek || option?.value || ''}
-                                                </span>
+                                                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                                    <span className={`truncate font-semibold ${isSelected ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
+                                                        {option?.label || option?.kode_projek || option?.value || ''}
+                                                    </span>
+                                                    {Number(option?.available_count || 0) > 0 && (
+                                                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${isSelected ? 'bg-white/15 text-white' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                                                            Ada: {Number(option.available_count).toLocaleString('id-ID')} barang
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {namaProyek && (
                                                     <span className={`truncate text-[10px] font-normal ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
                                                         {namaProyek}
@@ -395,7 +402,7 @@ export default function ModalBarangMasukRow({
                     <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Qty</Label>
                         {isProjectReturn ? (
-                            <div className="flex h-8 items-center justify-center rounded-md border border-slate-700 bg-slate-900/60 px-3 text-xs font-bold text-cyan-300">
+                            <div className="flex h-8 items-center justify-center rounded-md border border-slate-200 bg-slate-100 px-3 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-cyan-300">
                                 {Number(row.qty || 0)}
                             </div>
                         ) : (

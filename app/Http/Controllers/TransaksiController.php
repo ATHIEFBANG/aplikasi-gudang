@@ -463,22 +463,16 @@ class TransaksiController extends Controller
             ])
             ->values();
         [$projectStocksByBarang, $projectSerialsByBarang] = $this->getProjectInventorySnapshot();
-        $outstandingProjectCodes = [];
+        $projectReturnableCounts = [];
         foreach ($projectStocksByBarang as $projectStockMap) {
             foreach ($projectStockMap as $projectCode => $projectStock) {
-                if ((int) ($projectStock['aktif'] ?? 0) > 0) $outstandingProjectCodes[] = (string) $projectCode;
+                $projectReturnableCounts[(string) $projectCode] = ($projectReturnableCounts[(string) $projectCode] ?? 0) + max(0, (int) ($projectStock['aktif'] ?? 0));
             }
         }
-        foreach ($projectSerialsByBarang as $serialProjectMap) {
-            foreach (array_keys($serialProjectMap) as $projectCode) $outstandingProjectCodes[] = (string) $projectCode;
-        }
-        $outstandingProjectCodes = array_values(array_unique(array_filter($outstandingProjectCodes)));
-        // Proyek nonaktif tetap dapat dipilih saat mengembalikan aset yang masih aktif di sana.
+        $outstandingProjectCodes = array_keys(array_filter($projectReturnableCounts, fn ($count) => $count > 0));
+        // Dropdown pengembalian hanya menampilkan proyek yang masih memiliki barang aktif.
         $returnProjectOptions = Proyek::query()
-            ->where(function ($q) use ($outstandingProjectCodes) {
-                $q->where('is_active', true);
-                if (!empty($outstandingProjectCodes)) $q->orWhereIn('kode_projek', $outstandingProjectCodes);
-            })
+            ->whereIn('kode_projek', $outstandingProjectCodes ?: ['__NO_PROJECT_WITH_STOCK__'])
             ->orderBy('kode_projek')
             ->get()
             ->map(fn ($proyek) => [
@@ -487,6 +481,7 @@ class TransaksiController extends Controller
                 'kode_projek' => (string) $proyek->kode_projek,
                 'nama_projek' => $proyek->nama_projek ?? '',
                 'nama_customer' => $proyek->nama_customer ?? '',
+                'available_count' => (int) ($projectReturnableCounts[(string) $proyek->kode_projek] ?? 0),
             ])
             ->values();
         $customerOptions = Transaksi::query()

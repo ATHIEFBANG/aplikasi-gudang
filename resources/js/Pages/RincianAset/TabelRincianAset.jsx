@@ -40,53 +40,47 @@ const normalizeSerials = value => {
     return raw.split(/\r?\n|,|;/).map(item => item.trim()).filter(Boolean);
 };
 
-const buildPivotRows = dataList => {
+const buildPivotRows = (dataList, isProject) => {
     const rows = Array.isArray(dataList) ? dataList : [];
-
-    return rows.flatMap((item, index) => {
-        const serials = normalizeSerials(
-            item?.serials ?? item?.serial_numbers ?? item?.serial_number ?? item?.sn
-        );
-
+    const expandedRows = rows.flatMap((item, index) => {
+        const serials = normalizeSerials(item?.serials ?? item?.serial_numbers ?? item?.serial_number ?? item?.sn);
         const qty = Number(item?.qty ?? item?.jumlah ?? item?.quantity ?? 0);
+        const sign = qty < 0 ? -1 : 1;
+        const absQty = Math.abs(qty);
         const harga = Number(item?.harga ?? item?.harga_satuan ?? item?.unit_price ?? 0);
-
-        const baseData = {
-            ...item,
-            _source_index: index,
-            nama_barang_display: getBarangName(item),
-            kode_ppl: item?.kode_barang || '-',
-        };
+        const baseData = { ...item, _source_index: index, nama_barang_display: getBarangName(item), kode_ppl: item?.kode_barang || '-' };
 
         if (!serials.length) {
-            return [{
-                ...baseData,
-                serial_number: '-',
-                pivot_qty: qty,
-                pivot_nilai: qty * harga,
-            }];
+            return [{ ...baseData, serial_number: '-', pivot_qty: qty, pivot_nilai: qty * harga }];
         }
 
         const serialRows = serials.map(serial => ({
             ...baseData,
             serial_number: serial,
-            pivot_qty: 1,
-            pivot_nilai: harga,
+            pivot_qty: sign,
+            pivot_nilai: sign * harga,
         }));
 
-        if (qty > serials.length) {
+        if (absQty > serials.length) {
             serialRows.push({
                 ...baseData,
                 serial_number: '-',
-                pivot_qty: qty - serials.length,
-                pivot_nilai: (qty - serials.length) * harga,
+                pivot_qty: sign * (absQty - serials.length),
+                pivot_nilai: sign * (absQty - serials.length) * harga,
             });
         }
 
         return serialRows;
     });
-};
 
+    if (!isProject) return expandedRows;
+
+    const getBalanceKey = row => `${row?.project || '-'}::${row?.barang_id ?? row?.kode_ppl ?? '-'}::${row?.serial_number || '-'}`;
+    const balances = new Map();
+    expandedRows.forEach(row => balances.set(getBalanceKey(row), (balances.get(getBalanceKey(row)) || 0) + Number(row.pivot_qty || 0)));
+
+    return expandedRows.filter(row => (balances.get(getBalanceKey(row)) || 0) > 0);
+};
 
 export default function TabelRincianAset({
     activeTab = 'PROYEK',
@@ -106,8 +100,8 @@ export default function TabelRincianAset({
     searchWidth = 'clamp(7rem, 20vw, 20rem)',
 }) {
     const pivotRef = useRef(null);
-    const pivotRows = useMemo(() => buildPivotRows(dataList), [dataList]);
     const isProject = activeTab === 'PROYEK';
+    const pivotRows = useMemo(() => buildPivotRows(dataList, isProject), [dataList, isProject]);
 
     const pivotLevels = useMemo(() => {
         const barangLevel = {
@@ -297,7 +291,7 @@ export default function TabelRincianAset({
                                 Analisis Barang Keluar
                             </h2>
                             <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 sm:text-xs">
-                                {isProject ? 'Pengeluaran proyek → Nama Barang → Serial Number' : 'Non Proyek → Nama Barang → Serial Number'}
+                                {isProject ? 'Saldo pengeluaran proyek setelah pengembalian → Nama Barang → Serial Number' : 'Pemakaian internal → Nama Barang → Serial Number'}
                             </p>
                         </div>
 
@@ -325,8 +319,8 @@ export default function TabelRincianAset({
                         valueColumns={valueColumns}
                         rowLabelHeader="ROW LABELS"
                         grandTotalLabel="Grand Total"
-                        emptyMessage="Tidak ada data barang keluar."
-                        emptySubMessage="Coba ubah filter atau periode yang digunakan."
+                        emptyMessage={isProject ? "Tidak ada saldo aset aktif di proyek." : "Tidak ada data pemakaian nonproyek."}
+                        emptySubMessage={isProject ? "Barang mungkin sudah dikembalikan seluruhnya." : "Belum ada data yang sesuai dengan pencarian."}
                         indentation={24}
                         zoomLevel={Math.min(zoomLevel, 95)}
                         defaultExpanded={false}
