@@ -46,7 +46,10 @@ return new class extends Migration
             $table->foreignId('barang_id')->constrained('barangs')->cascadeOnDelete();
             $table->integer('qty');
             $table->decimal('harga', 15, 2)->nullable()->default(0);
+            // Kondisi barang saat dicatat pada transaksi ini (untuk pengembalian: kondisi aktual setelah kembali).
             $table->string('kondisi')->default('Baru')->index();
+            // Kondisi barang ketika masih berada di proyek; nullable agar transaksi lama tetap kompatibel.
+            $table->string('kondisi_asal')->nullable()->index();
             $table->timestamps();
 
             // Indeks Komposit untuk JOIN & Filter Detail

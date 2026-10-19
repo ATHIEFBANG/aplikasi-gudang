@@ -185,11 +185,11 @@ export function useModalBarangMasukControl({
                 return updated;
             }
             if (field === 'return_source') {
-                updated[rowIdx] = { ...currentRow, return_source: value, kode_projek: '', pihak_asal: '', barang_id: '', serials: [], non_sn_selections: {}, qty: value === 'PROJECT' ? 0 : 1 };
+                updated[rowIdx] = { ...currentRow, return_source: value, kode_projek: '', pihak_asal: '', barang_id: '', serials: [], serial_conditions: {}, non_sn_selections: {}, qty: value === 'PROJECT' ? 0 : 1 };
                 return updated;
             }
             if (field === 'kode_projek') {
-                updated[rowIdx] = { ...currentRow, kode_projek: value, pihak_asal: value ? `Proyek ${value}` : '', barang_id: '', serials: [], non_sn_selections: {}, qty: 0 };
+                updated[rowIdx] = { ...currentRow, kode_projek: value, pihak_asal: value ? `Proyek ${value}` : '', barang_id: '', serials: [], serial_conditions: {}, non_sn_selections: {}, qty: 0 };
                 return updated;
             }
             updated[rowIdx] = { ...currentRow, [field]: value, kondisi: newKondisi };
@@ -222,7 +222,7 @@ export function useModalBarangMasukControl({
                 barang_id: realId,
                 qty: isProjectReturn ? 0 : currentQty,
                 non_sn_selections: isProjectReturn ? {} : (currentRow.non_sn_selections || {}),
-                serials: isSn ? (isProjectReturn ? [] : Array(currentQty).fill('')) : []
+                serials: isSn ? (isProjectReturn ? [] : Array(currentQty).fill('')) : [], serial_conditions: {}
             };
             return updated;
         });
@@ -572,7 +572,9 @@ export function useModalBarangMasukControl({
                     barang_id: parseInt(r.barang_id, 10),
                     qty: parseInt(r.qty, 10),
                     harga: r.sub_jenis === 'PEMBELIAN' && r.harga !== '' ? parseFloat(r.harga) : 0,
-                    serials: r.serials || []
+                    serials: r.serials || [],
+                    serial_conditions: r.serial_conditions || {},
+                    non_sn_selections: Object.values(r.non_sn_selections || {}).filter(s => Number(s?.qty || 0) > 0).map(s => ({ kondisi_asal: s.kondisi_asal || s.kondisi || 'Baru', kondisi: s.kondisi || s.kondisi_asal || 'Baru', qty: Number(s.qty) }))
                 }))
             };
 

@@ -49,11 +49,12 @@ class TransaksiBarangMasukController extends Controller
                 });
             })
             ->orderBy('t.tanggal')->orderBy('t.id')->orderBy('td.id')
-            ->get(['td.qty', 'td.kondisi as detail_kondisi', 't.kondisi as header_kondisi', 't.jenis_transaksi', 't.sub_jenis']);
+            ->get(['td.qty', 'td.kondisi as detail_kondisi', 'td.kondisi_asal as detail_kondisi_asal', 't.kondisi as header_kondisi', 't.jenis_transaksi', 't.sub_jenis']);
 
         foreach ($events as $event) {
-            $condition = $this->normalizeProjectReturnCondition($event->detail_kondisi ?: $event->header_kondisi);
             $isReturn = $event->jenis_transaksi === 'MASUK' && $event->sub_jenis === 'PENGEMBALIAN';
+            // Saldo proyek dikurangi berdasarkan kondisi asal, bukan kondisi aktual saat kembali.
+            $condition = $this->normalizeProjectReturnCondition($isReturn ? ($event->detail_kondisi_asal ?: $event->detail_kondisi) : ($event->detail_kondisi ?: $event->header_kondisi));
             $delta = (int) $event->qty * ($isReturn ? -1 : 1);
             $stock[$condition] = max(0, $stock[$condition] + $delta);
         }
@@ -74,7 +75,14 @@ class TransaksiBarangMasukController extends Controller
                 'items' => 'required|array|min:1',
                 'items.*.sub_jenis' => 'required|string|in:PEMBELIAN,PEMINJAMAN,PENGEMBALIAN',
                 'items.*.tanggal' => 'required|date',
-                'items.*.kondisi' => 'required|string|max:50',
+                'items.*.kondisi' => 'nullable|string|max:50',
+                'items.*.serial_conditions' => 'nullable|array',
+                'items.*.serial_conditions.*' => 'nullable|string|in:Baru,Bekas,Rusak',
+                'items.*.non_sn_selections' => 'nullable|array',
+                'items.*.non_sn_selections.*.kondisi_asal' => 'nullable|string|in:Baru,Bekas,Rusak',
+                'items.*.non_sn_selections.*.kondisi' => 'required_with:items.*.non_sn_selections|string|in:Baru,Bekas,Rusak',
+                'items.*.non_sn_selections.*.return_condition' => 'nullable|string|in:Baru,Bekas,Rusak',
+                'items.*.non_sn_selections.*.qty' => 'required_with:items.*.non_sn_selections|integer|min:1|max:50',
                 'items.*.nomor_imc' => 'required|string|max:100',
                 'items.*.nomor_omc' => 'nullable|string|max:100',
                 'items.*.pihak_asal' => 'nullable|string|max:255',
@@ -157,9 +165,26 @@ class TransaksiBarangMasukController extends Controller
                             }
                         } else {
                             if (!empty($serials)) throw new \Exception("Barang '{$barang->nama_barang}' bukan barang SN.");
-                            $available = $this->getProjectNonSnConditionStock($barangId, $kodeProjek);
-                            if ($qty > (int) ($available[$condition] ?? 0)) {
-                                throw new \Exception("Saldo {$condition} barang '{$barang->nama_barang}' di proyek {$kodeProjek} tidak cukup (tersedia: " . (int) ($available[$condition] ?? 0) . ", diminta: {$qty}).");
+                            $selections = array_values(array_filter($item['non_sn_selections'] ?? [], fn ($selection) => (int) ($selection['qty'] ?? 0) > 0));
+                            if ($selections) {
+                                $selectedTotal = array_sum(array_map(fn ($selection) => (int) $selection['qty'], $selections));
+                                if ($selectedTotal !== $qty) throw new \Exception("Total pembagian kondisi Non-SN '{$barang->nama_barang}' harus sama dengan Qty ({$qty}).");
+                                $available = $this->getProjectNonSnConditionStock($barangId, $kodeProjek);
+                                $requestedByOrigin = [];
+                                foreach ($selections as $selection) {
+                                    $origin = $this->normalizeProjectReturnCondition($selection['kondisi_asal'] ?? $selection['kondisi'] ?? 'Baru');
+                                    $requestedByOrigin[$origin] = ($requestedByOrigin[$origin] ?? 0) + (int) $selection['qty'];
+                                }
+                                foreach ($requestedByOrigin as $origin => $requestedQty) {
+                                    if ($requestedQty > (int) ($available[$origin] ?? 0)) {
+                                        throw new \Exception("Saldo kondisi asal {$origin} barang '{$barang->nama_barang}' di proyek {$kodeProjek} tidak cukup (tersedia: " . (int) ($available[$origin] ?? 0) . ", diminta: {$requestedQty}).");
+                                    }
+                                }
+                            } else {
+                                $available = $this->getProjectNonSnConditionStock($barangId, $kodeProjek);
+                                if ($qty > (int) ($available[$condition] ?? 0)) {
+                                    throw new \Exception("Saldo {$condition} barang '{$barang->nama_barang}' di proyek {$kodeProjek} tidak cukup (tersedia: " . (int) ($available[$condition] ?? 0) . ", diminta: {$qty}).");
+                                }
                             }
                         }
                     } elseif ($isSn && count($serials) !== $qty) {
@@ -179,10 +204,16 @@ class TransaksiBarangMasukController extends Controller
                     $kondisiFix = $condition;
                     if ($isProjectReturn && $isSn) {
                         $returnSerialGroups = collect($serials)
-                            ->map(fn($sn) => $projectSerialRecords->get(strtolower($sn)))
+                            ->map(function ($sn) use ($projectSerialRecords, $item) {
+                                $record = $projectSerialRecords->get(strtolower($sn));
+                                if (!$record) return null;
+                                $origin = $this->normalizeProjectReturnCondition($record->kondisi);
+                                $actual = $this->normalizeProjectReturnCondition($item['serial_conditions'][$sn] ?? $origin);
+                                return ['record' => $record, 'origin' => $origin, 'actual' => $actual];
+                            })
                             ->filter()
-                            ->groupBy(fn($record) => $this->normalizeProjectReturnCondition($record->kondisi));
-                        $returnConditions = $returnSerialGroups->keys()->values();
+                            ->groupBy(fn($entry) => $entry['origin'] . '||' . $entry['actual']);
+                        $returnConditions = $returnSerialGroups->map(fn($group) => $group->first()['actual'])->unique()->values();
                         $kondisiFix = $returnConditions->count() > 1 ? 'Campuran' : ($returnConditions->first() ?? $condition);
                     }
                     $harga = $subJenis === 'PEMBELIAN' ? (float) ($item['harga'] ?? 0) : 0;
@@ -207,20 +238,24 @@ class TransaksiBarangMasukController extends Controller
 
                     $detail = null;
                     if ($isProjectReturn && $isSn) {
-                        // Buat detail terpisah per kondisi SN agar laporan stok kondisi tetap akurat.
-                        foreach ($returnSerialGroups as $returnCondition => $recordsForCondition) {
+                        // Kelompokkan detail berdasarkan kondisi asal DAN kondisi aktual.
+                        foreach ($returnSerialGroups as $groupKey => $entries) {
+                            [$originCondition, $actualCondition] = explode('||', $groupKey, 2);
                             $conditionDetail = TransaksiDetail::create([
                                 'transaksi_id' => $transaksi->id,
                                 'barang_id' => $barangId,
-                                'qty' => $recordsForCondition->count(),
+                                'qty' => $entries->count(),
                                 'harga' => $harga,
-                                'kondisi' => $returnCondition,
+                                'kondisi_asal' => $originCondition,
+                                'kondisi' => $actualCondition,
                             ]);
-                            foreach ($recordsForCondition as $record) {
+                            foreach ($entries as $entry) {
+                                $record = $entry['record'];
                                 DB::table('barang_serials')->where('id', $record->id)->update([
                                     'gudang_id' => (int) $item['gudang_tujuan_id'],
                                     'status' => 'IN_WAREHOUSE',
                                     'kode_projek' => null,
+                                    'kondisi' => $actualCondition,
                                     'updated_at' => $now,
                                 ]);
                                 $detailSerialsToInsert[] = [
@@ -231,12 +266,27 @@ class TransaksiBarangMasukController extends Controller
                                 ];
                             }
                         }
+                    } elseif ($isProjectReturn && !$isSn && !empty($item['non_sn_selections'])) {
+                        $selections = array_values(array_filter($item['non_sn_selections'], fn ($selection) => (int) ($selection['qty'] ?? 0) > 0));
+                        foreach ($selections as $selection) {
+                            TransaksiDetail::create([
+                                'transaksi_id' => $transaksi->id,
+                                'barang_id' => $barangId,
+                                'qty' => (int) $selection['qty'],
+                                'harga' => $harga,
+                                'kondisi_asal' => $this->normalizeProjectReturnCondition($selection['kondisi_asal'] ?? $selection['kondisi'] ?? 'Baru'),
+                                // return_condition adalah kondisi aktual yang dipilih ketika barang kembali.
+                                // Fallback ke kondisi menjaga kompatibilitas payload lama.
+                                'kondisi' => $this->normalizeProjectReturnCondition($selection['return_condition'] ?? $selection['kondisi'] ?? 'Baru'),
+                            ]);
+                        }
                     } else {
                         $detail = TransaksiDetail::create([
                             'transaksi_id' => $transaksi->id,
                             'barang_id' => $barangId,
                             'qty' => $qty,
                             'harga' => $harga,
+                            'kondisi_asal' => null,
                             'kondisi' => $kondisiFix,
                         ]);
 
@@ -350,6 +400,9 @@ class TransaksiBarangMasukController extends Controller
                             'gudang_id' => null, 'status' => 'IN_USE',
                             'kode_projek' => $transaksi->kode_projek, 'updated_at' => $now,
                         ]);
+                        if (!empty($detail->kondisi_asal)) {
+                            DB::table('barang_serials')->whereIn('id', $serialIds)->update(['kondisi' => $detail->kondisi_asal, 'updated_at' => $now]);
+                        }
                     }
 
                     StockLog::create([

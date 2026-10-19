@@ -1,6 +1,7 @@
 import React from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import HybridDropdown from "@/components/gabungan/HybridDropdown";
 import {
     PackageCheck,
     QrCode,
@@ -61,6 +62,8 @@ export default function ModalBarangSelectorUI({
         getBatchSelectedQty,
         isBatchSelected,
         handleToggleNonSnBatch,
+        setSerialActualCondition,
+        setNonSnActualCondition,
         incrementNonSnBatch,
         decrementNonSnBatch,
         availableNonSnStock
@@ -123,7 +126,7 @@ export default function ModalBarangSelectorUI({
                                         handleSnSearchChange(e.target.value)
                                     }
                                     placeholder="Cari nomor SN..."
-                                    className="h-7 text-[11px] pl-7 pr-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                    className="h-9 rounded-md text-xs pl-8 pr-7 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-slate-400"
                                 />
 
                                 {snSearch && (
@@ -176,11 +179,22 @@ export default function ModalBarangSelectorUI({
                                         >
                                             <span>{snVal}</span>
 
-                                            <span
-                                                className={`text-[8px] px-1 py-0.5 rounded font-sans uppercase ${kondisiClass}`}
-                                            >
-                                                {kondisiLabel}
-                                            </span>
+                                            {isProjectReturn ? (
+                                                <select
+                                                    value={row?.serial_conditions?.[snVal] || kondisiLabel}
+                                                    disabled={isProcessing}
+                                                    onChange={value => setSerialActualCondition(snVal, value)}
+                                                    onClick={e => e.stopPropagation()}
+                                                    aria-label={`Kondisi pengembalian ${snVal}`}
+                                                    className="h-6 max-w-[92px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 text-[10px] font-sans text-slate-700 dark:text-slate-200"
+                                                >
+                                                    <option value="Baru">Baru</option>
+                                                    <option value="Bekas">Bekas</option>
+                                                    <option value="Rusak">Rusak</option>
+                                                </select>
+                                            ) : (
+                                                <span className={`text-[8px] px-1 py-0.5 rounded font-sans uppercase ${kondisiClass}`}>{kondisiLabel}</span>
+                                            )}
 
                                             <button
                                                 type="button"
@@ -198,7 +212,7 @@ export default function ModalBarangSelectorUI({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto pt-1">
                             {filteredAvailableSns.length === 0 ? (
-                                <div className="col-span-full py-3 text-center text-xs text-slate-400">
+                                <div className="col-span-full rounded-md border border-dashed border-slate-200 py-6 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                                     Tidak ada SN yang cocok.
                                 </div>
                             ) : (
@@ -268,24 +282,20 @@ export default function ModalBarangSelectorUI({
      * ========================================================= */
 
     return (
-        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                    <PackageCheck className="w-3.5 h-3.5 text-amber-500" />
+                    <PackageCheck className="h-4 w-4 text-slate-500 dark:text-slate-400" />
 
-                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                        {isProjectReturn ? 'Pilih Barang dari Proyek (Non-SN)' : 'Pilih Barang dari Gudang (Non-SN)'}
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                        {isProjectReturn ? 'Barang dari Proyek · Non-SN' : 'Barang dari Gudang · Non-SN'}
                     </span>
                 </div>
 
-                <div className="flex items-center gap-2 text-[11px] font-mono font-bold">
-                    <span className="text-slate-500 dark:text-slate-400">
-                        Ada: {availableNonSnStock}
-                    </span>
-
-                    <span className="text-rose-600 dark:text-rose-400">
-                        {row?.qty || 0} Unit
-                    </span>
+                <div className="flex items-center gap-3 text-[11px]">
+                    <span className="text-slate-500 dark:text-slate-400">Tersedia <strong className="font-mono font-semibold text-slate-700 dark:text-slate-200">{availableNonSnStock}</strong></span>
+                    <span className="text-slate-300 dark:text-slate-700">/</span>
+                    <span className="text-slate-500 dark:text-slate-400">Dipilih <strong className="font-mono font-semibold text-slate-800 dark:text-slate-100">{row?.qty || 0}</strong></span>
                 </div>
             </div>
 
@@ -298,7 +308,7 @@ export default function ModalBarangSelectorUI({
                         handleNonSnSearchChange(e.target.value)
                     }
                     placeholder="Cari kondisi / no IMC..."
-                    className="h-7 text-[11px] pl-7 pr-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                    className="h-9 rounded-md text-xs pl-8 pr-7 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-slate-400"
                 />
 
                 {nonSnSearch && (
@@ -312,7 +322,7 @@ export default function ModalBarangSelectorUI({
                 )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto pt-1">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-1 pt-0.5">
                 {filteredBatches.length === 0 ? (
                     <div className="col-span-full py-3 text-center text-xs text-slate-400">
                         Tidak ada data stok Non-SN yang cocok.
@@ -328,83 +338,86 @@ export default function ModalBarangSelectorUI({
                         return (
                             <div
                                 key={batch.key}
-                                className={`p-2.5 rounded-lg border transition-all flex flex-col justify-between gap-2 ${
+                                className={`group min-w-0 rounded-lg border p-3 transition-colors ${
                                     isChecked
-                                        ? 'bg-rose-600/10 border-rose-600/60 text-rose-700 dark:text-rose-300 shadow-2xs'
-                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-rose-400'
+                                        ? 'border-rose-500/60 bg-rose-50/40 dark:bg-rose-950/15'
+                                        : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700'
                                 }`}
                             >
-                                <div
-                                    className="flex items-start justify-between gap-1.5 cursor-pointer select-none"
-                                    onClick={() =>
-                                        handleToggleNonSnBatch(batch)
-                                    }
+                                <button
+                                    type="button"
+                                    disabled={isProcessing}
+                                    onClick={() => handleToggleNonSnBatch(batch)}
+                                    className="flex w-full min-w-0 items-center gap-2.5 text-left disabled:cursor-not-allowed"
                                 >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <div
-                                            className={`w-3.5 h-3.5 rounded-xs flex items-center justify-center border shrink-0 ${
-                                                isChecked
-                                                    ? 'bg-rose-600 border-rose-600 text-white'
-                                                    : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900'
-                                            }`}
-                                        >
-                                            {isChecked && (
-                                                <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                            )}
-                                        </div>
-
-                                        <span className="font-mono text-[11px] font-bold truncate leading-tight">
-                                            {currentNamaBarang} / {batch.nomor_imc}
+                                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
+                                        isChecked
+                                            ? 'border-rose-600 bg-rose-600 text-white'
+                                            : 'border-slate-300 bg-white text-transparent dark:border-slate-600 dark:bg-slate-950'
+                                    }`}>
+                                        <Check className="h-3 w-3 stroke-[3]" />
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-xs font-semibold leading-4 text-slate-800 dark:text-slate-100" title={currentNamaBarang}>
+                                            {currentNamaBarang}
                                         </span>
-                                    </div>
-
-                                    <span
-                                        className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${batch.badgeClass}`}
-                                    >
+                                        <span className="mt-0.5 block truncate font-mono text-[10px] text-slate-500 dark:text-slate-400" title={batch.nomor_imc || 'Tanpa nomor IMC'}>
+                                            IMC: {batch.nomor_imc || '-'}
+                                        </span>
+                                    </span>
+                                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${batch.badgeClass}`}>
                                         {batch.kondisi}
                                     </span>
-                                </div>
+                                </button>
 
-                                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80">
-                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                                        Tersedia: <strong>{batch.max_stock}</strong>
-                                    </span>
+                                {isProjectReturn && selectedQty > 0 && (
+                                    <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+                                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                                            <label className="text-[11px] font-medium text-slate-600 dark:text-slate-300">Kondisi saat kembali</label>
+                                            <span className="text-[10px] text-slate-400">Kondisi aktual</span>
+                                        </div>
+                                        <HybridDropdown
+                                            value={row?.non_sn_selections?.[batch.key]?.return_condition || row?.non_sn_selections?.[batch.key]?.kondisi || batch.kondisi}
+                                            options={[
+                                                { value: 'Baru', label: 'Baru' },
+                                                { value: 'Bekas', label: 'Bekas' },
+                                                { value: 'Rusak', label: 'Rusak' }
+                                            ]}
+                                            onChange={value => setNonSnActualCondition(batch, value)}
+                                            placeholder="Pilih kondisi"
+                                            searchPlaceholder="Cari kondisi..."
+                                            allowCustom={false}
+                                            disabled={isProcessing}
+                                            className="w-full min-w-0"
+                                            inputClassName="h-9 min-h-9 rounded-md border-slate-200 bg-white px-2.5 text-xs font-medium shadow-none dark:border-slate-800 dark:bg-slate-950"
+                                        />
+                                    </div>
+                                )}
 
-                                    <div className="flex items-center gap-1">
+                                <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+                                    <div className="min-w-0">
+                                        <span className="block text-[10px] text-slate-500 dark:text-slate-400">Stok tersedia</span>
+                                        <span className="font-mono text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100">{batch.max_stock} <span className="text-[10px] font-normal text-slate-400">unit</span></span>
+                                    </div>
+                                    <div className="flex h-9 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-1 dark:border-slate-800 dark:bg-slate-950">
                                         <button
                                             type="button"
-                                            disabled={
-                                                isProcessing ||
-                                                selectedQty <= 0
-                                            }
-                                            onClick={e => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                decrementNonSnBatch(batch);
-                                            }}
-                                            className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
+                                            aria-label={`Kurangi ${currentNamaBarang}`}
+                                            disabled={isProcessing || selectedQty <= 0}
+                                            onClick={e => { e.preventDefault(); e.stopPropagation(); decrementNonSnBatch(batch); }}
+                                            className="flex h-7 w-7 items-center justify-center rounded text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-800"
                                         >
-                                            <Minus className="w-2.5 h-2.5" />
+                                            <Minus className="h-3.5 w-3.5" />
                                         </button>
-
-                                        <span className="w-6 text-center font-mono font-bold text-xs text-slate-900 dark:text-slate-100">
-                                            {selectedQty}
-                                        </span>
-
+                                        <span className="min-w-6 text-center font-mono text-xs font-semibold tabular-nums text-slate-900 dark:text-white">{selectedQty}</span>
                                         <button
                                             type="button"
-                                            disabled={
-                                                isProcessing ||
-                                                selectedQty >= Number(batch.max_stock || 0)
-                                            }
-                                            onClick={e => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                incrementNonSnBatch(batch);
-                                            }}
-                                            className="w-5 h-5 rounded bg-rose-600 hover:bg-rose-700 flex items-center justify-center text-xs font-bold text-white disabled:opacity-30 cursor-pointer"
+                                            aria-label={`Tambah ${currentNamaBarang}`}
+                                            disabled={isProcessing || selectedQty >= Number(batch.max_stock || 0)}
+                                            onClick={e => { e.preventDefault(); e.stopPropagation(); incrementNonSnBatch(batch); }}
+                                            className="flex h-7 w-7 items-center justify-center rounded bg-rose-600 text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-30"
                                         >
-                                            <Plus className="w-2.5 h-2.5" />
+                                            <Plus className="h-3.5 w-3.5" />
                                         </button>
                                     </div>
                                 </div>

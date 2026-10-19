@@ -163,6 +163,7 @@ class TransaksiController extends Controller
                 'transaksi_details.barang_id',
                 'transaksi_details.qty',
                 'transaksi_details.kondisi as detail_kondisi',
+                'transaksi_details.kondisi_asal as detail_kondisi_asal',
                 'transaksis.jenis_transaksi',
                 'transaksis.sub_jenis',
                 'transaksis.gudang_asal_id',
@@ -303,13 +304,13 @@ class TransaksiController extends Controller
                 });
             })
             ->orderBy('t.tanggal')->orderBy('t.id')->orderBy('td.id')
-            ->get(['td.barang_id', 'td.qty', 'td.kondisi as detail_kondisi', 't.kondisi as header_kondisi', 't.kode_projek', 't.jenis_transaksi', 't.sub_jenis']);
+            ->get(['td.barang_id', 'td.qty', 'td.kondisi as detail_kondisi', 'td.kondisi_asal as detail_kondisi_asal', 't.kondisi as header_kondisi', 't.kode_projek', 't.jenis_transaksi', 't.sub_jenis']);
         $stock = [];
         foreach ($ledger as $movement) {
             $code = trim((string) $movement->kode_projek);
             if ($code === '') continue;
-            $condition = $this->normalizeProjectCondition($movement->detail_kondisi ?: $movement->header_kondisi);
             $isReturn = $movement->jenis_transaksi === 'MASUK' && $movement->sub_jenis === 'PENGEMBALIAN';
+            $condition = $this->normalizeProjectCondition($isReturn ? ($movement->detail_kondisi_asal ?: $movement->detail_kondisi) : ($movement->detail_kondisi ?: $movement->header_kondisi));
             $qty = (int) $movement->qty * ($isReturn ? -1 : 1);
             $stock[(int) $movement->barang_id][$code][$condition] = ($stock[(int) $movement->barang_id][$code][$condition] ?? 0) + $qty;
         }
