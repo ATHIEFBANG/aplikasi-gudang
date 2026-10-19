@@ -568,7 +568,9 @@ export function useModalBarangSelectorLogic({
                         .map(item => `${item.qty} ${item.kondisi}`)
                         .join(', ')
                     : 'Baru',
-                nomor_imc: imcParts.join(', ')
+                // IMC pada form inbound adalah nomor IMC penerimaan, bukan IMC batch asal.
+                // Saat pengembalian proyek, pilihan batch hanya mengubah qty/kondisi, bukan nomor IMC.
+                nomor_imc: isProjectReturn ? currentRow.nomor_imc : imcParts.join(', ')
             };
 
             return updated;
