@@ -55,12 +55,14 @@ class LaporanController extends Controller
         $barangIds = $barangs->pluck('id');
         $gudangList = Gudang::where('is_active', true)->get(['id', 'nama_gudang', 'kode_gudang']);
 
+        // Kondisi detail menjadi acuan utama, termasuk kondisi aktual saat pengembalian.
+        // Kondisi kosong dianggap NULL agar fallback ke kondisi header tetap berjalan.
         $mutasiLalu = TransaksiDetail::select(
             'td.barang_id',
             DB::raw("SUM(CASE
                 WHEN t.tanggal < '{$startDate}'
                 AND t.gudang_tujuan_id " . ($gudangId !== 'ALL' ? "= " . (int) $gudangId : "IS NOT NULL") . "
-                AND (t.jenis_transaksi != 'MASUK' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%')
+                AND (t.jenis_transaksi != 'MASUK' OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%')
                 THEN td.qty ELSE 0
             END) as masuk_lalu"),
             DB::raw("SUM(CASE
@@ -85,13 +87,13 @@ class LaporanController extends Controller
             'td.barang_id',
             DB::raw("SUM(CASE
                 WHEN t.jenis_transaksi = 'MASUK'
-                AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' " .
+                AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%' " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as masuk_bulan"),
             DB::raw("SUM(CASE
                 WHEN t.jenis_transaksi = 'MASUK'
-                AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' " .
+                AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%' " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as masuk_rusak"),
@@ -145,18 +147,18 @@ class LaporanController extends Controller
             ->selectRaw("
                 td.barang_id,
                 SUM(CASE
-                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
-                      OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%'
+                    WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%'
+                      OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%'
                     THEN td.qty ELSE 0
                 END) as keluar_bekas,
                 SUM(CASE
-                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                    WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%'
                     THEN td.qty ELSE 0
                 END) as keluar_rusak,
                 SUM(CASE
-                    WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
+                    WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%'
                     THEN td.qty ELSE 0
                 END) as keluar_baru
             ")
@@ -183,46 +185,46 @@ class LaporanController extends Controller
                 td.barang_id,
                 SUM(CASE
                     WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond}
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%'
                     THEN td.qty
                     WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%'
                     THEN -td.qty
                     WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%'
                     THEN {$trfCase}
                     ELSE 0
                 END) as net_baru,
                 SUM(CASE
                     WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond}
-                     AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
-                      OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
+                     AND (UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%'
+                      OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%')
                     THEN td.qty
                     WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
-                     AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
-                      OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
+                     AND (UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%'
+                      OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%')
                     THEN -td.qty
                     WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
-                     AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
-                      OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
+                     AND (UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%'
+                      OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%')
                     THEN {$trfCase}
                     ELSE 0
                 END) as net_bekas,
                 SUM(CASE
                     WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond}
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%'
                     THEN td.qty
                     WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%'
                     THEN -td.qty
                     WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%'
                     THEN {$trfCase}
                     ELSE 0
                 END) as net_rusak
@@ -237,14 +239,14 @@ class LaporanController extends Controller
         if ($gudangId === 'ALL') {
             $conditionSql = function ($sign = 1) {
                 $baru = $sign === 1
-                    ? "SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' THEN td.qty ELSE 0 END)"
-                    : "SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' THEN -td.qty ELSE 0 END)";
+                    ? "SUM(CASE WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%' THEN td.qty ELSE 0 END)"
+                    : "SUM(CASE WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%' AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%' AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%' THEN -td.qty ELSE 0 END)";
                 $bekas = $sign === 1
-                    ? "SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%' THEN td.qty ELSE 0 END)"
-                    : "SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%' THEN -td.qty ELSE 0 END)";
+                    ? "SUM(CASE WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%' THEN td.qty ELSE 0 END)"
+                    : "SUM(CASE WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%' OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%' THEN -td.qty ELSE 0 END)";
                 $rusak = $sign === 1
-                    ? "SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' THEN td.qty ELSE 0 END)"
-                    : "SUM(CASE WHEN UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' THEN -td.qty ELSE 0 END)";
+                    ? "SUM(CASE WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%' THEN td.qty ELSE 0 END)"
+                    : "SUM(CASE WHEN UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%' THEN -td.qty ELSE 0 END)";
 
                 return [$baru, $bekas, $rusak];
             };
@@ -547,7 +549,7 @@ class LaporanController extends Controller
             DB::raw("SUM(CASE
                 WHEN t.tanggal < '{$startDate}'
                 AND t.gudang_tujuan_id " . ($gudangId !== 'ALL' ? "= " . (int) $gudangId : "IS NOT NULL") . "
-                AND (t.jenis_transaksi != 'MASUK' OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%')
+                AND (t.jenis_transaksi != 'MASUK' OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%')
                 THEN td.qty ELSE 0
             END) as masuk_lalu"),
             DB::raw("SUM(CASE
@@ -571,13 +573,13 @@ class LaporanController extends Controller
             'td.barang_id',
             DB::raw("SUM(CASE
                 WHEN t.jenis_transaksi = 'MASUK'
-                AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%' " .
+                AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%' " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as masuk_bulan"),
             DB::raw("SUM(CASE
                 WHEN t.jenis_transaksi = 'MASUK'
-                AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%' " .
+                AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%' " .
                 ($gudangId !== 'ALL' ? "AND t.gudang_tujuan_id = " . (int) $gudangId : "") . "
                 THEN td.qty ELSE 0
             END) as masuk_rusak"),
@@ -626,46 +628,46 @@ class LaporanController extends Controller
                 td.barang_id,
                 SUM(CASE
                     WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond}
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%'
                     THEN td.qty
                     WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%'
                     THEN -td.qty
                     WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%BEKAS%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%SECOND%'
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) NOT LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%BEKAS%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%SECOND%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) NOT LIKE '%RUSAK%'
                     THEN {$trfCase}
                     ELSE 0
                 END) as net_baru,
                 SUM(CASE
                     WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond}
-                     AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
-                      OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
+                     AND (UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%'
+                      OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%')
                     THEN td.qty
                     WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
-                     AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
-                      OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
+                     AND (UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%'
+                      OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%')
                     THEN -td.qty
                     WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
-                     AND (UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%BEKAS%'
-                      OR UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%SECOND%')
+                     AND (UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%BEKAS%'
+                      OR UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%SECOND%')
                     THEN {$trfCase}
                     ELSE 0
                 END) as net_bekas,
                 SUM(CASE
                     WHEN t.jenis_transaksi = 'MASUK' {$tujuanCond}
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%'
                     THEN td.qty
                     WHEN (t.jenis_transaksi = 'KELUAR' OR (t.jenis_transaksi = 'TRANSFER' AND t.kode_projek IS NOT NULL AND t.kode_projek != '' AND t.gudang_tujuan_id IS NULL)) {$asalCond}
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%'
                     THEN -td.qty
                     WHEN (t.gudang_asal_id IS NOT NULL AND t.gudang_tujuan_id IS NOT NULL AND (t.jenis_transaksi = 'TRANSFER' OR t.sub_jenis = 'TRANSFER_GUDANG'))
-                     AND UPPER(COALESCE(td.kondisi, t.kondisi, 'BARU')) LIKE '%RUSAK%'
+                     AND UPPER(COALESCE(NULLIF(TRIM(td.kondisi), ''), NULLIF(TRIM(t.kondisi), ''), 'BARU')) LIKE '%RUSAK%'
                     THEN {$trfCase}
                     ELSE 0
                 END) as net_rusak

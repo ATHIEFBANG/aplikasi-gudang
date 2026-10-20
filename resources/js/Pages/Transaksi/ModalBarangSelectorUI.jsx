@@ -362,7 +362,7 @@ export default function ModalBarangSelectorUI({
                                             {currentNamaBarang}
                                         </span>
                                         <span className="mt-0.5 block truncate font-mono text-[10px] text-slate-500 dark:text-slate-400" title={batch.nomor_imc || 'Tanpa nomor IMC'}>
-                                            IMC: {batch.nomor_imc || '-'}
+                                            PPL: {batch.nomor_imc || '-'}
                                         </span>
                                     </span>
                                     <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${batch.badgeClass}`}>
