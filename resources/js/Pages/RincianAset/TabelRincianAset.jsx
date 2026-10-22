@@ -282,29 +282,43 @@ export default function TabelRincianAset({
         <div className="w-full">
             <div className="mb-4 flex flex-wrap items-center gap-2" role="tablist" aria-label="Kategori rincian aset">
                 <Button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeSection === 'KELUAR'}
-                    onClick={() => setActiveSection('KELUAR')}
-                    disabled={isProcessing}
-                    shape="default" flipHorizontal={false} flipVertical={false} variant="default"
-                    effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF"
-                    color="rose" size="sm" width="fit" layer="normal" attached="none" hover
-                    selected={activeSection === 'KELUAR'}
-                    className={`!w-auto gap-2 px-4 py-2 text-xs font-bold transition-colors ${activeSection === 'KELUAR' ? '!bg-rose-600 !text-white shadow-sm' : '!bg-transparent !text-slate-600 hover:!bg-slate-100 dark:!text-slate-300 dark:hover:!bg-slate-800'}`}
+                    type="button" role="tab" aria-selected={activeSection === 'KELUAR' && projectCodeFilter === 'ALL'}
+                    onClick={() => { setActiveSection('KELUAR'); onProjectCodeFilterChange?.('ALL'); }} disabled={isProcessing}
+                    shape="default" flipHorizontal={false} flipVertical={false} variant="default" effect="none" effectColor="#22D3EE"
+                    decoration="none" decorationColor="#FFFFFF" color="blue" size="sm" width="fit" layer="normal" attached="none" hover
+                    selected={activeSection === 'KELUAR' && projectCodeFilter === 'ALL'}
+                    className={`!w-auto gap-2 px-4 py-2 text-xs font-bold transition-colors ${activeSection === 'KELUAR' && projectCodeFilter === 'ALL' ? '!bg-rose-600 !text-white shadow-sm' : '!bg-transparent !text-slate-600 hover:!bg-slate-100 dark:!text-slate-300 dark:hover:!bg-slate-800'}`}
                 >
                     <ClipboardList className="h-4 w-4" />
-                    <span>Rincian Keluar</span>
+                    <span>Rincian Keluar (Semua)</span>
                 </Button>
                 <Button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeSection === 'STOK_AKHIR'}
-                    onClick={() => setActiveSection('STOK_AKHIR')}
-                    disabled={isProcessing}
-                    shape="default" flipHorizontal={false} flipVertical={false} variant="default"
-                    effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF"
-                    color="blue" size="sm" width="fit" layer="normal" attached="none" hover
+                    type="button" role="tab" aria-selected={activeSection === 'KELUAR' && projectCodeFilter === 'OTC'}
+                    onClick={() => { setActiveSection('KELUAR'); onProjectCodeFilterChange?.('OTC'); }} disabled={isProcessing}
+                    shape="default" flipHorizontal={false} flipVertical={false} variant="default" effect="none" effectColor="#22D3EE"
+                    decoration="none" decorationColor="#FFFFFF" color="blue" size="sm" width="fit" layer="normal" attached="none" hover
+                    selected={activeSection === 'KELUAR' && projectCodeFilter === 'OTC'}
+                    className={`!w-auto gap-2 px-4 py-2 text-xs font-bold transition-colors ${activeSection === 'KELUAR' && projectCodeFilter === 'OTC' ? '!bg-blue-600 !text-white shadow-sm' : '!bg-transparent !text-slate-600 hover:!bg-slate-100 dark:!text-slate-300 dark:hover:!bg-slate-800'}`}
+                >
+                    <ClipboardList className="h-4 w-4" />
+                    <span>Rincian Keluar (OTC)</span>
+                </Button>
+                <Button
+                    type="button" role="tab" aria-selected={activeSection === 'KELUAR' && projectCodeFilter === 'MRC'}
+                    onClick={() => { setActiveSection('KELUAR'); onProjectCodeFilterChange?.('MRC'); }} disabled={isProcessing}
+                    shape="default" flipHorizontal={false} flipVertical={false} variant="default" effect="none" effectColor="#22D3EE"
+                    decoration="none" decorationColor="#FFFFFF" color="blue" size="sm" width="fit" layer="normal" attached="none" hover
+                    selected={activeSection === 'KELUAR' && projectCodeFilter === 'MRC'}
+                    className={`!w-auto gap-2 px-4 py-2 text-xs font-bold transition-colors ${activeSection === 'KELUAR' && projectCodeFilter === 'MRC' ? '!bg-violet-600 !text-white shadow-sm' : '!bg-transparent !text-slate-600 hover:!bg-slate-100 dark:!text-slate-300 dark:hover:!bg-slate-800'}`}
+                >
+                    <ClipboardList className="h-4 w-4" />
+                    <span>Rincian Keluar (MRC)</span>
+                </Button>
+                <Button
+                    type="button" role="tab" aria-selected={activeSection === 'STOK_AKHIR'}
+                    onClick={() => setActiveSection('STOK_AKHIR')} disabled={isProcessing}
+                    shape="default" flipHorizontal={false} flipVertical={false} variant="default" effect="none" effectColor="#22D3EE"
+                    decoration="none" decorationColor="#FFFFFF" color="blue" size="sm" width="fit" layer="normal" attached="none" hover
                     selected={activeSection === 'STOK_AKHIR'}
                     className={`!w-auto gap-2 px-4 py-2 text-xs font-bold transition-colors ${activeSection === 'STOK_AKHIR' ? '!bg-blue-600 !text-white shadow-sm' : '!bg-transparent !text-slate-600 hover:!bg-slate-100 dark:!text-slate-300 dark:hover:!bg-slate-800'}`}
                 >
@@ -319,32 +333,133 @@ export default function TabelRincianAset({
                     <div className="px-4 sm:px-5 py-3 border-b border-slate-200 dark:border-slate-800">
                         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                             <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                <Button type="button" onClick={() => onTabChange?.('PROYEK')} disabled={isProcessing} shape="default" flipHorizontal={false} flipVertical={false} variant="default" effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="rose" size="sm" width="fit" layer="normal" attached="none" hover selected={activeTab === 'PROYEK'} className={`!w-auto gap-1.5 px-3.5 py-1.5 text-xs font-bold ${activeTab === 'PROYEK' ? '!bg-rose-600 !text-white' : '!bg-transparent !text-slate-600 dark:!text-slate-400'}`}>
-                                    <BriefcaseBusiness className="h-3.5 w-3.5" /><span>Proyek</span>
-                                </Button>
-                                <Button type="button" onClick={() => onTabChange?.('NON_PROYEK')} disabled={isProcessing} shape="default" flipHorizontal={false} flipVertical={false} variant="default" effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="blue" size="sm" width="fit" layer="normal" attached="none" hover selected={activeTab === 'NON_PROYEK'} className={`!w-auto gap-1.5 px-3.5 py-1.5 text-xs font-bold ${activeTab === 'NON_PROYEK' ? '!bg-blue-600 !text-white' : '!bg-transparent !text-slate-600 dark:!text-slate-400'}`}>
-                                    <Building2 className="h-3.5 w-3.5" /><span>Non Proyek</span>
-                                </Button>
+                                <div className="flex max-w-full flex-wrap items-center gap-3">
+                                    <Button
+                                        type="button"
+                                        onClick={() => onTabChange?.('PROYEK')}
+                                        disabled={isProcessing}
+                                        shape="default"
+                                        flipHorizontal={false}
+                                        flipVertical={false}
+                                        variant="default"
+                                        effect="none"
+                                        effectColor="#22D3EE"
+                                        decoration="none"
+                                        decorationColor="#FFFFFF"
+                                        color="rose"
+                                        size="sm"
+                                        width="fit"
+                                        layer="normal"
+                                        attached="none"
+                                        hover
+                                        selected={activeTab === 'PROYEK'}
+                                        className={`!w-auto gap-1.5 px-3.5 py-1.5 text-xs font-bold ${activeTab === 'PROYEK' ? '!bg-rose-600 !text-white' : '!bg-transparent !text-slate-600 dark:!text-slate-400'}`}
+                                    >
+                                        <BriefcaseBusiness className="h-3.5 w-3.5" />
+                                        <span>Proyek</span>
+                                    </Button>
+
+                                    <Button
+                                        type="button"
+                                        onClick={() => onTabChange?.('NON_PROYEK')}
+                                        disabled={isProcessing}
+                                        shape="default"
+                                        flipHorizontal={false}
+                                        flipVertical={false}
+                                        variant="default"
+                                        effect="none"
+                                        effectColor="#22D3EE"
+                                        decoration="none"
+                                        decorationColor="#FFFFFF"
+                                        color="blue"
+                                        size="sm"
+                                        width="fit"
+                                        layer="normal"
+                                        attached="none"
+                                        hover
+                                        selected={activeTab === 'NON_PROYEK'}
+                                        className={`!w-auto gap-1.5 px-3.5 py-1.5 text-xs font-bold ${activeTab === 'NON_PROYEK' ? '!bg-blue-600 !text-white' : '!bg-transparent !text-slate-600 dark:!text-slate-400'}`}
+                                    >
+                                        <Building2 className="h-3.5 w-3.5" />
+                                        <span>Non Proyek</span>
+                                    </Button>
+                                </div>
                             </div>
-                            <div className="flex min-w-0 flex-wrap items-center justify-start xl:justify-end gap-2">
-                                {isProject && <>
-                                    <Button type="button" aria-pressed={projectCodeFilter === 'MRC'} onClick={() => onProjectCodeFilterChange?.(projectCodeFilter === 'MRC' ? 'ALL' : 'MRC')} disabled={isProcessing} shape="default" flipHorizontal={false} flipVertical={false} variant={projectCodeFilter === 'MRC' ? 'default' : 'outlined'} effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="rose" size="sm" width="fit" layer="normal" attached="none" hover selected={projectCodeFilter === 'MRC'} className={`!w-auto px-3 py-1.5 text-[10px] font-bold ${projectCodeFilter === 'MRC' ? '!bg-rose-600 !text-white' : '!bg-transparent !text-rose-600 dark:!text-rose-300'}`}>MRC</Button>
-                                    <Button type="button" aria-pressed={projectCodeFilter === 'OTC'} onClick={() => onProjectCodeFilterChange?.(projectCodeFilter === 'OTC' ? 'ALL' : 'OTC')} disabled={isProcessing} shape="default" flipHorizontal={false} flipVertical={false} variant={projectCodeFilter === 'OTC' ? 'default' : 'outlined'} effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="blue" size="sm" width="fit" layer="normal" attached="none" hover selected={projectCodeFilter === 'OTC'} className={`!w-auto px-3 py-1.5 text-[10px] font-bold ${projectCodeFilter === 'OTC' ? '!bg-blue-600 !text-white' : '!bg-transparent !text-blue-600 dark:!text-blue-300'}`}>OTC</Button>
-                                </>}
-                                <Button type="button" onClick={handleExpandAll} disabled={!pivotRows.length || isProcessing} shape="default" flipHorizontal={false} flipVertical={false} variant="outlined" effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="slate" size="sm" width="fit" layer="normal" attached="none" hover className="!w-auto px-3 py-1.5 text-[10px] font-bold">Expand Semua</Button>
-                                <Button type="button" onClick={handleCollapseAll} disabled={!pivotRows.length || isProcessing} shape="default" flipHorizontal={false} flipVertical={false} variant="outlined" effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="slate" size="sm" width="fit" layer="normal" attached="none" hover className="!w-auto px-3 py-1.5 text-[10px] font-bold">Collapse</Button>
-                            </div>
+
+                            <div className="flex flex-wrap shrink-0 items-center justify-end gap-2">
+<Button
+                                type="button"
+                                onClick={handleExpandAll}
+                                disabled={!pivotRows.length || isProcessing}
+                                shape="default"
+                                flipHorizontal={false}
+                                flipVertical={false}
+                                variant="outlined"
+                                effect="none"
+                                effectColor="#22D3EE"
+                                decoration="none"
+                                decorationColor="#FFFFFF"
+                                color="slate"
+                                size="sm"
+                                width="fit"
+                                layer="normal"
+                                attached="none"
+                                hover
+                                className="!w-auto px-3 py-1.5 text-[10px] font-bold"
+                            >
+                                Expand Semua
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={handleCollapseAll}
+                                disabled={!pivotRows.length || isProcessing}
+                                shape="default"
+                                flipHorizontal={false}
+                                flipVertical={false}
+                                variant="outlined"
+                                effect="none"
+                                effectColor="#22D3EE"
+                                decoration="none"
+                                decorationColor="#FFFFFF"
+                                color="slate"
+                                size="sm"
+                                width="fit"
+                                layer="normal"
+                                attached="none"
+                                hover
+                                className="!w-auto px-3 py-1.5 text-[10px] font-bold"
+                            >
+                                Collapse
+                            </Button>
+                        </div>
                         </div>
                     </div>
 
-                    <div className="flex min-w-0 flex-col gap-3 border-b border-slate-200 px-3 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-5 sm:py-4">
+                    <div className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 dark:border-slate-800 sm:gap-5 sm:px-5 sm:py-4">
                         <div className="min-w-0 flex-1">
-                            <h2 className="truncate text-sm font-bold text-slate-900 dark:text-white sm:text-base lg:text-lg">Analisis Barang Keluar</h2>
-                            <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 sm:text-xs">{isProject ? 'Saldo pengeluaran proyek setelah pengembalian → Nama Barang → Serial Number' : 'Pemakaian internal → Nama Barang → Serial Number'}</p>
+                            <h2 className="truncate text-sm font-bold text-slate-900 dark:text-white sm:text-base lg:text-lg">
+                                Analisis Barang Keluar
+                            </h2>
+                            <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 sm:text-xs">
+                                {isProject ? 'Saldo pengeluaran proyek setelah pengembalian → Nama Barang → Serial Number' : 'Pemakaian internal → Nama Barang → Serial Number'}
+                            </p>
                         </div>
-                        <div className="min-w-0 shrink-0 w-full sm:w-[clamp(12rem,24vw,24rem)]">
-                            <Search value={searchTerm} onChange={setSearchTerm} onSearch={onSearch} placeholder="Cari barang / kode PPL / SN..." disabled={isProcessing} variant={searchVariant} color={searchColor} size={searchSize} buttonLabel={searchButtonLabel} iconPosition={searchIconPosition} className={`w-full ${searchClassName}`} />
-                        </div>
+
+                        <div className="min-w-0 shrink-0" style={{ width: searchWidth, maxWidth: '48%' }}>
+                                <Search
+                                    value={searchTerm}
+                                    onChange={setSearchTerm}
+                                    onSearch={onSearch}
+                                    placeholder="Cari barang / kode PPL / SN..."
+                                    disabled={isProcessing}
+                                    variant={searchVariant}
+                                    color={searchColor}
+                                    size={searchSize}
+                                    buttonLabel={searchButtonLabel}
+                                    iconPosition={searchIconPosition}
+                                    className={`w-full ${searchClassName}`}
+                                />
+                            </div>
                     </div>
 
                     <TabelPivot
@@ -377,6 +492,24 @@ export default function TabelRincianAset({
                                 Stok aktual di gudang → Kategori → Nama Barang → Serial Number atau kondisi Non-SN
                             </p>
                         </div>
+                        <div className="min-w-0 w-full sm:w-[clamp(12rem,24vw,20rem)]">
+                            <Search
+                                value={stockSearch}
+                                onChange={setStockSearch}
+                                onSearch={value => setStockSearch(String(value ?? stockSearch).trim())}
+                                placeholder="Cari gudang / kategori / barang / kode PPL / SN..."
+                                disabled={isProcessing}
+                                variant={searchVariant}
+                                color={searchColor}
+                                size={searchSize}
+                                buttonLabel={searchButtonLabel}
+                                iconPosition={searchIconPosition}
+                                className={`w-full ${searchClassName}`}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end border-b border-slate-200 px-3 py-3 dark:border-slate-800 sm:px-5">
                         <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
                             <Button
                                 type="button"
@@ -400,24 +533,6 @@ export default function TabelRincianAset({
                             >
                                 Collapse
                             </Button>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end border-b border-slate-200 px-3 py-3 dark:border-slate-800 sm:px-5">
-                        <div className="min-w-0 w-full sm:w-[clamp(12rem,24vw,20rem)]">
-                            <Search
-                                value={stockSearch}
-                                onChange={setStockSearch}
-                                onSearch={value => setStockSearch(String(value ?? stockSearch).trim())}
-                                placeholder="Cari gudang / kategori / barang / kode PPL / SN..."
-                                disabled={isProcessing}
-                                variant={searchVariant}
-                                color={searchColor}
-                                size={searchSize}
-                                buttonLabel={searchButtonLabel}
-                                iconPosition={searchIconPosition}
-                                className={`w-full ${searchClassName}`}
-                            />
                         </div>
                     </div>
 

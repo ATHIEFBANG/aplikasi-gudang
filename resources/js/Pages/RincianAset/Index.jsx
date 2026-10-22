@@ -55,8 +55,10 @@ export default function AnalisisBarangKeluarIndex({ activeTab = 'PROYEK', projec
 
     const handleProjectCodeFilterChange = value => {
         const nextFilter = normalizeProjectCodeFilter(value);
+        const nextTab = nextFilter === 'ALL' ? currentTab : 'PROYEK';
         setProjectCodeFilter(nextFilter);
-        navigateWithFilters({ project_code_filter: nextFilter, page: 1 });
+        if (nextTab !== currentTab) setCurrentTab(nextTab);
+        navigateWithFilters({ project_code_filter: nextFilter, tab: nextTab, page: 1 });
     };
 
     return (
