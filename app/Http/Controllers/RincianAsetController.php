@@ -87,6 +87,12 @@ class RincianAsetController extends Controller
             if (!empty($projects)) {
                 $query->whereIn('transaksis.kode_projek', $projects);
             }
+
+            $projectCodeFilter = strtoupper(trim((string) $request->input('project_code_filter', 'ALL')));
+            if (in_array($projectCodeFilter, ['MRC', 'OTC'], true)) {
+                // UPPER + LIKE agar filter tidak sensitif terhadap kapitalisasi kode proyek.
+                $query->whereRaw('UPPER(transaksis.kode_projek) LIKE ?', ['%' . $projectCodeFilter . '%']);
+            }
         }
 
         if ($type === 'NON_PROYEK' && !empty($departments)) {
@@ -599,6 +605,13 @@ class RincianAsetController extends Controller
             $tab = 'PROYEK';
         }
 
+        // Filter proyek berdasarkan token kode proyek: ALL, MRC, atau OTC.
+        $projectCodeFilter = strtoupper(trim((string) $request->input('project_code_filter', 'ALL')));
+        if (!in_array($projectCodeFilter, ['ALL', 'MRC', 'OTC'], true)) {
+            $projectCodeFilter = 'ALL';
+        }
+        $request->merge(['project_code_filter' => $projectCodeFilter]);
+
         $priceMap = $this->getLatestInboundPrices();
 
         $projectPivot = $this->getPivotRows(
@@ -622,6 +635,7 @@ class RincianAsetController extends Controller
             'stockPivot' => $stockPivot,
             'filters' => [
                 'tab' => $tab,
+                'project_code_filter' => $projectCodeFilter,
                 'search' => $request->input('search', ''),
                 'project' => $request->input('project', ''),
                 'department' => $request->input('department', ''),
