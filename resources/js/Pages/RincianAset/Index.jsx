@@ -6,7 +6,7 @@ import TabelRincianAset from './TabelRincianAset';
 const TAB_CONFIG = { PROYEK: 'Proyek', NON_PROYEK: 'Non Proyek' };
 const getPivotData = data => Array.isArray(data) ? data : data?.data || [];
 
-export default function AnalisisBarangKeluarIndex({ activeTab = 'PROYEK', projectPivot = [], nonProjectPivot = [], filters = {} }) {
+export default function AnalisisBarangKeluarIndex({ activeTab = 'PROYEK', projectPivot = [], nonProjectPivot = [], stockPivot = [], filters = {} }) {
     const initialTab = TAB_CONFIG[activeTab] ? activeTab : 'PROYEK';
     const [currentTab, setCurrentTab] = useState(initialTab);
     const [searchTerm, setSearchTerm] = useState(filters?.search || '');
@@ -20,6 +20,7 @@ export default function AnalisisBarangKeluarIndex({ activeTab = 'PROYEK', projec
     }, [filters]);
 
     const activeData = currentTab === 'PROYEK' ? getPivotData(projectPivot) : getPivotData(nonProjectPivot);
+    const stockData = getPivotData(stockPivot);
 
     const navigateWithFilters = (params = {}) => {
         setIsProcessing(true);
@@ -49,7 +50,7 @@ export default function AnalisisBarangKeluarIndex({ activeTab = 'PROYEK', projec
                     <p className="mt-1 text-sm sm:text-base text-slate-500 dark:text-slate-400">Analisis saldo aset proyek setelah pengembalian dan pemakaian nonproyek.</p>
                 </div>
                 <div className="pt-5">
-                    <TabelRincianAset activeTab={currentTab} onTabChange={handleTabChange} dataList={activeData} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onSearch={handleSearch} isProcessing={isProcessing} zoomLevel={zoomLevel} />
+                    <TabelRincianAset activeTab={currentTab} onTabChange={handleTabChange} dataList={activeData} stockDataList={stockData} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onSearch={handleSearch} isProcessing={isProcessing} zoomLevel={zoomLevel} />
                 </div>
             </div>
         </AuthenticatedLayout>

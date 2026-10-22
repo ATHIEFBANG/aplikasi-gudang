@@ -207,7 +207,7 @@ export function useModalBarangSelectorLogic({
                 serial => String(serial) === String(snValue)
             );
 
-            if (!exists && currentSerials.length >= availableEligibleSns.length) {
+            if (!exists && (currentSerials.length >= availableEligibleSns.length || currentSerials.length >= 10)) {
                 return prev;
             }
 
@@ -217,14 +217,9 @@ export function useModalBarangSelectorLogic({
                 )
                 : [...currentSerials, snValue];
 
-            const serialConditions = { ...(currentRow.serial_conditions || {}) };
-            Object.keys(serialConditions).forEach(key => {
-                if (!newSerials.includes(key)) delete serialConditions[key];
-            });
             updated[rowIdx] = {
                 ...currentRow,
                 serials: newSerials,
-                serial_conditions: serialConditions,
                 qty: newSerials.length
             };
 
@@ -243,7 +238,6 @@ export function useModalBarangSelectorLogic({
             updated[rowIdx] = {
                 ...updated[rowIdx],
                 serials: [],
-                serial_conditions: {},
                 qty: 0
             };
 
@@ -273,7 +267,6 @@ export function useModalBarangSelectorLogic({
             updated[rowIdx] = {
                 ...currentRow,
                 serials: selected,
-                serial_conditions: Object.fromEntries(Object.entries(currentRow.serial_conditions || {}).filter(([sn]) => selected.includes(sn))),
                 qty: selected.length
             };
 
@@ -526,8 +519,7 @@ export function useModalBarangSelectorLogic({
                 } else {
                     selections[batch.key] = {
                         nomor_imc: batch.nomor_imc || '',
-                        kondisi_asal: normalizeKondisi(batch.kondisi),
-                        kondisi: selections[batch.key]?.kondisi || normalizeKondisi(batch.kondisi),
+                        kondisi: normalizeKondisi(batch.kondisi),
                         qty: safeQty
                     };
                 }
@@ -591,37 +583,6 @@ export function useModalBarangSelectorLogic({
         },
         [updateNonSnBatchQty]
     );
-
-    const setNonSnActualCondition = useCallback((batch, actualCondition) => {
-        if (!batch || isProcessing || !setRows) return;
-        setRows(prev => {
-            const updated = [...prev];
-            const currentRow = updated[rowIdx];
-            if (!currentRow) return prev;
-            const selections = { ...(currentRow.non_sn_selections || {}) };
-            if (!selections[batch.key]) return prev;
-            selections[batch.key] = { ...selections[batch.key], kondisi: normalizeKondisi(actualCondition) };
-            updated[rowIdx] = { ...currentRow, non_sn_selections: selections };
-            return updated;
-        });
-    }, [isProcessing, rowIdx, setRows]);
-
-    const setSerialActualCondition = useCallback((snValue, actualCondition) => {
-        if (!snValue || isProcessing || !setRows) return;
-        setRows(prev => {
-            const updated = [...prev];
-            const currentRow = updated[rowIdx];
-            if (!currentRow) return prev;
-            updated[rowIdx] = {
-                ...currentRow,
-                serial_conditions: {
-                    ...(currentRow.serial_conditions || {}),
-                    [snValue]: normalizeKondisi(actualCondition)
-                }
-            };
-            return updated;
-        });
-    }, [isProcessing, rowIdx, setRows]);
 
     const handleToggleNonSnBatch = useCallback(batch => {
         if (!batch || isProcessing) return;
@@ -694,8 +655,6 @@ export function useModalBarangSelectorLogic({
         isBatchSelected,
         handleNonSnBatchQtyChange,
         handleToggleNonSnBatch,
-        setNonSnActualCondition,
-        setSerialActualCondition,
         incrementNonSnBatch,
         decrementNonSnBatch,
         getKondisiBadgeClass

@@ -62,8 +62,7 @@ export default function ModalBarangSelectorUI({
         getBatchSelectedQty,
         isBatchSelected,
         handleToggleNonSnBatch,
-        setSerialActualCondition,
-        setNonSnActualCondition,
+        handleReturnConditionChange,
         incrementNonSnBatch,
         decrementNonSnBatch,
         availableNonSnStock
@@ -183,7 +182,7 @@ export default function ModalBarangSelectorUI({
                                                 <select
                                                     value={row?.serial_conditions?.[snVal] || kondisiLabel}
                                                     disabled={isProcessing}
-                                                    onChange={value => setSerialActualCondition(snVal, value)}
+                                                    onChange={e => setRows(prev => prev.map((item, idx) => idx !== rowIdx ? item : { ...item, serial_conditions: { ...(item.serial_conditions || {}), [snVal]: e.target.value } }))}
                                                     onClick={e => e.stopPropagation()}
                                                     aria-label={`Kondisi pengembalian ${snVal}`}
                                                     className="h-6 max-w-[92px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 text-[10px] font-sans text-slate-700 dark:text-slate-200"
@@ -235,7 +234,7 @@ export default function ModalBarangSelectorUI({
                                         <button
                                             key={serial?.id || snVal}
                                             type="button"
-                                            disabled={isProcessing}
+                                            disabled={isProcessing || (!isChecked && selectedSerials.length >= 10)}
                                             onClick={() => handleToggleSn(snVal)}
                                             className={`flex items-center justify-between p-2 rounded-lg border text-left transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                                                 isChecked
@@ -362,7 +361,7 @@ export default function ModalBarangSelectorUI({
                                             {currentNamaBarang}
                                         </span>
                                         <span className="mt-0.5 block truncate font-mono text-[10px] text-slate-500 dark:text-slate-400" title={batch.nomor_imc || 'Tanpa nomor IMC'}>
-                                            PPL: {batch.nomor_imc || '-'}
+                                            IMC: {batch.nomor_imc || '-'}
                                         </span>
                                     </span>
                                     <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${batch.badgeClass}`}>
@@ -377,13 +376,13 @@ export default function ModalBarangSelectorUI({
                                             <span className="text-[10px] text-slate-400">Kondisi aktual</span>
                                         </div>
                                         <HybridDropdown
-                                            value={row?.non_sn_selections?.[batch.key]?.return_condition || row?.non_sn_selections?.[batch.key]?.kondisi || batch.kondisi}
+                                            value={selector.getBatchSelection(batch.key)?.return_condition || batch.kondisi}
                                             options={[
                                                 { value: 'Baru', label: 'Baru' },
                                                 { value: 'Bekas', label: 'Bekas' },
                                                 { value: 'Rusak', label: 'Rusak' }
                                             ]}
-                                            onChange={value => setNonSnActualCondition(batch, value)}
+                                            onChange={value => handleReturnConditionChange(batch, value)}
                                             placeholder="Pilih kondisi"
                                             searchPlaceholder="Cari kondisi..."
                                             allowCustom={false}

@@ -201,6 +201,7 @@ export function useModalBarangMasukControl({
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
+            if (!currentRow) return prev;
 
             if (!newBarangId) {
                 updated[rowIdx] = {
@@ -214,15 +215,17 @@ export function useModalBarangMasukControl({
             const targetBarang = barangs.find(b => String(b.id) === String(newBarangId) || b.kode_barang.toLowerCase() === String(newBarangId).toLowerCase());
             const realId = targetBarang ? String(targetBarang.id) : '';
             const isSn = Boolean(targetBarang?.is_wajib_sn);
-            const currentQty = currentRow.qty || 1;
+            const currentQty = Math.max(1, parseInt(currentRow.qty, 10) || 1);
+            const qty = isSn ? Math.min(currentQty, 10) : currentQty;
 
             const isProjectReturn = currentRow.sub_jenis === 'PENGEMBALIAN' && currentRow.return_source !== 'MANUAL' && Boolean(currentRow.kode_projek);
             updated[rowIdx] = {
                 ...currentRow,
                 barang_id: realId,
-                qty: isProjectReturn ? 0 : currentQty,
+                qty: isProjectReturn ? 0 : qty,
                 non_sn_selections: isProjectReturn ? {} : (currentRow.non_sn_selections || {}),
-                serials: isSn ? (isProjectReturn ? [] : Array(currentQty).fill('')) : [], serial_conditions: {}
+                serials: isSn ? (isProjectReturn ? [] : Array(qty).fill('')) : [],
+                serial_conditions: {}
             };
             return updated;
         });
@@ -230,18 +233,25 @@ export function useModalBarangMasukControl({
 
     const handleQtyChange = (rowIdx, val) => {
         const rowToChange = rows[rowIdx];
-        if (rowToChange?.sub_jenis === 'PENGEMBALIAN' && rowToChange.return_source !== 'MANUAL') return;
+        if (!rowToChange || (rowToChange.sub_jenis === 'PENGEMBALIAN' && rowToChange.return_source !== 'MANUAL')) return;
+
+        const selectedBarang = barangs.find(b => String(b.id) === String(rowToChange.barang_id));
+        const isSn = Boolean(selectedBarang?.is_wajib_sn);
         let count = parseInt(val, 10);
-        if (isNaN(count) || count < 1) count = 1;
-        if (count > 10) count = 10;
+        if (Number.isNaN(count) || count < 1) count = 1;
+        // Hanya barang wajib SN yang dibatasi maksimal 10 unit per baris.
+        if (isSn && count > 10) count = 10;
+
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
+            if (!currentRow) return prev;
+
             const targetBarang = barangs.find(b => String(b.id) === String(currentRow.barang_id));
-            const isSn = Boolean(targetBarang?.is_wajib_sn);
+            const currentIsSn = Boolean(targetBarang?.is_wajib_sn);
             let newSerials = currentRow.serials || [];
             const isProjectReturn = currentRow.sub_jenis === 'PENGEMBALIAN' && currentRow.return_source !== 'MANUAL' && Boolean(currentRow.kode_projek);
-            if (isSn) {
+            if (currentIsSn) {
                 newSerials = [...newSerials];
                 if (!isProjectReturn) while (newSerials.length < count) newSerials.push('');
                 newSerials = newSerials.slice(0, count);
@@ -270,6 +280,10 @@ export function useModalBarangMasukControl({
             const updated = [...prev];
             const current = updated[rowIdx];
             const serials = Array.isArray(current.serials) ? current.serials : [];
+            if (checked && !serials.includes(serialNumber) && serials.length >= 10) {
+                alert('Barang wajib SN maksimal 10 unit per baris.');
+                return prev;
+            }
             const nextSerials = checked
                 ? [...new Set([...serials, serialNumber])]
                 : serials.filter(sn => sn !== serialNumber);
@@ -401,7 +415,7 @@ export function useModalBarangMasukControl({
 
             let parsedQty = parseInt(String(rawQty).replace(/[^0-9]/g, ''), 10);
             if (isNaN(parsedQty) || parsedQty < 1) parsedQty = 1;
-            if (parsedQty > 10) parsedQty = 10;
+            if (Boolean(targetBarang?.is_wajib_sn) && parsedQty > 10) parsedQty = 10;
 
             let parsedHarga = '';
             if (rawHarga && rawHarga !== '-') {
@@ -514,6 +528,10 @@ export function useModalBarangMasukControl({
 
             const targetBarang = barangs.find(b => String(b.id) === String(r.barang_id));
             const isSn = Boolean(targetBarang?.is_wajib_sn);
+            if (isSn && Number(r.qty || 0) > 10) {
+                alert(`Baris #${rowNum}: Barang wajib SN maksimal 10 unit per baris.`);
+                return;
+            }
 
             if (isSn && !isEditMode) {
                 if (r.serials.length !== r.qty) {

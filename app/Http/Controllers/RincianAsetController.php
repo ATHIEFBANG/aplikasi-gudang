@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Barang;
 use App\Models\BarangSerial;
+use App\Models\Gudang;
 use App\Models\TransaksiDetail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -284,6 +286,309 @@ class RincianAsetController extends Controller
         })->values()->all();
     }
 
+    private function normalizeStockCondition(?string $condition): string
+    {
+        $value = strtoupper(trim((string) $condition));
+
+        if (str_contains($value, 'RUSAK') || str_contains($value, 'DAMAGED')) {
+            return 'Rusak';
+        }
+
+        if (
+            str_contains($value, 'BEKAS') ||
+            str_contains($value, 'SECOND') ||
+            str_contains($value, 'USED')
+        ) {
+            return 'Bekas';
+        }
+
+        return 'Baru';
+    }
+
+    /**
+     * Pecah qty non-SN berdasarkan kondisi yang tersimpan pada detail transaksi.
+     * Mendukung format "3 Baru, 2 Bekas" maupun "Baru: 3, Bekas: 2".
+     */
+    private function parseStockConditionQuantities(?string $rawCondition, int $qty): array
+    {
+        $result = ['baru' => 0, 'bekas' => 0, 'rusak' => 0];
+        $raw = trim((string) $rawCondition);
+
+        preg_match_all(
+            '/(\d+)\s*(BARU|BEKAS|SECOND|USED|RUSAK|DAMAGED)|\b(BARU|BEKAS|SECOND|USED|RUSAK|DAMAGED)\s*[:=]\s*(\d+)/i',
+            $raw,
+            $matches,
+            PREG_SET_ORDER
+        );
+
+        if (!empty($matches)) {
+            foreach ($matches as $match) {
+                $condition = strtoupper(($match[2] ?? '') ?: ($match[3] ?? ''));
+                $amount = (int) ((($match[1] ?? '') !== '') ? $match[1] : ($match[4] ?? 0));
+
+                if (str_contains($condition, 'RUSAK') || str_contains($condition, 'DAMAGED')) {
+                    $result['rusak'] += $amount;
+                } elseif (
+                    str_contains($condition, 'BEKAS') ||
+                    str_contains($condition, 'SECOND') ||
+                    str_contains($condition, 'USED')
+                ) {
+                    $result['bekas'] += $amount;
+                } else {
+                    $result['baru'] += $amount;
+                }
+            }
+
+            return $result;
+        }
+
+        $key = strtolower($this->normalizeStockCondition($raw));
+        $key = $key === 'rusak' ? 'rusak' : ($key === 'bekas' ? 'bekas' : 'baru');
+        $result[$key] = max(0, $qty);
+
+        return $result;
+    }
+
+    /**
+     * Pivot stok akhir saat ini. SN dihitung dari serial yang masih berada di gudang;
+     * non-SN dihitung dari mutasi transaksi selesai, per gudang dan kondisi.
+     */
+    private function getStockPivotRows(array $priceMap): array
+    {
+        $gudangs = Gudang::query()
+            ->orderBy('nama_gudang')
+            ->get(['id', 'nama_gudang', 'kode_gudang'])
+            ->keyBy('id');
+
+        if ($gudangs->isEmpty()) {
+            return [];
+        }
+
+        $barangs = Barang::query()
+            ->get([
+                'id', 'kode_barang', 'nama_barang', 'brand', 'tipe',
+                'kategori', 'part_number', 'is_wajib_sn',
+            ])
+            ->keyBy('id');
+
+        $result = [];
+        $validWarehouseIds = $gudangs->keys()->map(fn ($id) => (int) $id)->all();
+
+        // 1. Serial number yang benar-benar masih berada di gudang saat ini.
+        $serials = BarangSerial::query()
+            ->whereIn('status', ['IN_WAREHOUSE', 'READY', 'AVAILABLE'])
+            ->whereNotNull('gudang_id')
+            ->whereIn('gudang_id', $validWarehouseIds)
+            ->orderBy('barang_id')
+            ->orderBy('serial_number')
+            ->get([
+                'id', 'barang_id', 'gudang_id', 'serial_number', 'kondisi', 'status',
+            ]);
+
+        foreach ($serials as $serial) {
+            $barang = $barangs->get($serial->barang_id);
+            $gudang = $gudangs->get($serial->gudang_id);
+
+            if (!$barang || !$gudang) {
+                continue;
+            }
+
+            $condition = $this->normalizeStockCondition($serial->kondisi);
+            $conditionKey = strtolower($condition);
+            $price = (float) ($priceMap[(int) $barang->id] ?? 0);
+
+            $result[] = [
+                'barang_id' => (int) $barang->id,
+                'kode_barang' => $barang->kode_barang,
+                'nama_barang' => $barang->nama_barang,
+                'brand' => $barang->brand,
+                'tipe' => $barang->tipe,
+                'kategori' => $barang->kategori,
+                'part_number' => $barang->part_number,
+                'is_wajib_sn' => true,
+                'warehouse_id' => (int) $gudang->id,
+                'warehouse_name' => $gudang->nama_gudang,
+                'warehouse_code' => $gudang->kode_gudang,
+                'serial_number' => $serial->serial_number,
+                'kondisi' => $condition,
+                'qty' => 1,
+                'stok_baru' => $conditionKey === 'baru' ? 1 : 0,
+                'stok_bekas' => $conditionKey === 'bekas' ? 1 : 0,
+                'stok_rusak' => $conditionKey === 'rusak' ? 1 : 0,
+                'stok_lainnya' => 0,
+                'harga_satuan' => $price,
+                'nilai_stok' => $price,
+            ];
+        }
+
+        // 2. Mutasi non-SN untuk mendapat saldo akhir per barang, gudang, dan kondisi.
+        $nonSnBarangIds = Barang::query()
+            ->where(function ($query) {
+                $query->where('is_wajib_sn', false)->orWhereNull('is_wajib_sn');
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->flip();
+
+        if ($nonSnBarangIds->isNotEmpty()) {
+            $events = DB::table('transaksi_details as td')
+                ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+                ->where(function ($query) {
+                    $query->whereIn('t.status', ['COMPLETED', 'completed'])
+                        ->orWhereNull('t.status');
+                })
+                ->orderBy('t.tanggal')
+                ->orderBy('t.id')
+                ->orderBy('td.id')
+                ->get([
+                    'td.barang_id',
+                    'td.qty',
+                    'td.kondisi as detail_kondisi',
+                    't.kondisi as header_kondisi',
+                    't.jenis_transaksi',
+                    't.sub_jenis',
+                    't.gudang_asal_id',
+                    't.gudang_tujuan_id',
+                ]);
+
+            $conditionByBarangWarehouse = [];
+            $qtyByBarangWarehouse = [];
+
+            $ensureStockMap = static function (&$map, int $barangId, int $warehouseId): void {
+                $map[$barangId][$warehouseId] ??= [
+                    'baru' => 0,
+                    'bekas' => 0,
+                    'rusak' => 0,
+                ];
+            };
+
+            foreach ($events as $event) {
+                $barangId = (int) $event->barang_id;
+
+                if (!isset($nonSnBarangIds[$barangId])) {
+                    continue;
+                }
+
+                $qty = max(0, (int) $event->qty);
+                if ($qty === 0) {
+                    continue;
+                }
+
+                $conditionRaw = ($event->detail_kondisi && $event->detail_kondisi !== '-')
+                    ? $event->detail_kondisi
+                    : ($event->header_kondisi ?? 'Baru');
+                $conditionQty = $this->parseStockConditionQuantities($conditionRaw, $qty);
+                $movementType = strtoupper((string) $event->jenis_transaksi);
+                $subType = strtoupper((string) $event->sub_jenis);
+
+                if ($movementType === 'MASUK' && $event->gudang_tujuan_id) {
+                    $warehouseId = (int) $event->gudang_tujuan_id;
+                    $ensureStockMap($conditionByBarangWarehouse, $barangId, $warehouseId);
+                    foreach ($conditionQty as $key => $amount) {
+                        $conditionByBarangWarehouse[$barangId][$warehouseId][$key] += $amount;
+                    }
+                    $qtyByBarangWarehouse[$barangId][$warehouseId] = ($qtyByBarangWarehouse[$barangId][$warehouseId] ?? 0) + $qty;
+                } elseif ($movementType === 'KELUAR' && $event->gudang_asal_id) {
+                    $warehouseId = (int) $event->gudang_asal_id;
+                    $ensureStockMap($conditionByBarangWarehouse, $barangId, $warehouseId);
+                    foreach ($conditionQty as $key => $amount) {
+                        $conditionByBarangWarehouse[$barangId][$warehouseId][$key] = max(
+                            0,
+                            $conditionByBarangWarehouse[$barangId][$warehouseId][$key] - $amount
+                        );
+                    }
+                    $qtyByBarangWarehouse[$barangId][$warehouseId] = max(
+                        0,
+                        ($qtyByBarangWarehouse[$barangId][$warehouseId] ?? 0) - $qty
+                    );
+                } elseif ($movementType === 'TRANSFER' || $subType === 'TRANSFER_GUDANG') {
+                    if ($event->gudang_asal_id) {
+                        $warehouseId = (int) $event->gudang_asal_id;
+                        $ensureStockMap($conditionByBarangWarehouse, $barangId, $warehouseId);
+                        foreach ($conditionQty as $key => $amount) {
+                            $conditionByBarangWarehouse[$barangId][$warehouseId][$key] = max(
+                                0,
+                                $conditionByBarangWarehouse[$barangId][$warehouseId][$key] - $amount
+                            );
+                        }
+                        $qtyByBarangWarehouse[$barangId][$warehouseId] = max(
+                            0,
+                            ($qtyByBarangWarehouse[$barangId][$warehouseId] ?? 0) - $qty
+                        );
+                    }
+
+                    if ($event->gudang_tujuan_id) {
+                        $warehouseId = (int) $event->gudang_tujuan_id;
+                        $ensureStockMap($conditionByBarangWarehouse, $barangId, $warehouseId);
+                        foreach ($conditionQty as $key => $amount) {
+                            $conditionByBarangWarehouse[$barangId][$warehouseId][$key] += $amount;
+                        }
+                        $qtyByBarangWarehouse[$barangId][$warehouseId] = ($qtyByBarangWarehouse[$barangId][$warehouseId] ?? 0) + $qty;
+                    }
+                }
+            }
+
+            foreach ($qtyByBarangWarehouse as $barangId => $warehouses) {
+                $barang = $barangs->get($barangId);
+                if (!$barang) {
+                    continue;
+                }
+
+                foreach ($warehouses as $warehouseId => $totalQty) {
+                    $gudang = $gudangs->get($warehouseId);
+                    if (!$gudang || $totalQty <= 0) {
+                        continue;
+                    }
+
+                    $conditions = $conditionByBarangWarehouse[$barangId][$warehouseId] ?? [
+                        'baru' => 0, 'bekas' => 0, 'rusak' => 0,
+                    ];
+                    $conditionTotal = array_sum($conditions);
+                    $conditions['lainnya'] = max(0, (int) $totalQty - $conditionTotal);
+                    $price = (float) ($priceMap[(int) $barangId] ?? 0);
+
+                    foreach ([
+                        'baru' => 'Baru',
+                        'bekas' => 'Bekas',
+                        'rusak' => 'Rusak',
+                        'lainnya' => 'Belum Terpetakan',
+                    ] as $key => $conditionLabel) {
+                        $amount = (int) ($conditions[$key] ?? 0);
+                        if ($amount <= 0) {
+                            continue;
+                        }
+
+                        $result[] = [
+                            'barang_id' => (int) $barangId,
+                            'kode_barang' => $barang->kode_barang,
+                            'nama_barang' => $barang->nama_barang,
+                            'brand' => $barang->brand,
+                            'tipe' => $barang->tipe,
+                            'kategori' => $barang->kategori,
+                            'part_number' => $barang->part_number,
+                            'is_wajib_sn' => false,
+                            'warehouse_id' => (int) $gudang->id,
+                            'warehouse_name' => $gudang->nama_gudang,
+                            'warehouse_code' => $gudang->kode_gudang,
+                            'serial_number' => null,
+                            'kondisi' => $conditionLabel,
+                            'qty' => $amount,
+                            'stok_baru' => $key === 'baru' ? $amount : 0,
+                            'stok_bekas' => $key === 'bekas' ? $amount : 0,
+                            'stok_rusak' => $key === 'rusak' ? $amount : 0,
+                            'stok_lainnya' => $key === 'lainnya' ? $amount : 0,
+                            'harga_satuan' => $price,
+                            'nilai_stok' => $amount * $price,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
+
     public function index(Request $request): Response
     {
         $tab = strtoupper(
@@ -308,10 +613,13 @@ class RincianAsetController extends Controller
             $priceMap
         );
 
+        $stockPivot = $this->getStockPivotRows($priceMap);
+
         return Inertia::render('RincianAset/Index', [
             'activeTab' => $tab,
             'projectPivot' => $projectPivot,
             'nonProjectPivot' => $nonProjectPivot,
+            'stockPivot' => $stockPivot,
             'filters' => [
                 'tab' => $tab,
                 'search' => $request->input('search', ''),

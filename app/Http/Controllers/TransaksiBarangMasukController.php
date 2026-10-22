@@ -82,7 +82,7 @@ class TransaksiBarangMasukController extends Controller
                 'items.*.non_sn_selections.*.kondisi_asal' => 'nullable|string|in:Baru,Bekas,Rusak',
                 'items.*.non_sn_selections.*.kondisi' => 'required_with:items.*.non_sn_selections|string|in:Baru,Bekas,Rusak',
                 'items.*.non_sn_selections.*.return_condition' => 'nullable|string|in:Baru,Bekas,Rusak',
-                'items.*.non_sn_selections.*.qty' => 'required_with:items.*.non_sn_selections|integer|min:1|max:50',
+                'items.*.non_sn_selections.*.qty' => 'required_with:items.*.non_sn_selections|integer|min:1',
                 'items.*.nomor_imc' => 'required|string|max:100',
                 'items.*.nomor_omc' => 'nullable|string|max:100',
                 'items.*.pihak_asal' => 'nullable|string|max:255',
@@ -90,7 +90,7 @@ class TransaksiBarangMasukController extends Controller
                 'items.*.nama_customer' => 'nullable|string|max:255',
                 'items.*.gudang_tujuan_id' => 'required|exists:gudangs,id',
                 'items.*.barang_id' => 'required|exists:barangs,id',
-                'items.*.qty' => 'required|integer|min:1|max:50',
+                'items.*.qty' => 'required|integer|min:1',
                 'items.*.harga' => 'nullable|numeric|min:0',
                 'items.*.serials' => 'nullable|array',
                 'items.*.serials.*' => 'nullable|string|max:100',
@@ -102,6 +102,12 @@ class TransaksiBarangMasukController extends Controller
 
             // Barang masuk normal harus memakai SN baru; pengembalian proyek memakai SN yang telah terdaftar.
             foreach ($validated['items'] as $index => $item) {
+                $barangUntukValidasi = $barangs->get((int) $item['barang_id']);
+                $isSnUntukValidasi = (bool) ($barangUntukValidasi?->is_wajib_sn);
+                if ($isSnUntukValidasi && (int) ($item['qty'] ?? 0) > 10) {
+                    throw new \Exception("Barang wajib SN '{$barangUntukValidasi->nama_barang}' maksimal 10 unit per transaksi.");
+                }
+
                 $isProjectReturn = $item['sub_jenis'] === 'PENGEMBALIAN' && !empty($item['kode_projek']);
                 if ($item['sub_jenis'] === 'PENGEMBALIAN' && !$isProjectReturn && empty(trim((string) ($item['pihak_asal'] ?? '')))) {
                     throw new \Exception('Asal barang wajib diisi untuk pengembalian manual.');
@@ -440,7 +446,7 @@ class TransaksiBarangMasukController extends Controller
             'kode_projek'      => 'nullable|string|max:100',
             'nama_customer'    => 'nullable|string|max:255',
             'gudang_tujuan_id' => 'nullable|exists:gudangs,id',
-            'qty'              => 'nullable|integer|min:1|max:50',
+            'qty'              => 'nullable|integer|min:1',
             'harga'            => 'nullable|numeric|min:0',
             'keterangan'       => 'nullable|string|max:500',
         ]);
@@ -448,6 +454,16 @@ class TransaksiBarangMasukController extends Controller
         $kondisiFix = ucfirst(strtolower($validated['kondisi'] ?? 'Baru'));
         $hargaFix   = $transaksi->sub_jenis === 'PEMBELIAN' ? (float) ($validated['harga'] ?? 0) : 0;
         $newQty     = isset($validated['qty']) ? (int) $validated['qty'] : null;
+
+        if ($newQty !== null && $newQty > 10) {
+            $detailsBarang = Barang::whereIn('id', $transaksi->details->pluck('barang_id')->unique())->get()->keyBy('id');
+            foreach ($transaksi->details as $detail) {
+                $barangQty = $detailsBarang->get($detail->barang_id);
+                if ((bool) ($barangQty?->is_wajib_sn)) {
+                    return back()->with('error', "Barang wajib SN '{$barangQty->nama_barang}' maksimal 10 unit per transaksi.");
+                }
+            }
+        }
 
         try {
             DB::transaction(function () use ($transaksi, $validated, $kondisiFix, $hargaFix, $newQty) {
