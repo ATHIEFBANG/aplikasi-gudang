@@ -407,9 +407,9 @@ export default function ModalBarangMasukRow({
                             </div>
                         ) : (
                             <div className="flex items-center">
-                                <button type="button" disabled={isProcessing || row.qty <= 1} onClick={() => onQtyChange(rowIdx, row.qty - 1)} className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"><Minus className="w-3 h-3" /></button>
-                                <Input type="number" min={1} max={isWajibSn ? 10 : undefined} disabled={isProcessing} value={row.qty} onFocus={(e) => e.target.select()} onChange={(e) => onQtyChange(rowIdx, e.target.value)} className="h-8 w-full text-center font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-blue-500" required />
-                                <button type="button" disabled={isProcessing || (isWajibSn && Number(row.qty) >= 10)} onClick={() => onQtyChange(rowIdx, Number(row.qty || 0) + 1)} className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"><Plus className="w-3 h-3" /></button>
+                                <button type="button" disabled={isProcessing || (isEditMode && !isWajibSn) || Number(row.qty) <= 1} onClick={() => onQtyChange(rowIdx, Number(row.qty || 1) - 1)} className="h-8 w-8 rounded-l-lg border border-r-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"><Minus className="w-3 h-3" /></button>
+                                <Input type="number" min={1} max={isWajibSn ? 10 : undefined} disabled={isProcessing || (isEditMode && !isWajibSn)} value={row.qty} onFocus={(e) => e.target.select()} onChange={(e) => onQtyChange(rowIdx, e.target.value)} className="h-8 w-full text-center font-bold text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 rounded-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus-visible:ring-1 focus-visible:ring-blue-500" required />
+                                <button type="button" disabled={isProcessing || (isEditMode && !isWajibSn) || (isWajibSn && Number(row.qty) >= 10)} onClick={() => onQtyChange(rowIdx, Number(row.qty || 0) + 1)} className="h-8 w-8 rounded-r-lg border border-l-0 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-xs disabled:opacity-40 cursor-pointer transition-colors"><Plus className="w-3 h-3" /></button>
                             </div>
                         )}
                     </div>
@@ -479,10 +479,17 @@ export default function ModalBarangMasukRow({
                     isEditMode={false}
                     allowRusak
                 />
-            ) : isWajibSn && !isEditMode ? (
+            ) : isWajibSn ? (
                 <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
-                    <div className="flex items-center justify-between"><Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Daftar Serial Number ({row.serials.length} Unit) *</Label><span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">{row.serials.filter(s => Boolean(s?.trim())).length} / {row.qty} Terisi</span></div>
-                    <div className="grid max-h-44 grid-cols-1 gap-2.5 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">{row.serials.map((sn, snIdx) => <div key={`sn-inbound-${rowIdx}-${snIdx}`} className="space-y-0.5"><Label className="text-[10px] font-mono text-slate-500 dark:text-slate-400">SN Unit #{snIdx + 1}</Label><Input placeholder={`Ketik Serial Number #${snIdx + 1}`} disabled={isProcessing} value={sn} onChange={e => onManualSerialChange(rowIdx, snIdx, e.target.value)} className="h-8 border-slate-200 bg-white text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" required /></div>)}</div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Daftar Serial Number ({row.serials.length} Unit) *</Label>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">{row.serials.filter(s => Boolean(String(s ?? '').trim())).length} / {row.qty} Terisi</span>
+
+                        </div>
+                    </div>
+                    <div className="grid max-h-44 grid-cols-1 gap-2.5 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">{row.serials.map((sn, snIdx) => <div key={`sn-inbound-${rowIdx}-${snIdx}`} className="space-y-0.5"><Label className="text-[10px] font-mono text-slate-500 dark:text-slate-400">SN Unit #{snIdx + 1}</Label><Input placeholder={`Ketik Serial Number #${snIdx + 1}`} disabled={isProcessing} value={typeof sn === 'object' && sn !== null ? (sn.serial_number || '') : (sn || '')} onChange={e => onManualSerialChange(rowIdx, snIdx, e.target.value)} className="h-8 border-slate-200 bg-white text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" required /></div>)}</div>
+                    {isEditMode && <p className="text-[10px] text-slate-500 dark:text-slate-400">Atur Qty dengan tombol − / +. Jumlah kotak SN mengikuti Qty, maksimal 10 unit.</p>}
                 </div>
             ) : null}
         </div>

@@ -71,6 +71,14 @@ class TransaksiBarangMasukController extends Controller
         set_time_limit(120);
 
         try {
+            foreach ((array) $request->input('items', []) as $index => $item) {
+                if (($item['sub_jenis'] ?? null) === 'PEMBELIAN' && (!array_key_exists('harga', $item) || trim((string) $item['harga']) === '')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "items.{$index}.harga" => 'Harga satuan wajib diisi untuk penerimaan pembelian.',
+                    ]);
+                }
+            }
+
             $validated = $request->validate([
                 'items' => 'required|array|min:1',
                 'items.*.sub_jenis' => 'required|string|in:PEMBELIAN,PEMINJAMAN,PENGEMBALIAN',
@@ -79,10 +87,9 @@ class TransaksiBarangMasukController extends Controller
                 'items.*.serial_conditions' => 'nullable|array',
                 'items.*.serial_conditions.*' => 'nullable|string|in:Baru,Bekas,Rusak',
                 'items.*.non_sn_selections' => 'nullable|array',
-                'items.*.non_sn_selections.*.kondisi_asal' => 'nullable|string|in:Baru,Bekas,Rusak',
+                'items.*.non_sn_selections.*.kondisi_asal' => 'required_with:items.*.non_sn_selections|string|in:Baru,Bekas,Rusak',
                 'items.*.non_sn_selections.*.kondisi' => 'required_with:items.*.non_sn_selections|string|in:Baru,Bekas,Rusak',
-                'items.*.non_sn_selections.*.return_condition' => 'nullable|string|in:Baru,Bekas,Rusak',
-                'items.*.non_sn_selections.*.qty' => 'required_with:items.*.non_sn_selections|integer|min:1',
+                'items.*.non_sn_selections.*.qty' => 'required_with:items.*.non_sn_selections|integer|min:1|max:50',
                 'items.*.nomor_imc' => 'required|string|max:100',
                 'items.*.nomor_omc' => 'nullable|string|max:100',
                 'items.*.pihak_asal' => 'nullable|string|max:255',
@@ -90,7 +97,7 @@ class TransaksiBarangMasukController extends Controller
                 'items.*.nama_customer' => 'nullable|string|max:255',
                 'items.*.gudang_tujuan_id' => 'required|exists:gudangs,id',
                 'items.*.barang_id' => 'required|exists:barangs,id',
-                'items.*.qty' => 'required|integer|min:1',
+                'items.*.qty' => 'required|integer|min:1|max:50',
                 'items.*.harga' => 'nullable|numeric|min:0',
                 'items.*.serials' => 'nullable|array',
                 'items.*.serials.*' => 'nullable|string|max:100',
@@ -102,12 +109,6 @@ class TransaksiBarangMasukController extends Controller
 
             // Barang masuk normal harus memakai SN baru; pengembalian proyek memakai SN yang telah terdaftar.
             foreach ($validated['items'] as $index => $item) {
-                $barangUntukValidasi = $barangs->get((int) $item['barang_id']);
-                $isSnUntukValidasi = (bool) ($barangUntukValidasi?->is_wajib_sn);
-                if ($isSnUntukValidasi && (int) ($item['qty'] ?? 0) > 10) {
-                    throw new \Exception("Barang wajib SN '{$barangUntukValidasi->nama_barang}' maksimal 10 unit per transaksi.");
-                }
-
                 $isProjectReturn = $item['sub_jenis'] === 'PENGEMBALIAN' && !empty($item['kode_projek']);
                 if ($item['sub_jenis'] === 'PENGEMBALIAN' && !$isProjectReturn && empty(trim((string) ($item['pihak_asal'] ?? '')))) {
                     throw new \Exception('Asal barang wajib diisi untuk pengembalian manual.');
@@ -178,7 +179,7 @@ class TransaksiBarangMasukController extends Controller
                                 $available = $this->getProjectNonSnConditionStock($barangId, $kodeProjek);
                                 $requestedByOrigin = [];
                                 foreach ($selections as $selection) {
-                                    $origin = $this->normalizeProjectReturnCondition($selection['kondisi_asal'] ?? $selection['kondisi'] ?? 'Baru');
+                                    $origin = $this->normalizeProjectReturnCondition($selection['kondisi_asal'] ?? '');
                                     $requestedByOrigin[$origin] = ($requestedByOrigin[$origin] ?? 0) + (int) $selection['qty'];
                                 }
                                 foreach ($requestedByOrigin as $origin => $requestedQty) {
@@ -280,10 +281,8 @@ class TransaksiBarangMasukController extends Controller
                                 'barang_id' => $barangId,
                                 'qty' => (int) $selection['qty'],
                                 'harga' => $harga,
-                                'kondisi_asal' => $this->normalizeProjectReturnCondition($selection['kondisi_asal'] ?? $selection['kondisi'] ?? 'Baru'),
-                                // return_condition adalah kondisi aktual yang dipilih ketika barang kembali.
-                                // Fallback ke kondisi menjaga kompatibilitas payload lama.
-                                'kondisi' => $this->normalizeProjectReturnCondition($selection['return_condition'] ?? $selection['kondisi'] ?? 'Baru'),
+                                'kondisi_asal' => $this->normalizeProjectReturnCondition($selection['kondisi_asal'] ?? 'Baru'),
+                                'kondisi' => $this->normalizeProjectReturnCondition($selection['kondisi'] ?? 'Baru'),
                             ]);
                         }
                     } else {
@@ -437,6 +436,12 @@ class TransaksiBarangMasukController extends Controller
             return back()->with('error', 'Pengembalian proyek tidak dapat diedit langsung. Batalkan lalu buat ulang dengan data yang benar.');
         }
 
+        if ($transaksi->sub_jenis === 'PEMBELIAN' && (! $request->exists('harga') || trim((string) $request->input('harga')) === '')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'harga' => 'Harga satuan wajib diisi untuk penerimaan pembelian.',
+            ]);
+        }
+
         $validated = $request->validate([
             'tanggal'          => 'required|date',
             'kondisi'          => 'nullable|string|max:50',
@@ -446,8 +451,10 @@ class TransaksiBarangMasukController extends Controller
             'kode_projek'      => 'nullable|string|max:100',
             'nama_customer'    => 'nullable|string|max:255',
             'gudang_tujuan_id' => 'nullable|exists:gudangs,id',
-            'qty'              => 'nullable|integer|min:1',
+            'qty'              => 'nullable|integer|min:1|max:50',
             'harga'            => 'nullable|numeric|min:0',
+            'serials'          => 'nullable|array|max:50',
+            'serials.*'        => 'nullable|string|max:100',
             'keterangan'       => 'nullable|string|max:500',
         ]);
 
@@ -455,60 +462,121 @@ class TransaksiBarangMasukController extends Controller
         $hargaFix   = $transaksi->sub_jenis === 'PEMBELIAN' ? (float) ($validated['harga'] ?? 0) : 0;
         $newQty     = isset($validated['qty']) ? (int) $validated['qty'] : null;
 
-        if ($newQty !== null && $newQty > 10) {
-            $detailsBarang = Barang::whereIn('id', $transaksi->details->pluck('barang_id')->unique())->get()->keyBy('id');
-            foreach ($transaksi->details as $detail) {
-                $barangQty = $detailsBarang->get($detail->barang_id);
-                if ((bool) ($barangQty?->is_wajib_sn)) {
-                    return back()->with('error', "Barang wajib SN '{$barangQty->nama_barang}' maksimal 10 unit per transaksi.");
-                }
-            }
-        }
-
         try {
             DB::transaction(function () use ($transaksi, $validated, $kondisiFix, $hargaFix, $newQty) {
                 $oldGudangTujuanId = (int) $transaksi->gudang_tujuan_id;
                 $newGudangTujuanId = isset($validated['gudang_tujuan_id']) ? (int) $validated['gudang_tujuan_id'] : $oldGudangTujuanId;
 
                 foreach ($transaksi->details as $detail) {
-                    $oldQty   = (int) $detail->qty;
+                    $oldQty = (int) $detail->qty;
+                    $isSn = (bool) ($detail->barang?->is_wajib_sn ?? false);
+                    $existingSerials = $detail->serials()->orderBy('barang_serials.id')->get();
+                    $serialValues = null;
                     $finalQty = $newQty !== null ? $newQty : $oldQty;
+
+                    if ($isSn && array_key_exists('serials', $validated)) {
+                        $serialValues = array_values(array_map(fn ($sn) => trim((string) $sn), $validated['serials'] ?? []));
+                        if (!$serialValues || in_array('', $serialValues, true)) {
+                            throw new \Exception('Semua Serial Number wajib diisi.');
+                        }
+                        if (count($serialValues) > 10) {
+                            throw new \Exception('Maksimal 10 Serial Number saat edit barang wajib SN.');
+                        }
+                        $removedSerials = $existingSerials->slice(count($serialValues));
+                        foreach ($removedSerials as $removedSerial) {
+                            $status = strtoupper(trim((string) $removedSerial->status));
+                            if (!in_array($status, ['IN_WAREHOUSE', 'READY', 'AVAILABLE', 'AKTIF', 'TERSEDIA', 'ADA'], true)) {
+                                throw new \Exception("SN '{$removedSerial->serial_number}' tidak bisa dihapus dari transaksi edit karena statusnya sudah berubah atau sudah digunakan.");
+                            }
+                            $usedElsewhere = DB::table('transaksi_detail_serials')
+                                ->where('barang_serial_id', $removedSerial->id)
+                                ->where('transaksi_detail_id', '!=', $detail->id)
+                                ->exists();
+                            if ($usedElsewhere) {
+                                throw new \Exception("SN '{$removedSerial->serial_number}' sudah tercatat pada transaksi lain dan tidak bisa dikurangi.");
+                            }
+                        }
+                        $normalized = array_map(fn ($sn) => mb_strtolower($sn), $serialValues);
+                        if (count(array_unique($normalized)) !== count($normalized)) {
+                            throw new \Exception('Terdapat Serial Number duplikat pada form.');
+                        }
+
+                        $existingIds = $existingSerials->pluck('id')->all();
+                        foreach ($serialValues as $sn) {
+                            $duplicate = BarangSerial::whereRaw('LOWER(serial_number) = ?', [mb_strtolower($sn)])
+                                ->when($existingIds, fn ($q) => $q->whereNotIn('id', $existingIds))
+                                ->exists();
+                            if ($duplicate) throw new \Exception("Serial Number '{$sn}' sudah digunakan oleh aset lain.");
+                        }
+                        $finalQty = count($serialValues);
+                    }
 
                     $detail->update([
                         'kondisi' => $kondisiFix,
-                        'harga'   => $hargaFix,
-                        'qty'     => $finalQty,
+                        'harga' => $hargaFix,
+                        'qty' => $finalQty,
                     ]);
 
-                    if ($newGudangTujuanId && $newGudangTujuanId !== $oldGudangTujuanId) {
-                        $barangId = $detail->barang_id;
-                        $stokLama = Stok::where('barang_id', $barangId)->where('gudang_id', $oldGudangTujuanId)->first();
-                        if ($stokLama) {
-                            $stokLama->decrement('jumlah', min($stokLama->jumlah, $oldQty));
+                    if ($isSn && $serialValues !== null) {
+                        if (isset($removedSerials) && $removedSerials->isNotEmpty()) {
+                            $removedIds = $removedSerials->pluck('id')->all();
+                            $detail->serials()->detach($removedIds);
+                            BarangSerial::whereIn('id', $removedIds)->delete();
                         }
+                        foreach ($serialValues as $index => $sn) {
+                            if (isset($existingSerials[$index])) {
+                                $existingSerials[$index]->update([
+                                    'serial_number' => $sn,
+                                    'gudang_id' => $newGudangTujuanId ?: $existingSerials[$index]->gudang_id,
+                                    'nomer_imc' => $validated['nomor_imc'] ?? $existingSerials[$index]->nomer_imc,
+                                    'kondisi' => $kondisiFix,
+                                ]);
+                            } else {
+                                $newSerial = BarangSerial::create([
+                                    'barang_id' => $detail->barang_id,
+                                    'serial_number' => $sn,
+                                    'status' => 'IN_WAREHOUSE',
+                                    'gudang_id' => $newGudangTujuanId,
+                                    'kondisi' => $kondisiFix,
+                                    'nomer_imc' => $validated['nomor_imc'] ?? $transaksi->nomor_imc,
+                                    'kode_projek' => null,
+                                ]);
+                                $detail->serials()->attach($newSerial->id);
+                            }
+                        }
+                    } elseif (!$isSn && $newQty !== null && $newQty !== $oldQty) {
+                        // Untuk Non-SN, penyesuaian jumlah tetap mengikuti field Qty yang lama.
+                    }
 
-                        $stokBaru = Stok::firstOrCreate(['barang_id' => $barangId, 'gudang_id' => $newGudangTujuanId], ['jumlah' => 0]);
+                    if ($newGudangTujuanId && $newGudangTujuanId !== $oldGudangTujuanId) {
+                        if ($oldGudangTujuanId) {
+                            $stokLama = Stok::where('barang_id', $detail->barang_id)->where('gudang_id', $oldGudangTujuanId)->first();
+                            if ($stokLama) $stokLama->decrement('jumlah', min((int) $stokLama->jumlah, $oldQty));
+                        }
+                        $stokBaru = Stok::firstOrCreate(['barang_id' => $detail->barang_id, 'gudang_id' => $newGudangTujuanId], ['jumlah' => 0]);
                         $stokBaru->increment('jumlah', $finalQty);
-
-                        foreach ($detail->serials as $serial) {
-                            $serial->update([
-                                'gudang_id' => $newGudangTujuanId,
-                                'nomer_imc' => $validated['nomor_imc'] ?? $serial->nomer_imc,
-                            ]);
+                    } else {
+                        $deltaQty = $finalQty - $oldQty;
+                        if ($deltaQty > 0) {
+                            $stok = Stok::firstOrCreate(['barang_id' => $detail->barang_id, 'gudang_id' => $newGudangTujuanId], ['jumlah' => 0]);
+                            $stok->increment('jumlah', $deltaQty);
+                        } elseif ($deltaQty < 0) {
+                            $stok = Stok::where('barang_id', $detail->barang_id)->where('gudang_id', $newGudangTujuanId)->first();
+                            if ($stok) $stok->decrement('jumlah', min((int) $stok->jumlah, abs($deltaQty)));
                         }
                     }
                 }
 
                 $transaksi->update([
-                    'tanggal'          => $validated['tanggal'],
-                    'kondisi'          => $kondisiFix,
-                    'nomor_imc'        => $validated['nomor_imc'] ?? $transaksi->nomor_imc,
-                    'nomor_omc'        => $validated['nomor_omc'] ?? $transaksi->nomor_omc,
-                    'pihak_asal'       => $validated['pihak_asal'] ?? $transaksi->pihak_asal,
-                    'kode_projek'      => $validated['kode_projek'] ?? $transaksi->kode_projek,
-                    'nama_customer'    => $validated['nama_customer'] ?? $transaksi->nama_customer,
+                    'tanggal' => $validated['tanggal'],
+                    'kondisi' => $kondisiFix,
+                    'nomor_imc' => $validated['nomor_imc'] ?? $transaksi->nomor_imc,
+                    'nomor_omc' => $validated['nomor_omc'] ?? $transaksi->nomor_omc,
+                    'pihak_asal' => $validated['pihak_asal'] ?? $transaksi->pihak_asal,
+                    'kode_projek' => $validated['kode_projek'] ?? $transaksi->kode_projek,
+                    'nama_customer' => $validated['nama_customer'] ?? $transaksi->nama_customer,
                     'gudang_tujuan_id' => $newGudangTujuanId,
-                    'keterangan'       => $validated['keterangan'] ?? $transaksi->keterangan,
+                    'keterangan' => $validated['keterangan'] ?? $transaksi->keterangan,
                 ]);
             });
 

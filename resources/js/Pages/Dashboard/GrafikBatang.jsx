@@ -148,7 +148,7 @@ export default function GrafikBatangLogistik({ data = [] }) {
         <div
             className="lg:col-span-2 relative overflow-hidden rounded-[28px] p-6 shadow-xl border border-slate-100/80 dark:border-slate-700 text-slate-800 dark:text-slate-100 font-sans select-none transition-colors duration-300"
             style={{
-                backgroundImage: `linear-gradient(rgba(255,255,255,0.78), rgba(255,255,255,0.78)), url(${GRAFIK_BACKGROUND})`,
+                backgroundImage: `linear-gradient(rgba(255,255,255,0.24), rgba(255,255,255,0.24)), url(${GRAFIK_BACKGROUND})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
             }}
@@ -170,13 +170,13 @@ export default function GrafikBatangLogistik({ data = [] }) {
 
                     <div>
 
-                        <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight tracking-wide">
+                        <h3 className="text-xl font-extrabold text-white leading-tight tracking-wide drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]">
 
                             Tren Aktivitas Logistik Bulanan
 
                         </h3>
 
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        <p className="text-xs text-white font-extrabold mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
 
                             Jumlah aktivitas per jenis transaksi!
 
@@ -234,7 +234,7 @@ export default function GrafikBatangLogistik({ data = [] }) {
                 {/* Lapisan tipis agar grid dan batang tetap mudah dibaca */}
                 <div
                     aria-hidden="true"
-                    className="absolute inset-0 pointer-events-none bg-white/30 dark:bg-slate-950/35"
+                    className="absolute inset-0 pointer-events-none bg-white/10 dark:bg-slate-950/15"
                 />
                 <div className="relative z-10 h-full w-full">
 
@@ -386,7 +386,7 @@ export default function GrafikBatangLogistik({ data = [] }) {
 
                 {/* CARD 1: TOTAL MASUK */}
 
-                <div className="relative overflow-hidden bg-emerald-50/90 dark:bg-slate-900/90 border border-emerald-100 dark:border-emerald-800/40 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                <div className="relative overflow-hidden bg-emerald-50/75 dark:bg-slate-900/75 border border-emerald-100 dark:border-emerald-800/40 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
 
 
 
@@ -504,7 +504,7 @@ export default function GrafikBatangLogistik({ data = [] }) {
 
                 {/* CARD 2: TOTAL KELUAR */}
 
-                <div className="relative overflow-hidden bg-rose-50/90 dark:bg-slate-900/90 border border-rose-100 dark:border-rose-800/40 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                <div className="relative overflow-hidden bg-rose-50/75 dark:bg-slate-900/75 border border-rose-100 dark:border-rose-800/40 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
 
 
 
@@ -622,7 +622,7 @@ export default function GrafikBatangLogistik({ data = [] }) {
 
                 {/* CARD 3: TOTAL TRANSFER */}
 
-                <div className="relative overflow-hidden bg-blue-50/90 dark:bg-slate-900/90 border border-blue-100 dark:border-blue-800/40 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
+                <div className="relative overflow-hidden bg-blue-50/75 dark:bg-slate-900/75 border border-blue-100 dark:border-blue-800/40 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all">
 
 
 

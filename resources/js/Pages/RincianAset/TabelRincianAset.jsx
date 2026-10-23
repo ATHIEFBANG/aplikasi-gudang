@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import TabelPivot from '@/components/gabungan/TabelPivot';
 import Search from '@/components/gabungan/Search';
 import Button from '@/components/gabungan/Button';
+import Toolbar from '@/components/gabungan/Toolbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { BriefcaseBusiness, Building2, ClipboardList, Warehouse } from 'lucide-react';
 
@@ -125,6 +126,28 @@ const buildStockPivotRows = (dataList, searchTerm = '') => {
                 pivot_nilai: Number(item?.nilai_stok ?? (qty * harga)),
             };
         });
+};
+
+const csvCell = value => {
+    const normalized = Array.isArray(value) ? value.join(', ') : (value ?? '');
+    const text = String(normalized);
+    const safeText = /^[=+@\-]/.test(text) ? `'${text}` : text;
+    return `"${safeText.replace(/"/g, '""')}"`;
+};
+
+const downloadCsv = (rows, columns, filename) => {
+    const header = columns.map(column => csvCell(column.label)).join(';');
+    const body = rows.map(row => columns.map(column => csvCell(column.value(row))).join(';'));
+    const csv = '\uFEFF' + [header, ...body].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
 };
 
 export default function TabelRincianAset({
@@ -278,6 +301,42 @@ export default function TabelRincianAset({
         pivotRef.current?.collapseAll();
     };
 
+    const handleExportOutgoing = () => {
+        const columns = [
+            { label: 'Kategori', value: row => row?.kategori || 'Tanpa Kategori' },
+            { label: isProject ? 'Kode Proyek' : 'Departemen', value: row => isProject ? (row?.project || '-') : (row?.department || row?.pihak_asal || '-') },
+            { label: 'Kode PPL', value: row => row?.kode_ppl || row?.kode_barang || '-' },
+            { label: 'Nama Barang', value: row => row?.nama_barang_display || getBarangName(row) },
+            { label: 'Serial Number', value: row => row?.serial_number || '-' },
+            { label: 'Jumlah', value: row => row?.pivot_qty ?? 0 },
+            { label: 'Harga Satuan (Rp)', value: row => row?.harga ?? 0 },
+            { label: 'Nilai (Rp)', value: row => row?.pivot_nilai ?? 0 },
+        ];
+        const category = isProject ? (projectCodeFilter || 'ALL') : 'NON_PROYEK';
+        downloadCsv(pivotRows, columns, `rincian-keluar-${category.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`);
+    };
+
+    const handleExportStock = () => {
+        const columns = [
+            { label: 'Gudang', value: row => row?.warehouse_display || row?.warehouse_name || '-' },
+            { label: 'Kategori', value: row => row?.kategori_display || row?.kategori || 'Tanpa Kategori' },
+            { label: 'Kode PPL', value: row => row?.kode_ppl || row?.kode_barang || '-' },
+            { label: 'Nama Barang', value: row => row?.nama_barang_display || getBarangName(row) },
+            { label: 'Jenis', value: row => row?.is_wajib_sn ? 'SN' : 'Non-SN' },
+            { label: 'Serial Number / Rincian', value: row => row?.serial_number_display || row?.serial_number || `Stok Non-SN — ${row?.kondisi || 'Belum diketahui'}` },
+            { label: 'Kondisi', value: row => row?.kondisi || '-' },
+            { label: 'Jumlah', value: row => row?.pivot_qty ?? 0 },
+            { label: 'Stok Usable', value: row => row?.pivot_usable ?? 0 },
+            { label: 'Baru', value: row => row?.pivot_baru ?? 0 },
+            { label: 'Bekas', value: row => row?.pivot_bekas ?? 0 },
+            { label: 'Rusak', value: row => row?.pivot_rusak ?? 0 },
+            { label: 'Lainnya', value: row => row?.pivot_lainnya ?? 0 },
+            { label: 'Harga Satuan (Rp)', value: row => row?.harga_satuan ?? row?.harga ?? 0 },
+            { label: 'Nilai Stok (Rp)', value: row => row?.pivot_nilai ?? 0 },
+        ];
+        downloadCsv(stockPivotRows, columns, `rincian-stok-akhir-${new Date().toISOString().slice(0, 10)}.csv`);
+    };
+
     return (
         <div className="w-full">
             <div className="mb-4 flex flex-wrap items-center gap-2" role="tablist" aria-label="Kategori rincian aset">
@@ -285,7 +344,7 @@ export default function TabelRincianAset({
                     type="button" role="tab" aria-selected={activeSection === 'KELUAR' && projectCodeFilter === 'ALL'}
                     onClick={() => { setActiveSection('KELUAR'); onProjectCodeFilterChange?.('ALL'); }} disabled={isProcessing}
                     shape="default" flipHorizontal={false} flipVertical={false} variant="default" effect="none" effectColor="#22D3EE"
-                    decoration="none" decorationColor="#FFFFFF" color="blue" size="sm" width="fit" layer="normal" attached="none" hover
+                    decoration="none" decorationColor="#FFFFFF" color="rose" size="sm" width="fit" layer="normal" attached="none" hover
                     selected={activeSection === 'KELUAR' && projectCodeFilter === 'ALL'}
                     className={`!w-auto gap-2 px-4 py-2 text-xs font-bold transition-colors ${activeSection === 'KELUAR' && projectCodeFilter === 'ALL' ? '!bg-rose-600 !text-white shadow-sm' : '!bg-transparent !text-slate-600 hover:!bg-slate-100 dark:!text-slate-300 dark:hover:!bg-slate-800'}`}
                 >
@@ -346,7 +405,7 @@ export default function TabelRincianAset({
                                         effectColor="#22D3EE"
                                         decoration="none"
                                         decorationColor="#FFFFFF"
-                                        color="rose"
+                                        color="blue"
                                         size="sm"
                                         width="fit"
                                         layer="normal"
@@ -386,52 +445,17 @@ export default function TabelRincianAset({
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap shrink-0 items-center justify-end gap-2">
-<Button
-                                type="button"
-                                onClick={handleExpandAll}
-                                disabled={!pivotRows.length || isProcessing}
-                                shape="default"
-                                flipHorizontal={false}
-                                flipVertical={false}
-                                variant="outlined"
-                                effect="none"
-                                effectColor="#22D3EE"
-                                decoration="none"
-                                decorationColor="#FFFFFF"
-                                color="slate"
-                                size="sm"
-                                width="fit"
-                                layer="normal"
-                                attached="none"
-                                hover
-                                className="!w-auto px-3 py-1.5 text-[10px] font-bold"
-                            >
-                                Expand Semua
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={handleCollapseAll}
-                                disabled={!pivotRows.length || isProcessing}
-                                shape="default"
-                                flipHorizontal={false}
-                                flipVertical={false}
-                                variant="outlined"
-                                effect="none"
-                                effectColor="#22D3EE"
-                                decoration="none"
-                                decorationColor="#FFFFFF"
-                                color="slate"
-                                size="sm"
-                                width="fit"
-                                layer="normal"
-                                attached="none"
-                                hover
-                                className="!w-auto px-3 py-1.5 text-[10px] font-bold"
-                            >
-                                Collapse
-                            </Button>
-                        </div>
+                            <Toolbar
+                                isProcessing={isProcessing}
+                                onExport={handleExportOutgoing}
+                                leftContent={(
+                                    <>
+                                        <Button type="button" onClick={handleExpandAll} disabled={!pivotRows.length || isProcessing} shape="square" flipHorizontal={false} flipVertical={false} variant="glass" effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="slate" size="sm" width="fit" layer="normal" attached="none" hover className="!w-auto px-3 py-1.5 text-[10px] font-bold">Expand Semua</Button>
+                                        <Button type="button" onClick={handleCollapseAll} disabled={!pivotRows.length || isProcessing} shape="square" flipHorizontal={false} flipVertical={false} variant="glass" effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="slate" size="sm" width="fit" layer="normal" attached="none" hover className="!w-auto px-3 py-1.5 text-[10px] font-bold">Collapse</Button>
+                                    </>
+                                )}
+                                className=""
+                            />
                         </div>
                     </div>
 
@@ -485,7 +509,18 @@ export default function TabelRincianAset({
             {activeSection === 'STOK_AKHIR' && (
             <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <CardContent className="p-0">
-                    <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                    <Toolbar
+                        isProcessing={isProcessing}
+                        onExport={handleExportStock}
+                        leftContent={(
+                            <>
+                                <Button type="button" onClick={() => stockPivotRef.current?.expandAll()} disabled={!stockPivotRows.length || isProcessing} shape="default" flipHorizontal={false} flipVertical={false} variant="outlined" effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="slate" size="sm" width="fit" layer="normal" attached="none" hover className="!w-auto px-3 py-1.5 text-[10px] font-bold">Expand Semua</Button>
+                                <Button type="button" onClick={() => stockPivotRef.current?.collapseAll()} disabled={!stockPivotRows.length || isProcessing} shape="default" flipHorizontal={false} flipVertical={false} variant="outlined" effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF" color="slate" size="sm" width="fit" layer="normal" attached="none" hover className="!w-auto px-3 py-1.5 text-[10px] font-bold">Collapse</Button>
+                            </>
+                        )}
+                    />
+
+                    <div className="flex min-w-0 flex-col gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                         <div className="min-w-0 flex-1">
                             <h2 className="text-sm font-bold text-slate-900 dark:text-white sm:text-base lg:text-lg">Rincian Stok Akhir</h2>
                             <p className="mt-1 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 sm:text-xs">
@@ -506,33 +541,6 @@ export default function TabelRincianAset({
                                 iconPosition={searchIconPosition}
                                 className={`w-full ${searchClassName}`}
                             />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end border-b border-slate-200 px-3 py-3 dark:border-slate-800 sm:px-5">
-                        <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
-                            <Button
-                                type="button"
-                                onClick={() => stockPivotRef.current?.expandAll()}
-                                disabled={!stockPivotRows.length || isProcessing}
-                                shape="default" flipHorizontal={false} flipVertical={false} variant="outlined"
-                                effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF"
-                                color="slate" size="sm" width="fit" layer="normal" attached="none" hover
-                                className="!w-auto px-3 py-1.5 text-[10px] font-bold"
-                            >
-                                Expand Semua
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={() => stockPivotRef.current?.collapseAll()}
-                                disabled={!stockPivotRows.length || isProcessing}
-                                shape="default" flipHorizontal={false} flipVertical={false} variant="outlined"
-                                effect="none" effectColor="#22D3EE" decoration="none" decorationColor="#FFFFFF"
-                                color="slate" size="sm" width="fit" layer="normal" attached="none" hover
-                                className="!w-auto px-3 py-1.5 text-[10px] font-bold"
-                            >
-                                Collapse
-                            </Button>
                         </div>
                     </div>
 

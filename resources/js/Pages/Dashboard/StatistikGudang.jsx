@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Package, ArrowLeftRight, TrendingUp, ArrowRight, PackagePlus, PackageMinus } from 'lucide-react';
+import { Package, ArrowLeftRight, TrendingUp, PackagePlus, PackageMinus } from 'lucide-react';
 
 /* ==========================================================
    Gambar latar kelima kartu sudah tertanam di kode
@@ -45,13 +45,13 @@ function useCountUp(target, duration = 1000) {
 // KARTU KPI
 // Gambar penuh di belakang. Di atasnya hanya ada:
 //  - pil judul (kiri atas) + label satuan (kanan atas)
-//  - satu panel kaca di kiri bawah: angka, keterangan, tombol aksi
+//  - satu panel kaca di kiri bawah: angka dan keterangan
 // ==========================================================
 
 const GLASS = 'bg-white/90 ring-1 ring-black/5 backdrop-blur-md';
 
 function KpiCard({ card, value, href, onClick }) {
-    const { title, caption, cta, unit, Icon, image, imgPos, panelW, currency, span } = card;
+    const { title, caption, unit, Icon, image, imgPos, panelW, currency, span } = card;
     const shown = useCountUp(value);
 
     const Tag = href ? 'a' : 'button';
@@ -86,24 +86,17 @@ function KpiCard({ card, value, href, onClick }) {
                     </span>
                 </div>
 
-                {/* Panel kaca: angka + keterangan + tombol aksi */}
+                {/* Panel kaca: angka dan keterangan */}
                 <div className={`mt-auto w-full rounded-2xl p-4 shadow-md ${panelW} ${GLASS}`}>
                     <div
                         className={`whitespace-nowrap font-extrabold leading-none tracking-tight text-slate-900 tabular-nums ${
-                            currency ? 'text-[2rem]' : 'text-4xl'
+                            currency ? 'text-[clamp(1.15rem,2.5vw,2rem)]' : 'text-4xl'
                         }`}
                     >
                         {currency && <span className="mr-1.5 align-top text-base font-semibold text-slate-500">Rp</span>}
                         {shown.toLocaleString('id-ID')}
                     </div>
                     <p className="mt-1.5 text-sm font-medium leading-snug text-slate-600">{caption}</p>
-
-                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-200 pt-3 text-[13px] font-semibold text-slate-800">
-                        <span>{cta}</span>
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white transition-transform duration-300 group-hover:translate-x-0.5">
-                            <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
-                        </span>
-                    </div>
                 </div>
             </div>
         </Tag>
@@ -126,33 +119,30 @@ export default function StatistikGudang({ kpi = {}, hrefs = {}, onSelect }) {
             key: 'master',
             title: 'Total master barang',
             caption: 'Item SKU terdaftar',
-            cta: 'Lihat detail barang',
             unit: 'SKU',
             Icon: Package,
             image: IMG_MASTER,
             imgPos: 'right center',
             panelW: 'max-w-[72%]',
             span: 'lg:col-span-2',
-            value: kpi.totalBarang ?? 758,
+            value: kpi.totalBarang ?? 759,
         },
         {
             key: 'masuk',
             title: 'Total barang masuk',
             caption: 'Unit masuk operasional',
-            cta: 'Lihat riwayat barang masuk',
             unit: 'Unit',
             Icon: PackagePlus,
             image: IMG_MASUK,
             imgPos: 'right center',
             panelW: 'max-w-[72%]',
             span: 'lg:col-span-2',
-            value: kpi.totalBarangMasuk ?? 50,
+            value: kpi.totalBarangMasuk ?? 77,
         },
         {
             key: 'transfer',
             title: 'Total transfer gudang',
             caption: 'Unit terdistribusi antar-hub',
-            cta: 'Lihat detail transfer',
             unit: 'Hub',
             Icon: ArrowLeftRight,
             image: IMG_TRANSFER,
@@ -165,28 +155,26 @@ export default function StatistikGudang({ kpi = {}, hrefs = {}, onSelect }) {
             key: 'keluar',
             title: 'Total barang keluar',
             caption: 'Unit keluar operasional',
-            cta: 'Lihat riwayat barang keluar',
             unit: 'Unit',
             Icon: PackageMinus,
             image: IMG_KELUAR,
             imgPos: 'right 35%',
             panelW: 'max-w-[54%]',
             span: 'lg:col-span-3',
-            value: kpi.totalBarangKeluar ?? 17,
+            value: kpi.totalBarangKeluar ?? 7,
         },
         {
             key: 'aset',
             title: 'Total nilai aset gudang',
             caption: 'Akumulasi nilai persediaan',
-            cta: 'Lihat rincian nilai aset',
             unit: 'IDR',
             Icon: TrendingUp,
             image: IMG_ASET,
             imgPos: 'right center',
-            panelW: 'max-w-[54%]',
+            panelW: 'max-w-[92%]',
             currency: true,
             span: 'sm:col-span-2 lg:col-span-3',
-            value: kpi.totalNilaiPembelian ?? kpi.totalNilaiAset ?? 754000000,
+            value: kpi.totalNilaiPembelian ?? kpi.totalNilaiAset ?? 101032390000,
         },
     ];
 

@@ -27,7 +27,7 @@ export default function Toolbar({
     onFitZoom,
 }) {
     return (
-        <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="p-4 bg-white dark:bg-slate-900 flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 {leftContent}
             </div>
