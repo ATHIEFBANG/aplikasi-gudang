@@ -24,6 +24,7 @@ export default function ModalBarangSelectorUI({
     stockInOrigin = 0,
     allowRusak = false
 }) {
+    const [qtyDrafts, setQtyDrafts] = React.useState({});
     const isProjectReturn = row?.arah_transfer === 'PROYEK_KE_GUDANG' || (row?.sub_jenis === 'PENGEMBALIAN' && row?.return_source !== 'MANUAL' && Boolean(row?.kode_projek));
     const sourceSelected = isProjectReturn ? Boolean(row?.kode_projek) : Boolean(row?.gudang_asal_id);
     const selector = useModalBarangSelectorLogic({
@@ -57,6 +58,7 @@ export default function ModalBarangSelectorUI({
 
         nonSnSearch,
         handleNonSnSearchChange,
+        handleNonSnBatchQtyChange,
         clearNonSnSearch,
         filteredBatches,
         getBatchSelectedQty,
@@ -88,20 +90,19 @@ export default function ModalBarangSelectorUI({
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] font-mono font-bold">
+                    <div className="flex flex-wrap items-center justify-end gap-2.5 text-[11px] font-mono font-semibold tabular-nums">
                         <span className="text-slate-500 dark:text-slate-400">
-                            Ada: {availableSnCount}
+                            Tersedia <strong className="font-bold text-slate-700 dark:text-slate-200">{availableSnCount}</strong>
                         </span>
-
-                        <span
-                            className={
-                                isSnSelectionComplete
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : 'text-amber-600 dark:text-amber-400'
-                            }
-                        >
-                            {selectedSnCount} / {row?.qty || 0} Unit Terpilih
+                        <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">/</span>
+                        <span className={isSnSelectionComplete ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}>
+                            Dipilih <strong className="font-bold">{selectedSnCount}</strong>
                         </span>
+                        {selectedSerials.length > 0 && (
+                            <Button type="button" variant="ghost" size="sm" onClick={handleClearSns} disabled={isProcessing} className="h-7 px-2 text-[10px] text-rose-500 hover:text-rose-700 cursor-pointer">
+                                Reset
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -139,18 +140,6 @@ export default function ModalBarangSelectorUI({
                                 )}
                             </div>
 
-                            {selectedSerials.length > 0 && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleClearSns}
-                                    disabled={isProcessing}
-                                    className="h-7 px-2 text-[10px] text-rose-500 hover:text-rose-700 cursor-pointer"
-                                >
-                                    Reset
-                                </Button>
-                            )}
                         </div>
 
                         {selectedSerials.length > 0 && (
@@ -179,18 +168,24 @@ export default function ModalBarangSelectorUI({
                                             <span>{snVal}</span>
 
                                             {isProjectReturn ? (
-                                                <select
+                                                <HybridDropdown
                                                     value={row?.serial_conditions?.[snVal] || kondisiLabel}
+                                                    options={[
+                                                        { value: 'Baru', label: 'Baru' },
+                                                        { value: 'Bekas', label: 'Bekas' },
+                                                        { value: 'Rusak', label: 'Rusak' }
+                                                    ]}
+                                                    onChange={value => setRows(prev => prev.map((item, idx) => idx !== rowIdx ? item : { ...item, serial_conditions: { ...(item.serial_conditions || {}), [snVal]: value } }))}
+                                                    placeholder="Kondisi"
+                                                    searchPlaceholder="Cari kondisi..."
+                                                    allowCustom={false}
                                                     disabled={isProcessing}
-                                                    onChange={e => setRows(prev => prev.map((item, idx) => idx !== rowIdx ? item : { ...item, serial_conditions: { ...(item.serial_conditions || {}), [snVal]: e.target.value } }))}
-                                                    onClick={e => e.stopPropagation()}
-                                                    aria-label={`Kondisi pengembalian ${snVal}`}
-                                                    className="h-6 max-w-[92px] rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 text-[10px] font-sans text-slate-700 dark:text-slate-200"
-                                                >
-                                                    <option value="Baru">Baru</option>
-                                                    <option value="Bekas">Bekas</option>
-                                                    <option value="Rusak">Rusak</option>
-                                                </select>
+                                                    className="w-[88px] shrink-0"
+                                                    inputClassName="h-6 min-h-6 rounded border-slate-200 bg-white text-[10px] dark:border-slate-700 dark:bg-slate-900"
+                                                    compact
+                                                    portalMenu
+                                                    direction="auto"
+                                                />
                                             ) : (
                                                 <span className={`text-[8px] px-1 py-0.5 rounded font-sans uppercase ${kondisiClass}`}>{kondisiLabel}</span>
                                             )}
@@ -408,7 +403,40 @@ export default function ModalBarangSelectorUI({
                                         >
                                             <Minus className="h-3.5 w-3.5" />
                                         </button>
-                                        <span className="min-w-6 text-center font-mono text-xs font-semibold tabular-nums text-slate-900 dark:text-white">{selectedQty}</span>
+                                        <Input
+                                            type="number"
+                                            inputMode="numeric"
+                                            min={0}
+                                            max={Number(batch.max_stock || 0)}
+                                            value={Object.prototype.hasOwnProperty.call(qtyDrafts, batch.key) ? qtyDrafts[batch.key] : selectedQty}
+                                            disabled={isProcessing}
+                                            aria-label={`Jumlah pengembalian ${currentNamaBarang}`}
+                                            onChange={e => {
+                                                const raw = e.target.value;
+                                                setQtyDrafts(prev => ({ ...prev, [batch.key]: raw }));
+                                                if (raw.trim() === '') return;
+                                                const parsed = Number.parseInt(raw, 10);
+                                                if (Number.isFinite(parsed)) {
+                                                    handleNonSnBatchQtyChange(batch, Math.max(0, Math.min(Number(batch.max_stock || 0), parsed)));
+                                                }
+                                            }}
+                                            onFocus={e => {
+                                                setQtyDrafts(prev => ({ ...prev, [batch.key]: String(selectedQty) }));
+                                                e.target.select();
+                                            }}
+                                            onBlur={e => {
+                                                const raw = e.target.value.trim();
+                                                const parsed = raw === '' ? 0 : Number.parseInt(raw, 10);
+                                                const nextQty = Number.isFinite(parsed) ? Math.max(0, Math.min(Number(batch.max_stock || 0), parsed)) : 0;
+                                                handleNonSnBatchQtyChange(batch, nextQty);
+                                                setQtyDrafts(prev => {
+                                                    const next = { ...prev };
+                                                    delete next[batch.key];
+                                                    return next;
+                                                });
+                                            }}
+                                            className="h-7 w-12 border-0 bg-transparent px-0 text-center font-mono text-xs font-semibold tabular-nums text-slate-900 shadow-none focus-visible:ring-1 focus-visible:ring-blue-500 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
                                         <button
                                             type="button"
                                             aria-label={`Tambah ${currentNamaBarang}`}

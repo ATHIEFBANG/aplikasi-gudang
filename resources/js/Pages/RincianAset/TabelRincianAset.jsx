@@ -344,7 +344,7 @@ export default function TabelRincianAset({
                     type="button" role="tab" aria-selected={activeSection === 'KELUAR' && projectCodeFilter === 'ALL'}
                     onClick={() => { setActiveSection('KELUAR'); onProjectCodeFilterChange?.('ALL'); }} disabled={isProcessing}
                     shape="default" flipHorizontal={false} flipVertical={false} variant="default" effect="none" effectColor="#22D3EE"
-                    decoration="none" decorationColor="#FFFFFF" color="rose" size="sm" width="fit" layer="normal" attached="none" hover
+                    decoration="none" decorationColor="#FFFFFF" color="blue" size="sm" width="fit" layer="normal" attached="none" hover
                     selected={activeSection === 'KELUAR' && projectCodeFilter === 'ALL'}
                     className={`!w-auto gap-2 px-4 py-2 text-xs font-bold transition-colors ${activeSection === 'KELUAR' && projectCodeFilter === 'ALL' ? '!bg-rose-600 !text-white shadow-sm' : '!bg-transparent !text-slate-600 hover:!bg-slate-100 dark:!text-slate-300 dark:hover:!bg-slate-800'}`}
                 >

@@ -517,9 +517,17 @@ export function useModalBarangSelectorLogic({
                 if (safeQty <= 0) {
                     delete selections[batch.key];
                 } else {
+                    const previousSelection = currentRow.non_sn_selections?.[batch.key] || {};
+                    const kondisiAsal = normalizeKondisi(previousSelection.kondisi_asal || batch.kondisi);
+                    const kondisiAktual = isProjectReturn
+                        ? normalizeKondisi(previousSelection.return_condition || previousSelection.kondisi || batch.kondisi)
+                        : normalizeKondisi(batch.kondisi);
+
                     selections[batch.key] = {
                         nomor_imc: batch.nomor_imc || '',
-                        kondisi: normalizeKondisi(batch.kondisi),
+                        kondisi_asal: kondisiAsal,
+                        kondisi: kondisiAktual,
+                        ...(isProjectReturn ? { return_condition: kondisiAktual } : {}),
                         qty: safeQty
                     };
                 }
@@ -583,6 +591,51 @@ export function useModalBarangSelectorLogic({
         },
         [updateNonSnBatchQty]
     );
+
+    const handleReturnConditionChange = useCallback((batch, nextCondition) => {
+        if (!batch || isProcessing || !setRows) return;
+
+        const kondisiAktual = normalizeKondisi(nextCondition);
+
+        setRows(prev => {
+            const updated = [...prev];
+            const currentRow = updated[rowIdx];
+            if (!currentRow) return prev;
+
+            const selections = { ...(currentRow.non_sn_selections || {}) };
+            const previousSelection = selections[batch.key];
+            if (!previousSelection || (parseInt(previousSelection.qty, 10) || 0) <= 0) return prev;
+
+            selections[batch.key] = {
+                ...previousSelection,
+                kondisi_asal: normalizeKondisi(previousSelection.kondisi_asal || batch.kondisi),
+                kondisi: kondisiAktual,
+                return_condition: kondisiAktual
+            };
+
+            const activeSelections = Object.values(selections).filter(
+                selection => (parseInt(selection?.qty, 10) || 0) > 0
+            );
+            const conditionSummary = activeSelections.reduce((result, selection) => {
+                const kondisi = normalizeKondisi(selection?.kondisi);
+                const qty = parseInt(selection?.qty, 10) || 0;
+                const existing = result.find(item => item.kondisi === kondisi);
+                if (existing) existing.qty += qty;
+                else result.push({ kondisi, qty });
+                return result;
+            }, []);
+
+            updated[rowIdx] = {
+                ...currentRow,
+                non_sn_selections: selections,
+                kondisi: conditionSummary.length > 0
+                    ? conditionSummary.map(item => `${item.qty} ${item.kondisi}`).join(', ')
+                    : 'Baru'
+            };
+
+            return updated;
+        });
+    }, [isProcessing, rowIdx, setRows]);
 
     const handleToggleNonSnBatch = useCallback(batch => {
         if (!batch || isProcessing) return;
@@ -654,6 +707,7 @@ export function useModalBarangSelectorLogic({
         getBatchSelectedQty,
         isBatchSelected,
         handleNonSnBatchQtyChange,
+        handleReturnConditionChange,
         handleToggleNonSnBatch,
         incrementNonSnBatch,
         decrementNonSnBatch,

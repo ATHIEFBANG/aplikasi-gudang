@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, X, Search } from 'lucide-react';
 
 export default function HybridDropdown({
@@ -12,6 +13,8 @@ export default function HybridDropdown({
     className = '',
     direction = 'down',
     renderOption = null,
+    portalMenu = false,
+    compact = false,
     allowCustom = true // true: bisa ketik bebas (hybrid), false: wajib pilih dari list (select murni)
 }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -19,6 +22,8 @@ export default function HybridDropdown({
     const containerRef = useRef(null);
     const inputRef = useRef(null);
     const searchInputRef = useRef(null);
+    const menuRef = useRef(null);
+    const [portalPosition, setPortalPosition] = useState(null);
 
     // Normalisasi opsi universal (mendukung string biasa maupun object dengan label/subLabel)
     const normalizedOptions = useMemo(() => {
@@ -58,17 +63,59 @@ export default function HybridDropdown({
         );
     }, [normalizedOptions, searchQuery]);
 
-    // Tutup dropdown saat klik di luar
+    // Tutup dropdown saat klik di luar, termasuk saat menu dirender melalui portal.
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (containerRef.current && !containerRef.current.contains(e.target)) {
+            const clickedContainer = containerRef.current?.contains(e.target);
+            const clickedPortalMenu = portalMenu && menuRef.current?.contains(e.target);
+            if (!clickedContainer && !clickedPortalMenu) {
                 setIsOpen(false);
                 setSearchQuery('');
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [portalMenu]);
+
+    // Letakkan menu di body bila dropdown berada di dalam panel scroll/overflow.
+    // Dengan begitu isi dropdown tidak terpotong oleh container modal atau daftar SN.
+    useEffect(() => {
+        if (!isOpen || !portalMenu || typeof window === 'undefined') {
+            setPortalPosition(null);
+            return undefined;
+        }
+
+        const updatePosition = () => {
+            const anchor = containerRef.current?.getBoundingClientRect();
+            if (!anchor) return;
+
+            const estimatedHeight = normalizedOptions.length > 3
+                ? 270
+                : Math.max(88, normalizedOptions.length * 28 + 12);
+            const spaceBelow = window.innerHeight - anchor.bottom;
+            const spaceAbove = anchor.top;
+            const openUp = direction === 'up' || (
+                direction === 'auto' &&
+                spaceBelow < estimatedHeight + 12 &&
+                spaceAbove > spaceBelow
+            );
+            const left = Math.max(8, Math.min(anchor.left, window.innerWidth - anchor.width - 8));
+            const top = openUp
+                ? Math.max(8, anchor.top - estimatedHeight - 4)
+                : Math.min(anchor.bottom + 4, Math.max(8, window.innerHeight - estimatedHeight - 8));
+
+            setPortalPosition({ top, left, width: anchor.width, placement: openUp ? 'up' : 'down' });
+        };
+
+        const frame = window.requestAnimationFrame(updatePosition);
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+        };
+    }, [isOpen, portalMenu, direction, normalizedOptions.length]);
 
     // Auto-focus ke input search saat popover terbuka jika opsi > 3
     useEffect(() => {
@@ -102,6 +149,8 @@ export default function HybridDropdown({
     };
 
     const showSearch = normalizedOptions.length > 3;
+    const hasExplicitWidth = /(?:^|\s)(?:(?:sm|md|lg|xl|2xl):)?w-\S+/.test(className);
+    const wrapperClassName = `relative ${hasExplicitWidth ? className : `w-full ${className}`}`;
     const displayValue = useMemo(() => {
         if (typeof value === 'object' && value !== null) {
             return value.label || value.value || '';
@@ -114,7 +163,7 @@ export default function HybridDropdown({
     }, [value, allowCustom, normalizedOptions]);
 
     return (
-        <div ref={containerRef} className={`relative w-full ${className}`}>
+        <div ref={containerRef} className={wrapperClassName}>
             <div className="relative flex items-center">
                 {/* Kotak Input Teks Universal */}
                 <input
@@ -135,7 +184,7 @@ export default function HybridDropdown({
                         }
                     }}
                     placeholder={placeholder}
-                    className={`w-full h-8 pl-3 pr-14 truncate rounded-lg border bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`w-full ${compact ? 'h-6 pl-2 pr-9 text-[10px]' : 'h-8 pl-3 pr-14 text-xs'} truncate rounded-lg border bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
                         !allowCustom ? 'cursor-pointer select-none' : ''
                     } ${
                         isOpen 
@@ -174,11 +223,14 @@ export default function HybridDropdown({
             </div>
 
             {/* Menu Pop-up Dropdown */}
-            {isOpen && !disabled && (
+            {(() => {
+                const menu = isOpen && !disabled && (!portalMenu || portalPosition) ? (
                 <div
-                    className={`absolute left-0 right-0 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-1 text-xs transition-all ${
-                        direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
+                    ref={portalMenu ? menuRef : null}
+                    className={`${portalMenu ? 'fixed z-[99999]' : 'absolute left-0 right-0 z-50'} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-1 text-xs transition-all ${
+                        !portalMenu && direction === 'up' ? 'bottom-full mb-1' : !portalMenu ? 'top-full mt-1' : ''
                     }`}
+                    style={portalMenu ? { top: `${portalPosition.top}px`, left: `${portalPosition.left}px`, width: `${portalPosition.width}px`, zIndex: 99999 } : undefined}
                 >
                     {/* Kotak Search Otomatis */}
                     {showSearch && (
@@ -254,7 +306,12 @@ export default function HybridDropdown({
                         )}
                     </div>
                 </div>
-            )}
+                ) : null;
+                if (portalMenu && menu && typeof document !== 'undefined') {
+                    return createPortal(menu, document.body);
+                }
+                return menu;
+            })()}
         </div>
     );
 }
