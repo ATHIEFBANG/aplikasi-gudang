@@ -199,9 +199,9 @@ export default function ModalBarangMasukRow({
 
             {/* 2. Pengirim/Asal & Gudang Tujuan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="space-y-1">
+            <div className="space-y-3">
                 {row.sub_jenis === 'PENGEMBALIAN' ? (
-                    <div className="-space-y-1">
+                    <div className="space-y-1">
                         <div className="flex min-h-6 flex-wrap items-center justify-between gap-1">
                             <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                                 Asal Barang *
@@ -287,7 +287,7 @@ export default function ModalBarangMasukRow({
                     )}
                 </div>
                 <div className="space-y-2.5">
-                    <div className="space-y-1">
+                    <div className="space-y-3">
                         <Label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                             Gudang Tujuan (Penerima) *
                         </Label>
@@ -304,7 +304,7 @@ export default function ModalBarangMasukRow({
                             inputClassName="h-8 text-xs border-emerald-500/50 text-emerald-600 dark:text-emerald-400 font-bold"
                         />
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                         <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                             Nomor IMC (Inbound Material Control) *
                         </Label>
