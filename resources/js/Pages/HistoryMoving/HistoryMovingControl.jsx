@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { 
     ArrowDownCircle, 
     ArrowUpCircle, 
-    ArrowRightLeft 
+    ArrowRightLeft,
+    Clock
 } from 'lucide-react';
 
 export const KONDISI_OPTIONS = [
@@ -201,12 +202,34 @@ export function useHistoryMovingControl({
     const columns = useMemo(() => [
         {
             key: 'tanggal',
-            label: 'TANGGAL',
-            render: (item) => (
-                <span className="font-mono text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    {item.tanggal ? String(item.tanggal).split('T')[0] : '-'}
-                </span>
-            )
+            label: 'TANGGAL & Waktu',
+            render: (item) => {
+                const createdAt = item.created_at ? new Date(item.created_at) : null;
+                const inputTime = createdAt && !Number.isNaN(createdAt.getTime())
+                    ? createdAt.toLocaleTimeString('id-ID', {
+                        timeZone: 'Asia/Jakarta',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    })
+                    : null;
+
+                return (
+                    <div className="flex min-w-[112px] flex-col items-start gap-1 leading-tight whitespace-nowrap">
+                        <span className="font-mono text-xs text-slate-600 dark:text-slate-300">
+                            {item.tanggal ? String(item.tanggal).split('T')[0] : '-'}
+                        </span>
+                        <span
+                            className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-400 dark:text-slate-500"
+                            title="Waktu transaksi dicatat ke sistem (WIB)"
+                        >
+                            <Clock className="h-3 w-3 shrink-0" />
+                            {inputTime ? `${inputTime} WIB` : 'Jam tidak tercatat'}
+                        </span>
+                    </div>
+                );
+            }
         },
         {
             key: 'tipe_moving',
@@ -268,6 +291,51 @@ export function useHistoryMovingControl({
                     </span>
                 </div>
             )
+        },
+        {
+            key: 'pic_user',
+            label: 'PIC User',
+            render: (item) => {
+                const pic = item.pic_user || item.picUser || {};
+                const name = String(pic.name || '').trim();
+                const role = String(pic.role || '').toLowerCase().trim();
+                const roleLabels = { admin: 'ADMIN', staff: 'STAFF', view: 'VIEWER' };
+                const roleStyles = {
+                    admin: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+                    staff: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+                    view: 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20'
+                };
+                const initials = name
+                    ? name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('')
+                    : '';
+
+                if (!name) {
+                    return (
+                        <div className="flex min-w-[135px] flex-col leading-tight">
+                            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Tidak tercatat</span>
+                            <span className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-600">PIC belum tersedia</span>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="flex min-w-[135px] items-center gap-2">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-blue-500/20 bg-blue-500/10 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                            {initials}
+                        </div>
+                        <div className="flex min-w-0 flex-col items-start gap-1 leading-tight">
+                            <span className="max-w-[150px] truncate text-xs font-semibold text-slate-800 dark:text-slate-200" title={name}>
+                                {name}
+                            </span>
+                            {role && (
+                                <span className={`rounded border px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${roleStyles[role] || roleStyles.view}`}>
+                                    {roleLabels[role] || role.toUpperCase()}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
         },
         {
             key: 'nama_barang',

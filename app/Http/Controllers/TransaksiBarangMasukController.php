@@ -89,7 +89,7 @@ class TransaksiBarangMasukController extends Controller
                 'items.*.non_sn_selections' => 'nullable|array',
                 'items.*.non_sn_selections.*.kondisi_asal' => 'required_with:items.*.non_sn_selections|string|in:Baru,Bekas,Rusak',
                 'items.*.non_sn_selections.*.kondisi' => 'required_with:items.*.non_sn_selections|string|in:Baru,Bekas,Rusak',
-                'items.*.non_sn_selections.*.qty' => 'required_with:items.*.non_sn_selections|integer|min:1|max:50',
+                'items.*.non_sn_selections.*.qty' => 'required_with:items.*.non_sn_selections|integer|min:1',
                 'items.*.nomor_imc' => 'required|string|max:100',
                 'items.*.nomor_omc' => 'nullable|string|max:100',
                 'items.*.pihak_asal' => 'nullable|string|max:255',
@@ -97,7 +97,7 @@ class TransaksiBarangMasukController extends Controller
                 'items.*.nama_customer' => 'nullable|string|max:255',
                 'items.*.gudang_tujuan_id' => 'required|exists:gudangs,id',
                 'items.*.barang_id' => 'required|exists:barangs,id',
-                'items.*.qty' => 'required|integer|min:1|max:50',
+                'items.*.qty' => 'required|integer|min:1',
                 'items.*.harga' => 'nullable|numeric|min:0',
                 'items.*.serials' => 'nullable|array',
                 'items.*.serials.*' => 'nullable|string|max:100',
@@ -110,6 +110,10 @@ class TransaksiBarangMasukController extends Controller
             // Barang masuk normal harus memakai SN baru; pengembalian proyek memakai SN yang telah terdaftar.
             foreach ($validated['items'] as $index => $item) {
                 $isProjectReturn = $item['sub_jenis'] === 'PENGEMBALIAN' && !empty($item['kode_projek']);
+                $targetBarang = $barangs->get((int) $item['barang_id']);
+                if ($targetBarang && (bool) $targetBarang->is_wajib_sn && (int) $item['qty'] > 10) {
+                    throw new \Exception("Barang wajib SN '{$targetBarang->nama_barang}' maksimal 10 unit per baris.");
+                }
                 if ($item['sub_jenis'] === 'PENGEMBALIAN' && !$isProjectReturn && empty(trim((string) ($item['pihak_asal'] ?? '')))) {
                     throw new \Exception('Asal barang wajib diisi untuk pengembalian manual.');
                 }
@@ -147,6 +151,9 @@ class TransaksiBarangMasukController extends Controller
 
                     $serials = array_values(array_filter(array_map('trim', $item['serials'] ?? []), fn($sn) => $sn !== ''));
                     $isSn = (bool) $barang->is_wajib_sn;
+                    if ($isSn && $qty > 10) {
+                        throw new \Exception("Qty barang wajib SN '{$barang->nama_barang}' maksimal 10 unit per baris.");
+                    }
                     $condition = $this->normalizeProjectReturnCondition($item['kondisi'] ?? 'Baru');
                     $projectSerialRecords = collect();
 
@@ -451,9 +458,9 @@ class TransaksiBarangMasukController extends Controller
             'kode_projek'      => 'nullable|string|max:100',
             'nama_customer'    => 'nullable|string|max:255',
             'gudang_tujuan_id' => 'nullable|exists:gudangs,id',
-            'qty'              => 'nullable|integer|min:1|max:50',
+            'qty'              => 'nullable|integer|min:1',
             'harga'            => 'nullable|numeric|min:0',
-            'serials'          => 'nullable|array|max:50',
+            'serials'          => 'nullable|array|max:10',
             'serials.*'        => 'nullable|string|max:100',
             'keterangan'       => 'nullable|string|max:500',
         ]);
@@ -509,6 +516,10 @@ class TransaksiBarangMasukController extends Controller
                             if ($duplicate) throw new \Exception("Serial Number '{$sn}' sudah digunakan oleh aset lain.");
                         }
                         $finalQty = count($serialValues);
+                    }
+
+                    if ($isSn && $finalQty > 10) {
+                        throw new \Exception('Qty barang wajib SN maksimal 10 unit per baris.');
                     }
 
                     $detail->update([

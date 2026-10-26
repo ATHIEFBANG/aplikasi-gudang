@@ -400,7 +400,7 @@ export default function ModalBarangMasukRow({
 
                     {/* Quantity pengembalian mengikuti pilihan selector, seperti transfer */}
                     <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Qty</Label>
+                        <Label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Qty {isWajibSn && <span className="font-normal text-slate-400">(maks. 10 SN)</span>}</Label>
                         {isProjectReturn ? (
                             <div className="flex h-8 items-center justify-center rounded-md border border-slate-200 bg-slate-100 px-3 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-cyan-300">
                                 {Number(row.qty || 0)}

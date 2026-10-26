@@ -3,6 +3,9 @@ import { router } from '@inertiajs/react';
 import { ShoppingBag, Layers, RotateCcw } from 'lucide-react';
 
 export const MAX_ROWS_LIMIT = 50;
+
+// Batas khusus hanya untuk barang yang wajib Serial Number. Barang Non-SN tidak memiliki batas Qty buatan aplikasi.
+const MAX_SN_QTY = 10;
 export const CATEGORIES_MASUK = [
     { id: 'PEMBELIAN', label: 'Pembelian', icon: ShoppingBag },
     { id: 'PEMINJAMAN', label: 'Peminjaman', icon: Layers },
@@ -214,15 +217,16 @@ export function useModalBarangMasukControl({
             const targetBarang = barangs.find(b => String(b.id) === String(newBarangId) || b.kode_barang.toLowerCase() === String(newBarangId).toLowerCase());
             const realId = targetBarang ? String(targetBarang.id) : '';
             const isSn = Boolean(targetBarang?.is_wajib_sn);
-            const currentQty = currentRow.qty || 1;
+            const currentQty = Number(currentRow.qty) || 1;
+            const normalizedQty = isSn ? Math.min(currentQty, MAX_SN_QTY) : currentQty;
 
             const isProjectReturn = currentRow.sub_jenis === 'PENGEMBALIAN' && currentRow.return_source !== 'MANUAL' && Boolean(currentRow.kode_projek);
             updated[rowIdx] = {
                 ...currentRow,
                 barang_id: realId,
-                qty: isProjectReturn ? 0 : currentQty,
+                qty: isProjectReturn ? 0 : normalizedQty,
                 non_sn_selections: isProjectReturn ? {} : (currentRow.non_sn_selections || {}),
-                serials: isSn ? (isProjectReturn ? [] : Array(currentQty).fill('')) : [], serial_conditions: {}
+                serials: isSn ? (isProjectReturn ? [] : Array(normalizedQty).fill('')) : [], serial_conditions: {}
             };
             return updated;
         });
@@ -231,9 +235,11 @@ export function useModalBarangMasukControl({
     const handleQtyChange = (rowIdx, val) => {
         const rowToChange = rows[rowIdx];
         if (rowToChange?.sub_jenis === 'PENGEMBALIAN' && rowToChange.return_source !== 'MANUAL') return;
+        const currentTarget = barangs.find(b => String(b.id) === String(rowToChange?.barang_id));
+        const isSnTarget = Boolean(currentTarget?.is_wajib_sn);
         let count = parseInt(val, 10);
         if (isNaN(count) || count < 1) count = 1;
-        if (count > 10) count = 10;
+        if (isSnTarget && count > MAX_SN_QTY) count = MAX_SN_QTY;
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
@@ -401,7 +407,7 @@ export function useModalBarangMasukControl({
 
             let parsedQty = parseInt(String(rawQty).replace(/[^0-9]/g, ''), 10);
             if (isNaN(parsedQty) || parsedQty < 1) parsedQty = 1;
-            if (parsedQty > 10) parsedQty = 10;
+            if (Boolean(targetBarang?.is_wajib_sn) && parsedQty > MAX_SN_QTY) parsedQty = MAX_SN_QTY;
 
             let parsedHarga = '';
             if (rawHarga && rawHarga !== '-') {
@@ -486,6 +492,22 @@ export function useModalBarangMasukControl({
             const r = rows[i];
             const rowNum = i + 1;
 
+            // Harga satuan wajib diisi untuk setiap baris Pembelian sebelum form dikirim.
+            // Validasi eksplisit ini diperlukan karena form menggunakan handler submit kustom.
+            if (r.sub_jenis === 'PEMBELIAN') {
+                const hargaRaw = String(r.harga ?? '').trim();
+                if (hargaRaw === '') {
+                    alert(`Baris #${rowNum}: Harga Satuan (Rp) wajib diisi untuk jenis Pembelian.`);
+                    return;
+                }
+
+                const hargaValue = Number(hargaRaw);
+                if (!Number.isFinite(hargaValue) || hargaValue < 0) {
+                    alert(`Baris #${rowNum}: Harga Satuan harus berupa angka yang valid dan tidak boleh negatif.`);
+                    return;
+                }
+            }
+
             const isProjectReturn = r.sub_jenis === 'PENGEMBALIAN' && r.return_source !== 'MANUAL' && Boolean(r.kode_projek);
             if (r.sub_jenis === 'PENGEMBALIAN' && r.return_source !== 'MANUAL' && !r.kode_projek?.trim()) {
                 alert(`Baris #${rowNum}: Pilih proyek asal atau ubah ke mode Manual.`);
@@ -514,6 +536,11 @@ export function useModalBarangMasukControl({
 
             const targetBarang = barangs.find(b => String(b.id) === String(r.barang_id));
             const isSn = Boolean(targetBarang?.is_wajib_sn);
+
+            if (isSn && Number(r.qty || 0) > 10) {
+                alert(`Baris #${rowNum}: Maksimal 10 unit untuk barang wajib SN. Barang Non-SN tidak dibatasi Qty oleh aplikasi.`);
+                return;
+            }
 
             if (isSn && isEditMode) {
                 const serials = (r.serials || []).map(sn => String(sn ?? '').trim());

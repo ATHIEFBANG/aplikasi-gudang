@@ -31,13 +31,13 @@ class HistoryMovingController extends Controller
                 'id', 'no_transaksi', 'jenis_transaksi', 'sub_jenis', 'tanggal', 
                 'kondisi', 'nomor_imc', 'nomor_omc', 'pihak_asal', 'kode_projek', 
                 'nama_customer', 'gudang_asal_id', 'gudang_tujuan_id', 'supplier_id', 
-                'pic_user_id', 'status'
+                'pic_user_id', 'status', 'created_at'
             ])
             ->with([
                 'gudangAsal:id,nama_gudang,kode_gudang',
                 'gudangTujuan:id,nama_gudang,kode_gudang',
                 'supplier:id,nama_supplier',
-                'picUser:id,name',
+                'picUser:id,name,role',
                 'details' => fn($q) => $q->select('id', 'transaksi_id', 'barang_id', 'qty', 'kondisi'),
                 // Eager load 'stoks' agar Accessor total_stok pada Barang tidak memicu N+1 Query
                 'details.barang' => fn($q) => $q->select('id', 'kode_barang', 'nama_barang', 'brand', 'tipe', 'kategori', 'part_number', 'deskripsi', 'is_wajib_sn')
@@ -104,6 +104,11 @@ class HistoryMovingController extends Controller
                   ->orWhere('pihak_asal', 'like', "%{$search}%")
                   ->orWhere('kode_projek', 'like', "%{$search}%")
                   ->orWhere('nama_customer', 'like', "%{$search}%")
+                  ->orWhereHas('picUser', function ($picQuery) use ($search) {
+                      $picQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%")
+                          ->orWhere('role', 'like', "%{$search}%");
+                  })
                   ->orWhereHas('details.barang', function ($qb) use ($search) {
                       $qb->where('nama_barang', 'like', "%{$search}%")
                          ->orWhere('kode_barang', 'like', "%{$search}%")
@@ -159,6 +164,7 @@ class HistoryMovingController extends Controller
             'gudangAsal:id,nama_gudang',
             'gudangTujuan:id,nama_gudang',
             'supplier:id,nama_supplier',
+            'picUser:id,name,role',
             'details.barang' => fn($q) => $q->with('stoks:id,barang_id,gudang_id,jumlah'),
             'details.serials'
         ])
@@ -217,6 +223,11 @@ class HistoryMovingController extends Controller
                   ->orWhere('pihak_asal', 'like', "%{$search}%")
                   ->orWhere('kode_projek', 'like', "%{$search}%")
                   ->orWhere('nama_customer', 'like', "%{$search}%")
+                  ->orWhereHas('picUser', function ($picQuery) use ($search) {
+                      $picQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%")
+                          ->orWhere('role', 'like', "%{$search}%");
+                  })
                   ->orWhereHas('details.barang', function ($qb) use ($search) {
                       $qb->where('nama_barang', 'like', "%{$search}%")
                          ->orWhere('kode_barang', 'like', "%{$search}%")
@@ -245,8 +256,8 @@ class HistoryMovingController extends Controller
             $file = fopen('php://output', 'w');
             fputs($file, "\xEF\xBB\xBF");
             fputcsv($file, [
-                'Tanggal', 'No Transaksi', 'Tipe Moving', 'Sub Jenis', 'Kode PPL', 
-                'Nama Barang', 'Part Number', 'Qty', 'Kondisi', 'Dari (Asal)', 
+                'Tanggal Transaksi', 'Waktu Dicatat (WIB)', 'No Transaksi', 'PIC (Input Oleh)', 'Role PIC', 'Tipe Moving', 'Sub Jenis', 'Kode PPL',
+                'Nama Barang', 'Part Number', 'Qty', 'Kondisi', 'Dari (Asal)',
                 'Ke (Tujuan)', 'Kode Projek', 'Nama Customer', 'No IMC', 'No OMC', 'Serial Numbers'
             ], ';');
 
@@ -262,7 +273,10 @@ class HistoryMovingController extends Controller
 
                     fputcsv($file, [
                         $r->tanggal ? date('Y-m-d', strtotime($r->tanggal)) : '-',
+                        $r->created_at ? $r->created_at->timezone('Asia/Jakarta')->format('H:i:s') : '-',
                         $r->no_transaksi,
+                        $r->picUser?->name ?: 'Tidak tercatat',
+                        $r->picUser?->role ? strtoupper($r->picUser->role === 'view' ? 'viewer' : $r->picUser->role) : '-',
                         $r->jenis_transaksi,
                         $r->sub_jenis ?: '-',
                         $b?->kode_barang ?? '-',
