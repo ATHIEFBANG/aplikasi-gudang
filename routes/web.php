@@ -12,6 +12,7 @@ use App\Http\Controllers\TransaksiController;
 use App\Http\Controllers\TransaksiBarangMasukController;
 use App\Http\Controllers\TransaksiBarangKeluarController;
 use App\Http\Controllers\TransaksiTransferController;
+use App\Http\Middleware\RoleAccessMiddleware;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -19,12 +20,18 @@ Route::get('/', function () {
 })->name('welcome');
 
 Route::middleware(['auth'])->group(function () {
-    // DASHBOARD & LOKASI GUDANG
+    // DASHBOARD
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/home', fn() => redirect()->route('dashboard'))->name('home');
 
-    Route::prefix('gudang')->name('gudang.')->group(function () {
-        Route::post('/', [DashboardController::class, 'storeGudang'])->name('store');
+    // MASTER GUDANG / LOKASI
+    // Hanya Admin yang boleh menambahkan lokasi gudang.
+    Route::post('/gudang', [DashboardController::class, 'storeGudang'])
+        ->middleware(RoleAccessMiddleware::class . ':admin')
+        ->name('gudang.store');
+
+    // Supervisi boleh mengedit/menghapus lokasi yang sudah ada; Pelaksana tidak.
+    Route::prefix('gudang')->name('gudang.')->middleware(RoleAccessMiddleware::class . ':admin-supervisi')->group(function () {
         Route::put('/{id}', [DashboardController::class, 'updateGudang'])->name('update');
         Route::delete('/{id}', [DashboardController::class, 'destroyGudang'])->name('destroy');
     });
@@ -32,40 +39,42 @@ Route::middleware(['auth'])->group(function () {
     // MASTER DATA PROYEK
     Route::prefix('proyek')->name('proyek.')->controller(ProyekController::class)->group(function () {
         Route::get('/', 'index')->name('index');
-        Route::post('/', 'store')->name('store');
-        Route::put('/{proyek}', 'update')->name('update');
-        Route::delete('/{proyek}', 'destroy')->name('destroy');
+        Route::post('/', 'store')->middleware(RoleAccessMiddleware::class . ':operational')->name('store');
+        Route::put('/{proyek}', 'update')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('update');
+        Route::delete('/{proyek}', 'destroy')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('destroy');
     });
 
     // MASTER BARANG
     Route::prefix('barang')->name('barang.')->controller(BarangController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/export', 'export')->name('export');
-        Route::post('/reset', 'reset')->name('reset');
-        Route::post('/bulk-delete', 'bulkDelete')->name('bulk-delete');
-        Route::post('/', 'store')->name('store');
-        Route::put('/{id}', 'update')->name('update');
-        Route::delete('/{id}', 'destroy')->name('destroy');
+        Route::post('/reset', 'reset')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('reset');
+        Route::post('/bulk-delete', 'bulkDelete')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('bulk-delete');
+        Route::post('/', 'store')->middleware(RoleAccessMiddleware::class . ':operational')->name('store');
+        Route::put('/{id}', 'update')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('update');
+        Route::delete('/{id}', 'destroy')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('destroy');
     });
 
     // ACTION: BARANG MASUK (INBOUND)
     Route::prefix('transaksi-masuk')->name('transaksi.masuk.')->controller(TransaksiBarangMasukController::class)->group(function () {
-        Route::post('/', 'store')->name('store');
-        Route::put('/{id}', 'update')->name('update');
+        // Pelaksana boleh membuat transaksi inbound, tetapi tidak boleh melakukan
+        // Pengembalian Manual. Pemeriksaan dilakukan lagi di middleware.
+        Route::post('/', 'store')->middleware(RoleAccessMiddleware::class . ':inbound-create')->name('store');
+        Route::put('/{id}', 'update')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('update');
     });
 
     // ACTION: BARANG KELUAR (OUTBOUND)
     Route::prefix('transaksi-keluar')->name('transaksi.keluar.')->controller(TransaksiBarangKeluarController::class)->group(function () {
-        Route::post('/', 'store')->name('store');
-        Route::put('/{id}', 'update')->name('update');
-        Route::post('/{id}/cancel', 'cancel')->name('cancel');
+        Route::post('/', 'store')->middleware(RoleAccessMiddleware::class . ':operational')->name('store');
+        Route::put('/{id}', 'update')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('update');
+        Route::post('/{id}/cancel', 'cancel')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('cancel');
     });
 
     // ACTION: TRANSFER GUDANG
     Route::prefix('transaksi-transfer')->name('transaksi.transfer.')->controller(TransaksiTransferController::class)->group(function () {
-        Route::post('/', 'store')->name('store');
-        Route::put('/{id}', 'update')->name('update');
-        Route::post('/{id}/cancel', 'cancel')->name('cancel');
+        Route::post('/', 'store')->middleware(RoleAccessMiddleware::class . ':operational')->name('store');
+        Route::put('/{id}', 'update')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('update');
+        Route::post('/{id}/cancel', 'cancel')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('cancel');
     });
 
     // HALAMAN UTAMA TRANSAKSI STOK & MANAGEMENT
@@ -73,9 +82,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/barangs/{barangId}/serials', 'getSerialsByBarang')->name('barangs.serials');
         Route::get('/export', 'export')->name('export');
-        Route::post('/reset', 'reset')->name('reset');
-        Route::post('/bulk-delete', 'bulkDelete')->name('bulk-delete');
-        Route::delete('/{id}', 'destroy')->name('destroy');
+        Route::post('/reset', 'reset')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('reset');
+        Route::post('/bulk-delete', 'bulkDelete')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('bulk-delete');
+        Route::delete('/{id}', 'destroy')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('destroy');
     });
 
     // RINCIAN ASET BARANG KELUAR
@@ -95,20 +104,27 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // PROFILE
+    // Profile GET tetap bisa dibuka semua role. Perubahan/hapus profil dibatasi
+    // untuk Admin dan Supervisi, sesuai aturan "Pelaksana tidak bisa edit/hapus".
     Route::prefix('profile')->name('profile.')->controller(ProfileController::class)->group(function () {
         Route::get('/', 'edit')->name('edit');
-        Route::patch('/', 'update')->name('update');
-        Route::delete('/', 'destroy')->name('destroy');
+        Route::patch('/', 'update')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('update');
+        Route::delete('/', 'destroy')->middleware(RoleAccessMiddleware::class . ':no-pelaksana')->name('destroy');
     });
 
-    // ADMIN USER MANAGEMENT
-    Route::prefix('admin/users')->name('admin.users.')->controller(UserController::class)->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::post('/', 'store')->name('store');
-        Route::post('/bulk-delete', 'bulkDelete')->name('bulk-delete');
-        Route::put('/{user}', 'update')->name('update');
-        Route::delete('/{user}', 'destroy')->name('destroy');
-    });
+    // ADMIN PANEL & MANAJEMEN PENGGUNA: hanya Admin (juga terlindungi bila URL dibuka langsung)
+    Route::prefix('admin/users')->name('admin.users.')
+        ->middleware(RoleAccessMiddleware::class . ':admin')
+        ->controller(UserController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::post('/bulk-delete', 'bulkDelete')->name('bulk-delete');
+            // Kompatibilitas untuk link lama yang membuka /admin/users/{id} via GET.
+            // Controller akan mengarahkan ke halaman index dan membuka modal edit.
+            Route::get('/{user}', 'show')->name('show');
+            Route::put('/{user}', 'update')->name('update');
+            Route::delete('/{user}', 'destroy')->name('destroy');
+        });
 });
 
 require __DIR__ . '/auth.php';

@@ -13,23 +13,30 @@ use Inertia\Inertia;
 class UserController extends Controller
 {
     /**
-     * Helper privat untuk proteksi role admin
+     * Helper privat untuk proteksi role admin.
      */
     private function authorizeAdmin(Request $request): void
     {
-        if ($request->user()->role !== 'admin') {
-            abort(403, 'Akses Ditolak. Halaman ini hanya untuk Administrator.');
+        if (!$request->user()?->isAdmin()) {
+            abort(403, 'Akses ditolak. Admin Panel hanya dapat diakses oleh Admin.');
         }
     }
 
     /**
-     * Tampilkan daftar user + pencarian, filter role & sorting
+     * Tampilkan daftar user + pencarian, filter role, sorting, dan pagination.
      */
     public function index(Request $request)
     {
         $this->authorizeAdmin($request);
 
-        $sort = in_array($request->input('sort'), ['asc', 'desc']) ? $request->input('sort') : 'asc';
+        $sort = in_array($request->input('sort'), ['asc', 'desc'], true)
+            ? $request->input('sort')
+            : 'asc';
+
+        $perPage = (int) $request->input('per_page', 10);
+        if ($perPage < 1 || $perPage > 100) {
+            $perPage = 10;
+        }
 
         $users = User::query()
             ->when($request->search, function ($query, $search) {
@@ -42,21 +49,40 @@ class UserController extends Controller
                 $query->where('role', $role);
             })
             ->orderBy('created_at', $sort)
-            ->paginate(10)
+            ->paginate($perPage)
             ->withQueryString();
+
+        $editingUser = $request->filled('edit')
+            ? User::query()->find($request->integer('edit'))
+            : null;
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
             'filters' => [
-                'search' => $request->search ?? '',
-                'role'   => $request->role ?? '',
-                'sort'   => $sort,
+                'search'   => $request->search ?? '',
+                'role'     => $request->role ?? '',
+                'sort'     => $sort,
+                'per_page' => $perPage,
             ],
+            'editingUser' => $editingUser,
         ]);
     }
 
     /**
-     * Simpan user baru yang dibuat oleh Admin
+     * Kompatibilitas GET /admin/users/{user}.
+     */
+    public function show(Request $request, User $user)
+    {
+        $this->authorizeAdmin($request);
+
+        return redirect()->route('admin.users.index', array_merge(
+            $request->query(),
+            ['edit' => $user->id]
+        ));
+    }
+
+    /**
+     * Simpan user baru yang dibuat oleh Admin.
      */
     public function store(Request $request)
     {
@@ -66,7 +92,7 @@ class UserController extends Controller
             'name'     => ['required', 'string', 'max:255'],
             'email'    => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', Rules\Password::defaults()],
-            'role'     => ['required', 'in:admin,staff,view'],
+            'role'     => ['required', Rule::in(User::ROLES)],
         ]);
 
         User::create([
@@ -80,7 +106,7 @@ class UserController extends Controller
     }
 
     /**
-     * Update data user / role / password
+     * Update data user / role / password.
      */
     public function update(Request $request, User $user)
     {
@@ -89,7 +115,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name'     => ['required', 'string', 'max:255'],
             'email'    => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'role'     => ['required', 'in:admin,staff,view'],
+            'role'     => ['required', Rule::in(User::ROLES)],
             'password' => ['nullable', Rules\Password::defaults()],
         ]);
 
@@ -99,7 +125,6 @@ class UserController extends Controller
             'role'  => $validated['role'],
         ];
 
-        // Update password hanya jika diisi oleh Admin
         if ($request->filled('password')) {
             $data['password'] = Hash::make($validated['password']);
         }
@@ -110,24 +135,23 @@ class UserController extends Controller
     }
 
     /**
-     * Hapus akun user tunggal
+     * Hapus akun user tunggal.
      */
     public function destroy(Request $request, User $user)
     {
         $this->authorizeAdmin($request);
 
-        if ($request->user()->id === $user->id) {
+        if ((int) $request->user()->id === (int) $user->id) {
             return redirect()->back()->with('error', 'Anda tidak dapat menghapus akun Anda sendiri.');
         }
 
-        // 💡 Ganti $user->delete(); menjadi ini agar Intelephense tidak protes:
         User::destroy($user->id);
 
         return redirect()->back()->with('success', 'User berhasil dihapus.');
     }
 
     /**
-     * Hapus akun user secara massal (Bulk Delete)
+     * Hapus akun user secara massal (Bulk Delete).
      */
     public function bulkDelete(Request $request)
     {
@@ -138,8 +162,10 @@ class UserController extends Controller
             'ids.*' => ['exists:users,id'],
         ]);
 
-        // Cegah admin menghapus akunnya sendiri jika ikut tercentang
-        $ids = array_filter($request->ids, fn($id) => (int)$id !== (int)$request->user()->id);
+        $ids = array_values(array_filter(
+            $request->input('ids'),
+            fn ($id) => (int) $id !== (int) $request->user()->id
+        ));
 
         if (empty($ids)) {
             return redirect()->back()->with('error', 'Tidak ada user yang dihapus (Anda tidak dapat menghapus akun Anda sendiri).');

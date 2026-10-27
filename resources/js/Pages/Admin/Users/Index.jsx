@@ -2,28 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Head, useForm, router, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
-// Shadcn UI Components
+// UI base
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import {
     Dialog,
     DialogContent,
@@ -33,20 +17,25 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 
+// Komponen universal proyek
+import Tabel from '@/components/gabungan/Tabel';
+import HybridDropdown from '@/components/gabungan/HybridDropdown';
+
 // Icons
 import { 
-    Search, ArrowUpDown, Trash2, Pencil, UserPlus, 
-    Shield, UserCheck, Eye, X, Loader2, CheckCircle2, 
-    AlertTriangle 
+    Search, ArrowUpDown, Trash2, UserPlus, ChevronLeft, ChevronRight,
+    Shield, UserCheck, Eye, X, Loader2, CheckCircle2,
+    AlertTriangle
 } from 'lucide-react';
 
-export default function UserIndex({ users = { data: [] }, filters = {} }) {
+export default function UserIndex({ users = { data: [] }, filters = {}, editingUser: initialEditingUser = null }) {
     const { flash } = usePage().props;
 
     // State Filter & Search
     const [search, setSearch] = useState(filters?.search || '');
     const [roleFilter, setRoleFilter] = useState(filters?.role || 'all');
     const [sortOrder, setSortOrder] = useState(filters?.sort || 'asc');
+    const [perPageInput, setPerPageInput] = useState(Number(users?.per_page ?? filters?.per_page ?? 10));
 
     // State Checkbox Multi-select
     const [selectedIds, setSelectedIds] = useState([]);
@@ -99,19 +88,61 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
         name: '',
         email: '',
         password: '',
-        role: 'staff',
+        role: 'pelaksana',
     });
 
+    // Jika dibuka lewat URL /admin/users/{id}, route akan mengarahkan ke
+    // /admin/users?edit={id}; buka modal edit secara otomatis.
+    useEffect(() => {
+        if (!initialEditingUser) return;
+
+        setEditingUser(initialEditingUser);
+        setData({
+            name: initialEditingUser.name ?? '',
+            email: initialEditingUser.email ?? '',
+            password: '',
+            role: initialEditingUser.role ?? 'pelaksana',
+        });
+        setIsFormOpen(true);
+    }, [initialEditingUser]);
+
     // Filter & Reload Data
-    const handleFilterChange = (newSearch = search, newRole = roleFilter, newSort = sortOrder) => {
+    const handleFilterChange = (newSearch = search, newRole = roleFilter, newSort = sortOrder, newPerPage = perPageInput) => {
         router.get(
             route('admin.users.index'),
             {
                 search: newSearch,
                 role: newRole === 'all' ? '' : newRole,
                 sort: newSort,
+                per_page: Number(newPerPage) || 10,
             },
-            { preserveState: true, replace: true }
+            { preserveState: true, preserveScroll: true, replace: true }
+        );
+    };
+
+    const handlePerPageSubmit = () => {
+        let value = parseInt(perPageInput, 10);
+        if (Number.isNaN(value) || value < 1) value = 10;
+        else if (value > 100) value = 100;
+
+        setPerPageInput(value);
+        if (value !== Number(users?.per_page ?? filters?.per_page ?? 10)) {
+            handleFilterChange(search, roleFilter, sortOrder, value);
+        }
+    };
+
+    const handlePageChange = (pageNumber) => {
+        const page = Math.max(1, Math.min(lastPage, Number(pageNumber) || 1));
+        router.get(
+            route('admin.users.index'),
+            {
+                search,
+                role: roleFilter === 'all' ? '' : roleFilter,
+                sort: sortOrder,
+                per_page: Number(users?.per_page ?? perPageInput ?? 10),
+                page,
+            },
+            { preserveState: true, preserveScroll: true, replace: true }
         );
     };
 
@@ -122,15 +153,21 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
     };
 
     // Selection Handlers
-    const userData = users?.data || [];
-    const isAllSelected = userData.length > 0 && userData.every((item) => selectedIds.includes(item.id));
+    const userData = Array.isArray(users?.data) ? users.data : [];
+    const totalUserCount = Number(users?.total ?? userData.length);
+    const currentPage = Number(users?.current_page ?? 1);
+    const lastPage = Number(users?.last_page ?? 1);
+    const rangeFrom = Number(users?.from ?? (userData.length > 0 ? 1 : 0));
+    const rangeTo = Number(users?.to ?? userData.length);
 
-    const handleSelectAll = () => {
-        if (isAllSelected) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(userData.map((item) => item.id));
+    const handleSelectAll = (checked) => {
+        if (typeof checked === 'boolean') {
+            setSelectedIds(checked ? userData.map((item) => item.id) : []);
+            return;
         }
+        setSelectedIds((prev) =>
+            prev.length === userData.length ? [] : userData.map((item) => item.id)
+        );
     };
 
     const handleSelectRow = (id) => {
@@ -154,7 +191,7 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
             name: user.name,
             email: user.email,
             password: '',
-            role: user.role || 'view',
+            role: user.role || 'pelaksana',
         });
         setIsFormOpen(true);
     };
@@ -203,7 +240,7 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
         );
     };
 
-    // Render Badge Role
+    // Render Badge Role (mendukung nilai lama sementara akun dimigrasikan manual oleh Admin)
     const renderRoleBadge = (role) => {
         switch (role) {
             case 'admin':
@@ -212,16 +249,34 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
                         <Shield className="w-3 h-3 mr-1" /> Admin
                     </Badge>
                 );
-            case 'staff':
+            case 'supervisi':
+                return (
+                    <Badge className="bg-violet-600 hover:bg-violet-700 text-white uppercase text-[10px]">
+                        <Shield className="w-3 h-3 mr-1" /> Supervisi
+                    </Badge>
+                );
+            case 'pelaksana':
                 return (
                     <Badge className="bg-blue-600 hover:bg-blue-700 text-white uppercase text-[10px]">
-                        <UserCheck className="w-3 h-3 mr-1" /> Staff
+                        <UserCheck className="w-3 h-3 mr-1" /> Pelaksana
+                    </Badge>
+                );
+            case 'staff':
+                return (
+                    <Badge variant="outline" className="uppercase text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3 h-3 mr-1" /> Staff Lama
+                    </Badge>
+                );
+            case 'view':
+                return (
+                    <Badge variant="outline" className="uppercase text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3 h-3 mr-1" /> View Lama
                     </Badge>
                 );
             default:
                 return (
                     <Badge variant="secondary" className="uppercase text-[10px]">
-                        <Eye className="w-3 h-3 mr-1" /> View
+                        <Eye className="w-3 h-3 mr-1" /> Role Tidak Dikenal
                     </Badge>
                 );
         }
@@ -232,18 +287,25 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
             <Head title="Admin - Kelola User" />
 
             <div className="space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-                        Manajemen Pengguna
-                    </h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Kelola akun staf, atur ulang role, atau ubah kata sandi.
-                    </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                            Manajemen Pengguna
+                        </h1>
+                        <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                            Kelola akun, hak akses, dan role pengguna. Pilih role sesuai tanggung jawab operasional masing-masing.
+                        </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <UserCheck className="h-4 w-4 text-red-500" />
+                        <span>Total Pengguna</span>
+                        <span className="text-base font-bold tabular-nums text-slate-900 dark:text-white">{totalUserCount.toLocaleString('id-ID')}</span>
+                    </div>
                 </div>
 
-                <Card className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/80 dark:border-white/10 shadow-sm overflow-hidden">
+                <Card className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/30 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 dark:shadow-black/10">
                     {/* TOOLBAR */}
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                    <div className="flex flex-col gap-4 border-b border-slate-200/80 p-4 dark:border-slate-800 xl:flex-row xl:items-center xl:justify-between">
                         {/* AREA KIRI: Search, Sort & Role Switch */}
                         <div className="flex items-center gap-2 flex-wrap">
                             <form onSubmit={(e) => e.preventDefault()} className="relative w-full sm:w-auto">
@@ -283,24 +345,28 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
                                 <span className="uppercase">{sortOrder}</span>
                             </Button>
 
-                            <div className="w-32">
-                                <Select
+                            <div className="w-full sm:w-40">
+                                <HybridDropdown
                                     value={roleFilter}
-                                    onValueChange={(val) => {
-                                        setRoleFilter(val);
-                                        handleFilterChange(search, val, sortOrder);
+                                    options={[
+                                        { value: 'all', label: 'Semua Role' },
+                                        { value: 'admin', label: 'Admin' },
+                                        { value: 'supervisi', label: 'Supervisi' },
+                                        { value: 'pelaksana', label: 'Pelaksana' },
+                                    ]}
+                                    onChange={(value) => {
+                                        const nextRole = value || 'all';
+                                        setRoleFilter(nextRole);
+                                        handleFilterChange(search, nextRole, sortOrder);
                                     }}
-                                >
-                                    <SelectTrigger className="h-9 text-xs dark:border-slate-800">
-                                        <SelectValue placeholder="Semua Role" />
-                                    </SelectTrigger>
-                                    <SelectContent className="dark:bg-slate-900 border-slate-800 text-xs">
-                                        <SelectItem value="all">Semua Role</SelectItem>
-                                        <SelectItem value="admin">Admin</SelectItem>
-                                        <SelectItem value="staff">Staff</SelectItem>
-                                        <SelectItem value="view">View</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                    placeholder="Semua Role"
+                                    searchPlaceholder="Cari role..."
+                                    allowCustom={false}
+                                    portalMenu={true}
+                                    direction="auto"
+                                    className="w-full"
+                                    inputClassName="h-9 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                                />
                             </div>
                         </div>
 
@@ -321,7 +387,7 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
 
                             <Button
                                 onClick={openAddModal}
-                                className="bg-red-600 hover:bg-red-700 text-white shadow-md h-9 text-xs font-medium gap-1.5"
+                                className="bg-blue-600 hover:bg-blue-700 text-white shadow-md h-9 text-xs font-medium gap-1.5"
                             >
                                 <UserPlus className="w-3.5 h-3.5" />
                                 <span>Tambah User</span>
@@ -329,85 +395,141 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
                         </div>
                     </div>
 
-                    {/* TABEL */}
-                    <div className="relative overflow-x-auto rounded-b-xl border-t-0">
-                        <Table>
-                            <TableHeader className="bg-slate-100/80 dark:bg-slate-800/80">
-                                <TableRow>
-                                    {/* KOLOM AKSI & CHECKBOX */}
-                                    <TableHead className="w-16 text-center sticky left-0 z-20 bg-slate-100 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-800">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} />
-                                            <span>Aksi</span>
+                    {/* TABEL UNIVERSAL */}
+                    <div className="overflow-hidden">
+                        <Tabel
+                            data={userData}
+                            columns={[
+                                {
+                                    key: 'name',
+                                    label: 'Nama Pengguna',
+                                    className: 'min-w-[190px]',
+                                    cellClassName: 'min-w-[190px]',
+                                    render: (user) => (
+                                        <div className="flex items-center gap-2.5 py-0.5">
+                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-900 text-xs font-bold text-white shadow-sm shadow-yellow-500/20">
+                                                {(user.name || '?').trim().charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{user.name || '-'}</p>
+                                                <p className="mt-0.5 text-[10px] font-medium text-slate-400">ID Pengguna #{user.id}</p>
+                                            </div>
                                         </div>
-                                    </TableHead>
+                                    ),
+                                },
+                                {
+                                    key: 'email',
+                                    label: 'Email Perusahaan',
+                                    className: 'min-w-[220px]',
+                                    cellClassName: 'min-w-[220px] text-slate-600 dark:text-slate-400',
+                                    render: (user) => <span>{user.email || '-'}</span>,
+                                },
+                                {
+                                    key: 'role',
+                                    label: 'Role / Hak Akses',
+                                    className: 'min-w-[155px]',
+                                    cellClassName: 'min-w-[155px]',
+                                    render: (user) => renderRoleBadge(user.role),
+                                },
+                                {
+                                    key: 'created_at',
+                                    label: 'Terdaftar',
+                                    className: 'min-w-[125px]',
+                                    cellClassName: 'min-w-[125px] text-slate-500 dark:text-slate-400',
+                                    render: (user) => user.created_at
+                                        ? new Date(user.created_at).toLocaleDateString('id-ID', {
+                                            day: 'numeric',
+                                            month: 'short',
+                                            year: 'numeric',
+                                        })
+                                        : '-',
+                                },
+                            ]}
+                            selectedIds={selectedIds}
+                            onSelectAll={handleSelectAll}
+                            onSelectRow={handleSelectRow}
+                            onEditRow={openEditModal}
+                            getItemId={(user) => user.id}
+                            getRowNumber={(index) => rangeFrom > 0 ? rangeFrom + index : index + 1}
+                            emptyMessage="Tidak ada pengguna yang cocok dengan pencarian atau filter saat ini."
+                            zoomLevel={100}
+                        />
+                    </div>
 
-                                    {/* KOLOM NOMOR */}
-                                    <TableHead className="w-12 text-center">No</TableHead>
+                    {/* FOOTER TABEL / PAGINATION — mengikuti MasterDataProyek */}
+                    <div className="flex flex-col items-center justify-between gap-4 bg-slate-50/50 p-4 text-xs text-slate-500 dark:bg-slate-900/50 md:flex-row">
+                        <div className="flex items-center gap-2">
+                            <span className="whitespace-nowrap">Tampilkan</span>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={perPageInput}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value !== '' && Number(value) > 100) setPerPageInput(100);
+                                    else setPerPageInput(value);
+                                }}
+                                onBlur={handlePerPageSubmit}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handlePerPageSubmit();
+                                    }
+                                }}
+                                className="h-8 w-16 border-slate-200 bg-white text-center text-xs font-bold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:border-slate-700 dark:bg-slate-800"
+                                aria-label="Jumlah pengguna per halaman"
+                            />
+                            <span className="whitespace-nowrap">data per halaman</span>
+                        </div>
 
-                                    {/* KOLOM ISI */}
-                                    <TableHead className="font-semibold text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap">Nama User</TableHead>
-                                    <TableHead className="font-semibold text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap">Email Perusahaan</TableHead>
-                                    <TableHead className="font-semibold text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap">Role / Hak Akses</TableHead>
-                                    <TableHead className="font-semibold text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap">Dibuat Pada</TableHead>
-                                </TableRow>
-                            </TableHeader>
+                        <div className="text-center text-slate-500">
+                            Menampilkan <span className="font-semibold text-slate-700 dark:text-slate-300">{rangeFrom.toLocaleString('id-ID')}</span> - <span className="font-semibold text-slate-700 dark:text-slate-300">{rangeTo.toLocaleString('id-ID')}</span> dari <span className="font-semibold text-slate-700 dark:text-slate-300">{totalUserCount.toLocaleString('id-ID')}</span> pengguna
+                            {selectedIds.length > 0 && <span className="ml-2 text-blue-600 dark:text-blue-400">• {selectedIds.length} dipilih</span>}
+                        </div>
 
-                            <TableBody>
-                                {userData.length > 0 ? (
-                                    userData.map((user, index) => {
-                                        const isSelected = selectedIds.includes(user.id);
-
-                                        return (
-                                            <TableRow key={user.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                                                {/* CELL AKSI & CHECKBOX */}
-                                                <TableCell className="sticky left-0 z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-100/90 dark:group-hover:bg-slate-800/90 border-r border-slate-200 dark:border-slate-800 text-center">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <Checkbox
-                                                            checked={isSelected}
-                                                            onCheckedChange={() => handleSelectRow(user.id)}
-                                                        />
-
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-7 w-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50"
-                                                            onClick={() => openEditModal(user)}
-                                                        >
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-
-                                                {/* CELL NOMOR */}
-                                                <TableCell className="font-mono text-xs text-slate-400 text-center font-bold">
-                                                    {index + 1}
-                                                </TableCell>
-
-                                                {/* DATA CELLS */}
-                                                <TableCell className="whitespace-nowrap font-semibold text-xs">{user.name}</TableCell>
-                                                <TableCell className="whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{user.email}</TableCell>
-                                                <TableCell className="whitespace-nowrap">{renderRoleBadge(user.role)}</TableCell>
-                                                <TableCell className="whitespace-nowrap text-xs text-slate-500">
-                                                    {new Date(user.created_at).toLocaleDateString('id-ID', {
-                                                        day: 'numeric',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                    })}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center text-slate-400 dark:text-slate-500">
-                                            Tidak ada data pengguna ditemukan.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={currentPage <= 1}
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                className="h-8 min-w-[32px] px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800"
+                                aria-label="Halaman sebelumnya"
+                            >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                            </Button>
+                            {Array.from({ length: lastPage }, (_, index) => index + 1).map((pageNum) => (
+                                <Button
+                                    key={`page-${pageNum}`}
+                                    type="button"
+                                    variant={currentPage === pageNum ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => handlePageChange(pageNum)}
+                                    className={`h-8 min-w-[32px] px-2 text-xs font-semibold dark:border-slate-800 ${
+                                        currentPage === pageNum
+                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                                    }`}
+                                    aria-label={`Halaman ${pageNum}`}
+                                    aria-current={currentPage === pageNum ? 'page' : undefined}
+                                >
+                                    {pageNum}
+                                </Button>
+                            ))}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={currentPage >= lastPage}
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                className="h-8 min-w-[32px] px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800"
+                                aria-label="Halaman selanjutnya"
+                            >
+                                <ChevronRight className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
                     </div>
                 </Card>
             </div>
@@ -422,7 +544,7 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
                         <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                             {editingUser
                                 ? 'Perbarui profil atau role pengguna.'
-                                : 'Buatkan akun baru staf untuk mengelola sistem.'}
+                                : 'Buat akun baru dan tentukan hak aksesnya sesuai tanggung jawab.'}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -460,16 +582,22 @@ export default function UserIndex({ users = { data: [] }, filters = {} }) {
                             <Label htmlFor="role" className="text-xs">
                                 Role / Peran Akses
                             </Label>
-                            <Select value={data.role} onValueChange={(val) => setData('role', val)}>
-                                <SelectTrigger className="h-9 text-xs w-full">
-                                    <SelectValue placeholder="Pilih Role" />
-                                </SelectTrigger>
-                                <SelectContent className="dark:bg-slate-900 border-slate-800 text-xs">
-                                    <SelectItem value="admin">Admin (Akses Penuh)</SelectItem>
-                                    <SelectItem value="staff">Staff (Input & Edit)</SelectItem>
-                                    <SelectItem value="view">View (Read-Only)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <HybridDropdown
+                                value={data.role}
+                                options={[
+                                    { value: 'admin', label: 'Admin', subLabel: 'Akses penuh termasuk Admin Panel' },
+                                    { value: 'supervisi', label: 'Supervisi', subLabel: 'Kelola data operasional, tanpa tambah lokasi gudang' },
+                                    { value: 'pelaksana', label: 'Pelaksana', subLabel: 'Input transaksi tanpa edit/hapus data tersimpan' },
+                                ]}
+                                onChange={(value) => setData('role', value)}
+                                placeholder="Pilih role pengguna"
+                                searchPlaceholder="Cari role..."
+                                allowCustom={false}
+                                portalMenu={true}
+                                direction="auto"
+                                className="w-full"
+                                inputClassName="h-9 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700"
+                            />
                             {errors.role && <p className="text-xs text-red-500">{errors.role}</p>}
                         </div>
 

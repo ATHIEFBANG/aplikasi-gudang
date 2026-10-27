@@ -165,14 +165,34 @@ export default function AuthenticatedLayout({ header, children }) {
         }
     }, [isDark]);
 
+    const normalizedRole = String(user?.role || '').toLowerCase();
+    const isAdmin = normalizedRole === 'admin';
+    const canEditOwnProfile = ['admin', 'supervisi'].includes(normalizedRole);
+
     const getRoleBadgeStyle = (role) => {
-        switch (role) {
+        switch (String(role || '').toLowerCase()) {
             case 'admin':
                 return 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30';
-            case 'staff':
+            case 'supervisi':
                 return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30';
+            case 'pelaksana':
+                return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+            // Role lama ditampilkan netral sampai akun dipetakan ke role baru.
+            case 'staff':
+            case 'view':
             default:
                 return 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30';
+        }
+    };
+
+    const getRoleLabel = (role) => {
+        switch (String(role || '').toLowerCase()) {
+            case 'admin': return 'Admin';
+            case 'supervisi': return 'Supervisi';
+            case 'pelaksana': return 'Pelaksana';
+            case 'staff': return 'Staff (role lama)';
+            case 'view': return 'View (role lama)';
+            default: return 'Role belum diatur';
         }
     };
 
@@ -271,7 +291,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                     {isDark ? <Sun className="w-5 h-5 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" /> : <Moon className="w-5 h-5 text-blue-600" />}
                                 </button>
 
-                                {user?.role === 'admin' && (
+                                {isAdmin && (
                                     <Link
                                         href={getRoute('admin.users.index')}
                                         className={`hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border ${
@@ -304,7 +324,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                             <p className="font-bold text-slate-900 dark:text-white text-sm">{user?.name}</p>
                                             <div className="mt-1 mb-1">
                                                 <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md border ${getRoleBadgeStyle(user?.role)}`}>
-                                                    {user?.role || 'User'}
+                                                    {getRoleLabel(user?.role)}
                                                 </span>
                                             </div>
                                             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
@@ -312,11 +332,13 @@ export default function AuthenticatedLayout({ header, children }) {
 
                                         <DropdownMenuSeparator className="bg-slate-200 dark:bg-white/10 my-1" />
                                         
-                                        <DropdownMenuItem className="p-0 focus:bg-transparent">
-                                            <Link href={getRoute('profile.edit')} className="flex items-center gap-2.5 w-full px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
-                                                <UserIcon className="w-4 h-4 text-slate-400" /> Edit Profile
-                                            </Link>
-                                        </DropdownMenuItem>
+                                        {canEditOwnProfile && (
+                                            <DropdownMenuItem className="p-0 focus:bg-transparent">
+                                                <Link href={getRoute('profile.edit')} className="flex items-center gap-2.5 w-full px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
+                                                    <UserIcon className="w-4 h-4 text-slate-400" /> Edit Profile
+                                                </Link>
+                                            </DropdownMenuItem>
+                                        )}
 
                                         <DropdownMenuItem className="p-0 focus:bg-transparent">
                                             <Link href={getRoute('logout')} method="post" as="button" className="flex items-center gap-2.5 w-full px-3 py-2 text-sm font-medium text-rose-600 dark:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors text-left cursor-pointer">
@@ -477,7 +499,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <FileSpreadsheet className="w-4 h-4" /> Laporan Bulanan
                             </Link>
 
-                            {user?.role === 'admin' && (
+                            {isAdmin && (
                                 <Link 
                                     href={getRoute('admin.users.index')} 
                                     className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-amber-500/30 ${
