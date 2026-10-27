@@ -66,6 +66,7 @@ export function useModalBarangMasukControl({
     suppliers = [],
     barangs = [],
     projectOptions = [],
+    allowManualReturn = false,
     onClose
 }) {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -138,7 +139,7 @@ export function useModalBarangMasukControl({
                 setRows([{
                     id: selectedItem.id,
                     sub_jenis: selectedItem.sub_jenis || 'PEMBELIAN',
-                    return_source: selectedItem.sub_jenis === 'PENGEMBALIAN' ? (selectedItem.kode_projek ? 'PROJECT' : 'MANUAL') : '',
+                    return_source: selectedItem.sub_jenis === 'PENGEMBALIAN' ? (selectedItem.kode_projek ? 'PROJECT' : (allowManualReturn ? 'MANUAL' : 'PROJECT')) : '',
                     tanggal: formatToISODate(selectedItem.tanggal),
                     nomor_imc: selectedItem.nomor_imc || '',
                     pihak_asal: selectedItem.pihak_asal || '',
@@ -154,7 +155,7 @@ export function useModalBarangMasukControl({
                 setRows([createEmptyRow()]);
             }
         }
-    }, [isOpen, isEditMode, selectedItem, barangs, gudangs, createEmptyRow]);
+    }, [isOpen, isEditMode, selectedItem, barangs, gudangs, createEmptyRow, allowManualReturn]);
 
     const handleAddMoreRows = (count = 1) => {
         setRows(prev => {
@@ -174,6 +175,9 @@ export function useModalBarangMasukControl({
     };
 
     const handleRowFieldChange = (rowIdx, field, value) => {
+        // Pelaksana tidak dapat mengubah asal pengembalian menjadi Manual.
+        if (field === 'return_source' && value === 'MANUAL' && !allowManualReturn) return;
+
         setRows(prev => {
             const updated = [...prev];
             const currentRow = updated[rowIdx];
@@ -192,7 +196,7 @@ export function useModalBarangMasukControl({
                 return updated;
             }
             if (field === 'kode_projek') {
-                updated[rowIdx] = { ...currentRow, kode_projek: value, pihak_asal: value ? `Proyek ${value}` : '', barang_id: '', serials: [], serial_conditions: {}, non_sn_selections: {}, qty: 0 };
+                updated[rowIdx] = { ...currentRow, kode_projek: value, pihak_asal: value ? `Proyek ${value}` : '', return_source: currentRow.sub_jenis === 'PENGEMBALIAN' && !allowManualReturn ? 'PROJECT' : currentRow.return_source, barang_id: '', serials: [], serial_conditions: {}, non_sn_selections: {}, qty: 0 };
                 return updated;
             }
             updated[rowIdx] = { ...currentRow, [field]: value, kondisi: newKondisi };
@@ -492,6 +496,12 @@ export function useModalBarangMasukControl({
             const r = rows[i];
             const rowNum = i + 1;
 
+            // Pelaksana hanya boleh mengembalikan barang yang berasal dari proyek.
+            if (r.sub_jenis === 'PENGEMBALIAN' && r.return_source === 'MANUAL' && !allowManualReturn) {
+                alert(`Baris #${rowNum}: Role Pelaksana tidak diizinkan melakukan Pengembalian Manual. Pilih proyek asal barang.`);
+                return;
+            }
+
             // Harga satuan wajib diisi untuk setiap baris Pembelian sebelum form dikirim.
             // Validasi eksplisit ini diperlukan karena form menggunakan handler submit kustom.
             if (r.sub_jenis === 'PEMBELIAN') {
@@ -510,7 +520,9 @@ export function useModalBarangMasukControl({
 
             const isProjectReturn = r.sub_jenis === 'PENGEMBALIAN' && r.return_source !== 'MANUAL' && Boolean(r.kode_projek);
             if (r.sub_jenis === 'PENGEMBALIAN' && r.return_source !== 'MANUAL' && !r.kode_projek?.trim()) {
-                alert(`Baris #${rowNum}: Pilih proyek asal atau ubah ke mode Manual.`);
+                alert(allowManualReturn
+                    ? `Baris #${rowNum}: Pilih proyek asal atau ubah ke mode Manual.`
+                    : `Baris #${rowNum}: Pelaksana hanya dapat menggunakan Pengembalian dari Proyek. Pilih proyek asal barang.`);
                 return;
             }
             if (!isProjectReturn && !r.pihak_asal.trim()) {

@@ -22,9 +22,12 @@ export default function TabMasterData({
     filters = {}
 }) {
     const { auth } = usePage().props;
-    const userRole = auth?.user?.role || 'view';
-    const canWrite = userRole === 'admin' || userRole === 'staff';
+    const userRole = auth?.user?.role || 'pelaksana';
     const isAdmin = userRole === 'admin';
+    const isSupervisi = userRole === 'supervisi' || userRole === 'staff';
+    const isPelaksana = userRole === 'pelaksana' || userRole === 'view';
+    const canWrite = isAdmin || isSupervisi || isPelaksana;
+    const canEdit = isAdmin || isSupervisi;
     const confirm = useConfirm();
 
     const [searchTerm, setSearchTerm] = useState(filters?.search || '');
@@ -199,7 +202,7 @@ export default function TabMasterData({
             <Toolbar
                 sortOrder={sortOrder}
                 onToggleSort={toggleSort}
-                selectedCount={selectedIds.length}
+                selectedCount={canEdit ? selectedIds.length : 0}
                 onDeleteSelected={isAdmin ? handleDeleteSelected : undefined}
                 onReset={isAdmin ? handleReset : undefined}
                 onExport={handleExport}
@@ -261,10 +264,10 @@ export default function TabMasterData({
             <div className="w-full overflow-x-auto relative border-b border-slate-200 dark:border-slate-800">
                 <CrudTable
                     dataList={dataList}
-                    selectedIds={selectedIds}
-                    onSelectAll={handleSelectAll}
-                    onSelectRow={handleSelectRow}
-                    onEditRow={canWrite ? handleOpenEdit : undefined}
+                    selectedIds={canEdit ? selectedIds : []}
+                    onSelectAll={canEdit ? handleSelectAll : undefined}
+                    onSelectRow={canEdit ? handleSelectRow : undefined}
+                    onEditRow={canEdit ? handleOpenEdit : undefined}
                     getRowNumber={getRowNumber}
                     zoomLevel={zoomLevel}
                 />

@@ -19,8 +19,12 @@ const EMPTY_FORM = {
 
 export default function MasterDataProyek({ proyekData = [] }) {
     const { auth } = usePage().props;
-    const role = auth?.user?.role || 'view';
-    const canWrite = role === 'admin' || role === 'staff';
+    const role = auth?.user?.role || 'pelaksana';
+    const isAdmin = role === 'admin';
+    const isSupervisi = role === 'supervisi' || role === 'staff';
+    const isPelaksana = role === 'pelaksana' || role === 'view';
+    const canWrite = isAdmin || isSupervisi || isPelaksana;
+    const canManage = isAdmin || isSupervisi;
 
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
@@ -47,7 +51,7 @@ export default function MasterDataProyek({ proyekData = [] }) {
     const handleSelectAll = checked => setSelectedIds(previous => checked ? [...new Set([...previous, ...visibleIds])] : previous.filter(id => !visibleIds.includes(id)));
 
     const handleDeleteSelected = () => {
-        if (!canWrite || !selectedIds.length || deleting) return;
+        if (!canManage || !selectedIds.length || deleting) return;
         const selectedProjects = proyekData.filter(item => selectedIds.includes(item.id));
         const names = selectedProjects.map(item => item.kode_projek).join(', ');
         if (!window.confirm(`Hapus ${selectedProjects.length} proyek terpilih (${names})? Proyek yang sudah digunakan pada transaksi atau data serial tidak dapat dihapus.`)) return;
@@ -90,7 +94,7 @@ export default function MasterDataProyek({ proyekData = [] }) {
     };
 
     const openEdit = (item) => {
-        if (!canWrite || !item) return;
+        if (!canManage || !item) return;
 
         setEditing(item);
         setForm({
@@ -164,9 +168,9 @@ export default function MasterDataProyek({ proyekData = [] }) {
                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                         Daftar Data Proyek Operasional
                     </span>
-                    {canWrite && (
+                    {(canWrite || canManage) && (
                         <div className="flex items-center gap-2">
-                            {selectedIds.length > 0 && (
+                            {canManage && selectedIds.length > 0 && (
                                 <Button type="button" size="sm" variant="outline" onClick={handleDeleteSelected} disabled={deleting} className="h-8 gap-1.5 border-rose-300 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/30">
                                     <Trash2 className="h-3.5 w-3.5" />
                                     <span>{deleting ? 'Menghapus…' : `Hapus Terpilih (${selectedIds.length})`}</span>
@@ -183,10 +187,10 @@ export default function MasterDataProyek({ proyekData = [] }) {
                 <div className="w-full [&>div]:border-0 [&>div]:rounded-none [&>div]:shadow-none border-b border-slate-200 dark:border-slate-800">
                     <Tabel
                     data={visible}
-                    selectedIds={selectedIds}
-                    onSelectAll={handleSelectAll}
-                    onSelectRow={handleSelectRow}
-                    onEditRow={openEdit}
+                    selectedIds={canManage ? selectedIds : []}
+                    onSelectAll={canManage ? handleSelectAll : undefined}
+                    onSelectRow={canManage ? handleSelectRow : undefined}
+                    onEditRow={canManage ? openEdit : undefined}
                     columns={[
                         {
                             key: 'kode_projek',

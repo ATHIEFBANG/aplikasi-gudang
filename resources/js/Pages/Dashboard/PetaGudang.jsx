@@ -27,15 +27,18 @@ const TABLE_COLUMNS = [
 
 export default function PetaGudang({ mapData = [] }) {
     const { auth } = usePage().props;
-    const userRole = auth?.user?.role || 'view';
-    const canWrite = userRole === 'admin' || userRole === 'staff';
+    const userRole = auth?.user?.role || 'pelaksana';
     const isAdmin = userRole === 'admin';
+    const isSupervisi = userRole === 'supervisi' || userRole === 'staff';
+    const canManage = isAdmin || isSupervisi;
+    const canCreate = isAdmin;
     const confirm = useConfirm();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Client-Side Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -65,14 +68,14 @@ export default function PetaGudang({ mapData = [] }) {
     };
 
     const handleOpenAdd = () => {
-        if (!canWrite) return;
+        if (!canCreate) return;
         setIsEditMode(false);
         setSelectedItem(null);
         setIsModalOpen(true);
     };
 
     const handleOpenEdit = (gudang) => {
-        if (!canWrite || !gudang) return;
+        if (!canManage || !gudang) return;
         setIsEditMode(true);
         setSelectedItem(gudang);
         setIsModalOpen(true);
@@ -94,18 +97,46 @@ export default function PetaGudang({ mapData = [] }) {
     };
 
     const handleDeleteSelected = () => {
-        if (!isAdmin || selectedIds.length === 0) return;
+        if (!canManage || selectedIds.length === 0 || isDeleting) return;
+
+        const idsToDelete = [...selectedIds];
+
         confirm({
             title: 'Hapus Lokasi Gudang',
-            message: `Apakah Anda yakin ingin MENGHAPUS ${selectedIds.length} data lokasi gudang terpilih? Data yang dihapus tidak dapat dikembalikan.`,
+            message: `Apakah Anda yakin ingin MENGHAPUS ${idsToDelete.length} data lokasi gudang terpilih? Data yang dihapus tidak dapat dikembalikan.`,
             variant: 'danger',
             confirmText: 'Ya, Hapus Data',
             cancelText: 'Batal',
-            onConfirm: () => {
-                router.post('/gudang/bulk-delete', { ids: selectedIds }, {
-                    preserveScroll: true,
-                    onSuccess: () => setSelectedIds([])
-                });
+            onConfirm: async () => {
+                setIsDeleting(true);
+
+                const deletedIds = [];
+                const failedIds = [];
+
+                // Gunakan endpoint DELETE per gudang yang sudah ada di routes.
+                for (const id of idsToDelete) {
+                    await new Promise(resolve => {
+                        router.delete(`/gudang/${id}`, {
+                            preserveScroll: true,
+                            onSuccess: page => {
+                                if (page.props?.flash?.error) failedIds.push(id);
+                                else deletedIds.push(id);
+                            },
+                            onError: () => failedIds.push(id),
+                            onFinish: resolve
+                        });
+                    });
+                }
+
+                setSelectedIds(previous => previous.filter(id => !deletedIds.includes(id)));
+                setIsDeleting(false);
+                router.reload({ preserveScroll: true });
+
+                if (failedIds.length > 0) {
+                    alert(
+                        `${deletedIds.length} lokasi berhasil dihapus. ${failedIds.length} lokasi gagal dihapus, mungkin masih digunakan oleh data lain.`
+                    );
+                }
             }
         });
     };
@@ -214,19 +245,20 @@ export default function PetaGudang({ mapData = [] }) {
                         Daftar Titik Gudang Operasional
                     </span>
                     <div className="flex items-center gap-2">
-                        {isAdmin && selectedIds.length > 0 && (
+                        {canManage && selectedIds.length > 0 && (
                             <Button
                                 type="button"
                                 size="sm"
                                 variant="destructive"
                                 onClick={handleDeleteSelected}
+                                disabled={isDeleting}
                                 className="h-8 text-xs gap-1.5 shadow-sm cursor-pointer animate-in fade-in"
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
-                                <span>Hapus ({selectedIds.length})</span>
+                                <span>{isDeleting ? 'Menghapus…' : `Hapus (${selectedIds.length})`}</span>
                             </Button>
                         )}
-                        {canWrite && (
+                        {canCreate && (
                             <Button 
                                 type="button"
                                 size="sm"
@@ -245,10 +277,10 @@ export default function PetaGudang({ mapData = [] }) {
                     <Tabel
                         data={paginatedList}
                         columns={formattedColumns}
-                        selectedIds={selectedIds}
-                        onSelectAll={handleSelectAll}
-                        onSelectRow={handleSelectRow}
-                        onEditRow={canWrite ? handleOpenEdit : undefined}
+                        selectedIds={canManage ? selectedIds : []}
+                        onSelectAll={canManage ? handleSelectAll : undefined}
+                        onSelectRow={canManage ? handleSelectRow : undefined}
+                        onEditRow={canManage ? handleOpenEdit : undefined}
                         getItemId={getItemId}
                         getRowNumber={getRowNumber}
                         emptyMessage="Belum ada data titik lokasi gudang terdaftar."
@@ -330,6 +362,8 @@ export default function PetaGudang({ mapData = [] }) {
                 onClose={() => setIsModalOpen(false)}
                 isEditMode={isEditMode}
                 selectedItem={selectedItem}
+                canCreate={canCreate}
+                canEdit={canManage}
             />
         </Card>
     );

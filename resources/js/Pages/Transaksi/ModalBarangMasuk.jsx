@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePage } from '@inertiajs/react';
 import Modal from '@/components/gabungan/FormModal';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,10 @@ export default function ModalBarangMasuk({
     barangs = [],
     projectOptions = []
 }) {
+    const { auth } = usePage().props;
+    const userRole = auth?.user?.role || 'pelaksana';
+    const allowManualReturn = ['admin', 'supervisi', 'staff'].includes(userRole);
+
     const {
         isProcessing,
         rows,
@@ -42,6 +47,7 @@ export default function ModalBarangMasuk({
         suppliers,
         barangs,
         projectOptions,
+        allowManualReturn,
         onClose
     });
 
@@ -91,7 +97,7 @@ export default function ModalBarangMasuk({
                 <Alert className="shrink-0 mb-3 bg-blue-50/60 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40 text-blue-700 dark:text-blue-300 p-2.5 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                     <AlertDescription className="text-[11px] leading-relaxed">
-                        <strong>Pencatatan Inbound:</strong> Catat stok masuk dari <strong>Pembelian</strong>, <strong>Peminjaman</strong>, atau <strong>Pengembalian</strong> barang. Anda dapat mengetik manual atau menggunakan tombol <strong>Paste dari Excel</strong> di pojok kanan atas.
+                        <strong>Pencatatan Inbound:</strong> Catat stok masuk dari <strong>Pembelian</strong>, <strong>Peminjaman</strong>, atau <strong>Pengembalian</strong> barang. {allowManualReturn ? 'Pengembalian dapat berasal dari proyek atau dicatat secara manual.' : 'Untuk jenis Pengembalian, Pelaksana wajib memilih proyek asal. Pengembalian manual hanya tersedia untuk Admin dan Supervisi.'} Anda juga dapat menggunakan tombol <strong>Paste dari Excel</strong> di pojok kanan atas.
                     </AlertDescription>
                 </Alert>
             )}
@@ -114,6 +120,7 @@ export default function ModalBarangMasuk({
                             gudangOptions={gudangOptions}
                             supplierOptions={supplierOptions}
                             projectOptions={projectOptions}
+                            allowManualReturn={allowManualReturn}
                             pplOptions={pplOptions}
                             namaOptions={namaOptions}
                             onRemoveRow={handleRemoveRow}

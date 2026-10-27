@@ -8,7 +8,9 @@ export default function ModalGudang({
     isOpen,
     onClose,
     isEditMode = false,
-    selectedItem = null
+    selectedItem = null,
+    canCreate = false,
+    canEdit = false
 }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [formData, setFormData] = useState({
@@ -46,6 +48,15 @@ export default function ModalGudang({
 
     const handleSubmit = (e) => {
         e?.preventDefault();
+
+        // Proteksi UI tambahan: hanya Admin dapat membuat lokasi,
+        // sedangkan Admin/Supervisi dapat mengedit lokasi yang sudah ada.
+        if (isEditMode ? !canEdit : !canCreate) {
+            alert(isEditMode
+                ? 'Akses ditolak. Anda tidak diizinkan mengedit lokasi gudang.'
+                : 'Akses ditolak. Hanya Admin yang dapat menambahkan lokasi gudang.');
+            return;
+        }
 
         if (!formData.kode_gudang.trim() || !formData.nama_gudang.trim() || !formData.latitude || !formData.longitude) {
             alert('Harap isi Kode Gudang, Nama Gudang, serta Koordinat Latitude & Longitude.');

@@ -26,6 +26,7 @@ export default function ModalBarangMasukRow({
     gudangOptions,
     supplierOptions,
     projectOptions = [],
+    allowManualReturn = false,
     pplOptions,
     namaOptions,
     onRemoveRow,
@@ -47,7 +48,7 @@ export default function ModalBarangMasukRow({
         ? 'Wajib PN'
         : 'Standar';
 
-    const isProjectReturn = row.sub_jenis === 'PENGEMBALIAN' && row.return_source !== 'MANUAL';
+    const isProjectReturn = row.sub_jenis === 'PENGEMBALIAN' && (row.return_source !== 'MANUAL' || !allowManualReturn);
     const isProjectSnReturn = isProjectReturn && isWajibSn;
     const projectSerialOptions = targetBarang?.project_serials?.[String(row.kode_projek)] || [];
     const selectedProjectSerialConditions = [...new Set(projectSerialOptions
@@ -207,26 +208,30 @@ export default function ModalBarangMasukRow({
                                 Asal Barang *
                             </Label>
 
-                            <div className="-translate-y-2 flex items-center gap-1.5">
-                                {[
-                                    { value: 'PROJECT', label: 'Proyek' },
-                                    { value: 'MANUAL', label: 'Manual' }
-                                ].map(option => (
-                                    <button
-                                        key={option.value}
-                                        type="button"
-                                        onClick={() => onFieldChange(rowIdx, 'return_source', option.value)}
-                                        disabled={isProcessing || isEditMode}
-                                        className={`rounded-md border px-1 py-1 text-[8px] font-semibold transition-colors ${
-                                            ((row.return_source || 'PROJECT') === option.value)
-                                                ? 'border-blue-500 bg-blue-600 text-white'
-                                                : 'border-slate-200 bg-white text-slate-600 hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
-                                        }`}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
-                            </div>
+                            {allowManualReturn ? (
+                                <div className="-translate-y-2 flex items-center gap-1.5">
+                                    {[
+                                        { value: 'PROJECT', label: 'Proyek' },
+                                        { value: 'MANUAL', label: 'Manual' }
+                                    ].map(option => (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => onFieldChange(rowIdx, 'return_source', option.value)}
+                                            disabled={isProcessing || isEditMode}
+                                            className={`rounded-md border px-1 py-1 text-[8px] font-semibold transition-colors ${
+                                                ((row.return_source || 'PROJECT') === option.value)
+                                                    ? 'border-blue-500 bg-blue-600 text-white'
+                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                                            }`}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <span className="-translate-y-1 text-[9px] font-semibold text-blue-600 dark:text-blue-400">Pengembalian Proyek</span>
+                            )}
                         </div>
 
                         {isProjectReturn ? (

@@ -35,8 +35,9 @@ export default function TabTransaksi({
     filters = {}
 }) {
     const { auth, flash } = usePage().props;
-    const userRole = auth?.user?.role || 'view';
-    const canWrite = userRole === 'admin' || userRole === 'staff';
+    const userRole = auth?.user?.role || '';
+    const canCreate = ['admin', 'supervisi', 'pelaksana'].includes(userRole);
+    const canManage = ['admin', 'supervisi'].includes(userRole);
     const isAdmin = userRole === 'admin';
     const confirm = useConfirm();
 
@@ -253,6 +254,8 @@ export default function TabTransaksi({
     };
 
     const handleSelectAll = checked => {
+        if (!canManage) return;
+
         if (checked) {
             const allIds = dataList
                 .map(item => item.id)
@@ -265,6 +268,8 @@ export default function TabTransaksi({
     };
 
     const handleSelectRow = id => {
+        if (!canManage) return;
+
         setSelectedIds(prev =>
             prev.includes(id)
                 ? prev.filter(item => item !== id)
@@ -291,7 +296,7 @@ export default function TabTransaksi({
     };
 
     const handleDeleteSelected = () => {
-        if (!isAdmin || selectedIds.length === 0) return;
+        if (!canManage || selectedIds.length === 0) return;
 
         confirm({
             title: 'Hapus Transaksi',
@@ -314,7 +319,7 @@ export default function TabTransaksi({
     };
 
     const handleCancelSelected = () => {
-        if (!canWrite || selectedIds.length === 0 || !['MASUK', 'KELUAR', 'TRANSFER'].includes(mainTab)) {
+        if (!canManage || selectedIds.length === 0 || !['MASUK', 'KELUAR', 'TRANSFER'].includes(mainTab)) {
             return;
         }
 
@@ -410,6 +415,8 @@ export default function TabTransaksi({
     };
 
     const handleOpenEdit = item => {
+        if (!canManage || !item) return;
+
         if (item?.sub_jenis === 'PENGEMBALIAN_PROYEK' || (item?.sub_jenis === 'PENGEMBALIAN' && item?.kode_projek)) {
             setToast({ isOpen: true, type: 'info', title: 'Pengembalian Proyek', message: 'Transaksi pengembalian aset proyek tidak dapat diedit langsung. Batalkan transaksi lalu buat pengembalian baru dengan data yang benar.' });
             return;
@@ -450,10 +457,10 @@ export default function TabTransaksi({
             <Toolbar
                 sortOrder={sortOrder}
                 onToggleSort={toggleSort}
-                selectedCount={selectedIds.length}
-                onDeleteSelected={isAdmin ? handleDeleteSelected : undefined}
+                selectedCount={canManage ? selectedIds.length : 0}
+                onDeleteSelected={canManage ? handleDeleteSelected : undefined}
                 onCancelSelected={
-                    canWrite && (
+                    canManage && (
                         ['KELUAR', 'TRANSFER'].includes(mainTab) ||
                         (mainTab === 'MASUK' && dataList.some(item => selectedIds.includes(item.id) && item.sub_jenis === 'PENGEMBALIAN' && item.kode_projek))
                     ) ? handleCancelSelected : undefined
@@ -557,7 +564,7 @@ export default function TabTransaksi({
                         )}
                     </div>
 
-                    {canWrite && (
+                    {canCreate && (
                         <Button
                             type="button"
                             size="sm"
@@ -587,9 +594,9 @@ export default function TabTransaksi({
                 <CrudTable
                     dataList={dataList}
                     selectedIds={selectedIds}
-                    onSelectAll={handleSelectAll}
-                    onSelectRow={handleSelectRow}
-                    onEditRow={canWrite ? handleOpenEdit : undefined}
+                    onSelectAll={canManage ? handleSelectAll : undefined}
+                    onSelectRow={canManage ? handleSelectRow : undefined}
+                    onEditRow={canManage ? handleOpenEdit : undefined}
                     getRowNumber={getRowNumber}
                     zoomLevel={zoomLevel}
                     mainTab={mainTab}

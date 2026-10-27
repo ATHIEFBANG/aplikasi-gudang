@@ -334,7 +334,7 @@ export default function ModalBarangSelectorUI({
                                 key={batch.key}
                                 className={`group min-w-0 rounded-lg border p-3 transition-colors ${
                                     isChecked
-                                        ? 'border-rose-500/60 bg-rose-50/40 dark:bg-rose-950/15'
+                                        ? 'border-blue-500/60 bg-blue-50/40 dark:bg-blue-950/15'
                                         : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700'
                                 }`}
                             >
@@ -346,7 +346,7 @@ export default function ModalBarangSelectorUI({
                                 >
                                     <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
                                         isChecked
-                                            ? 'border-rose-600 bg-rose-600 text-white'
+                                            ? 'border-blue-600 bg-blue-600 text-white'
                                             : 'border-slate-300 bg-white text-transparent dark:border-slate-600 dark:bg-slate-950'
                                     }`}>
                                         <Check className="h-3 w-3 stroke-[3]" />
