@@ -30,6 +30,7 @@ import {
     ChevronDown,
     ChevronUp,
     Shield,
+    CircleHelp,
 } from 'lucide-react';
 
 const ConfirmContext = createContext();
@@ -43,6 +44,7 @@ const ROUTE_FALLBACKS = {
     'history-moving.index': '/history-moving',
     'laporan.index': '/laporan',
     'admin.users.index': '/admin/users',
+    'help.index': '/help',
     'profile.edit': '/profile',
     'logout': '/logout',
 };
@@ -164,6 +166,7 @@ export default function AuthenticatedLayout({ header, children }) {
             localStorage.setItem('theme', 'light');
         }
     }, [isDark]);
+
 
     const normalizedRole = String(user?.role || '').toLowerCase();
     const isAdmin = normalizedRole === 'admin';
@@ -290,6 +293,19 @@ export default function AuthenticatedLayout({ header, children }) {
                                 >
                                     {isDark ? <Sun className="w-5 h-5 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" /> : <Moon className="w-5 h-5 text-blue-600" />}
                                 </button>
+
+                                <Link
+                                    href={getRoute('help.index')}
+                                    className={`p-2.5 rounded-xl transition-all border ${
+                                        checkActive('help.index')
+                                            ? 'text-blue-700 dark:text-amber-400 bg-blue-50 dark:bg-amber-500/10 border-blue-200 dark:border-amber-500/20'
+                                            : 'text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-200/70 dark:hover:bg-slate-800/80 hover:text-blue-600 dark:hover:text-amber-400 hover:border-slate-300/50 dark:hover:border-white/10'
+                                    }`}
+                                    title="Pusat Bantuan"
+                                    aria-label="Buka Pusat Bantuan"
+                                >
+                                    <CircleHelp className="w-5 h-5" />
+                                </Link>
 
                                 {isAdmin && (
                                     <Link
@@ -514,6 +530,7 @@ export default function AuthenticatedLayout({ header, children }) {
                         </div>
                     )}
                 </header>
+
 
                 {/* KONTEN UTAMA */}
                 <main className="max-w-7xl mx-auto w-full p-4 sm:p-8 relative z-10 pt-6">

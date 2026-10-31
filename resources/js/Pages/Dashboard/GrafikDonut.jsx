@@ -342,7 +342,7 @@ export default function GrafikDonutDistribusi({
             </header>
 
             {/* Donut */}
-            <div className="relative mt-3 rounded-3xl bg-transparent px-2 pb-1 pt-2 shadow-none ring-0" onMouseLeave={() => setActive(null)}>
+            <div className={`relative mt-3 rounded-3xl px-2 pb-1 pt-2 shadow-md ${GLASS}`} onMouseLeave={() => setActive(null)}>
                 <div className="gd-in mx-auto h-[210px] w-full max-w-[320px]">
                     <Donut3D items={items} total={total} active={active} setActive={setActive} shownTotal={shownTotal} />
                 </div>

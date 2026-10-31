@@ -14,6 +14,7 @@ use App\Http\Controllers\TransaksiBarangKeluarController;
 use App\Http\Controllers\TransaksiTransferController;
 use App\Http\Middleware\RoleAccessMiddleware;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -23,6 +24,9 @@ Route::middleware(['auth'])->group(function () {
     // DASHBOARD
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/home', fn() => redirect()->route('dashboard'))->name('home');
+
+    // PUSAT BANTUAN
+    Route::get('/help', fn() => Inertia::render('Help/Index'))->name('help.index');
 
     // MASTER GUDANG / LOKASI
     // Hanya Admin yang boleh menambahkan lokasi gudang.
